@@ -1,0 +1,8 @@
+.DS_Store
+.vscode
+
+build/
+rtype_server
+rtype_client
+
+docs/doxygen/
