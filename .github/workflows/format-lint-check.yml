@@ -3,7 +3,7 @@ name: Format & Lint Check
 on:
   push:
     branches:
-      - "main"
+      - main
   pull_request:
     branches:
       - main
@@ -26,9 +26,12 @@ jobs:
           xargs -0 -r clang-format --dry-run --Werror --style=file
 
       - name: Configure CMake
-        run: cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-
-      - name: Run Linter
         run: |
-          find src/ tests/ -type f \( -name "*.cpp" -o -name "*.c" \) -print0 |
-          xargs -0 -r clang-tidy -p build --warnings-as-errors='*'
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        run: |
+          run-clang-tidy -p build -warnings-as-errors='*' 'src/.*\.(cpp|c)$'

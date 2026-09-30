@@ -10,20 +10,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 include(cmake/CPM.cmake)
 
-CPMAddPackage(
-    NAME googletest
-    GITHUB_REPOSITORY google/googletest
-    GIT_TAG v1.15.2
-    OPTIONS
-        "INSTALL_GTEST OFF"
-        "gtest_force_shared_crt ON"
-)
+include(CTest)
 
-set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+if(BUILD_TESTING)
+    CPMAddPackage(
+        NAME googletest
+        GITHUB_REPOSITORY google/googletest
+        GIT_TAG v1.15.2
+        OPTIONS
+            "INSTALL_GTEST OFF"
+            "gtest_force_shared_crt ON"
+    )
+
+    add_subdirectory(tests)
+endif()
+
+option(RTYPE_CLIENT "Build the Client" ON)
+option(RTYPE_SERVER "Build the Server" ON)
 
 enable_testing()
 
+add_subdirectory(ampersand-engine)
 add_subdirectory(src)
-add_subdirectory(tests)
