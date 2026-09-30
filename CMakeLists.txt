@@ -23,8 +23,6 @@ if(BUILD_TESTING)
             "INSTALL_GTEST OFF"
             "gtest_force_shared_crt ON"
     )
-
-    add_subdirectory(tests)
 endif()
 
 option(AMPERSAND_MODULE_CORE "Build the Core module" ON)
@@ -37,3 +35,7 @@ option(AMPERSAND_MODULE_RENDER "Build the Render module" ON)
 enable_testing()
 
 add_subdirectory(src)
+
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
