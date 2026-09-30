@@ -1,0 +1,56 @@
+name: Build Check
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - main
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CPM
+        uses: actions/cache@v4
+        with:
+          path: .cpm-cache
+          key: cpm-linux-${{ hashFiles('**/CMakeLists.txt', 'cmake/CPM.cmake') }}
+          restore-keys: cpm-linux-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential clang-tidy
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build --parallel
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CPM
+        uses: actions/cache@v4
+        with:
+          path: .cpm-cache
+          key: cpm-windows-${{ hashFiles('**/CMakeLists.txt', 'cmake/CPM.cmake') }}
+          restore-keys: cpm-windows-
+
+      - name: Configure CMake
+        run: cmake -B build
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel
