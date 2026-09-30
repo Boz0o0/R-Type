@@ -26,14 +26,14 @@ if(BUILD_TESTING)
             "INSTALL_GTEST OFF"
             "gtest_force_shared_crt ON"
     )
-
-    add_subdirectory(tests)
 endif()
 
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
-enable_testing()
-
 add_subdirectory(ampersand-engine)
 add_subdirectory(src)
+
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

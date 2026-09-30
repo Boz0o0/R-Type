@@ -18,6 +18,11 @@ endfunction()
 add_project_module(common)
 
 if(RTYPE_CLIENT)
+    if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS 
+        OR NOT AMPERSAND_MODULE_INPUT OR NOT AMPERSAND_MODULE_RENDER OR NOT AMPERSAND_MODULE_AUDIO)
+        message(FATAL_ERROR "Missing Ampersand Engine modules for the Client. Please enable the following modules: Core, Network, Physics, Input, Render, Audio.")
+    endif()
+
     add_project_module(client)
     
     target_link_libraries(client
@@ -42,6 +47,10 @@ if(RTYPE_CLIENT)
 endif()
 
 if(RTYPE_SERVER)
+    if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS)
+        message(FATAL_ERROR "Missing Ampersand Engine modules for the Server. Please enable the following modules: Core, Network, Physics.")
+    endif()
+
     add_project_module(server)
     
     target_link_libraries(server
