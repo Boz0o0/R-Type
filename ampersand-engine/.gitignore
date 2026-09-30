@@ -2,6 +2,6 @@
 .vscode
 
 build/
-ampersand-engine
+ampersand_engine
 
 docs/doxygen/
