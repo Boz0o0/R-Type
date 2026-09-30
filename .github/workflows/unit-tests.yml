@@ -1,4 +1,4 @@
-name: Build Check
+name: Unit Tests
 
 on:
   push:
@@ -12,7 +12,7 @@ env:
   CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
 
 jobs:
-  build-linux:
+  tests-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential clang-tidy
+          sudo apt-get install -y cmake build-essential
 
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
@@ -36,7 +36,10 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-  build-windows:
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  tests-windows:
     runs-on: windows-latest
 
     steps:
@@ -54,3 +57,6 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Debug --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build -C Debug --output-on-failure
