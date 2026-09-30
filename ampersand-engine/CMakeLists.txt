@@ -32,8 +32,6 @@ option(AMPERSAND_MODULE_NET "Build the Network module" ON)
 option(AMPERSAND_MODULE_PHYSICS "Build the Physics module" ON)
 option(AMPERSAND_MODULE_RENDER "Build the Render module" ON)
 
-enable_testing()
-
 add_subdirectory(src)
 
 if (BUILD_TESTING)
