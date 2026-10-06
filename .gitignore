@@ -5,4 +5,5 @@ build/
 rtype_server
 rtype_client
 
-docs/doxygen/
+docs/doxygen/.venv/
+site/
