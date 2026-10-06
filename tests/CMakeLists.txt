@@ -19,5 +19,11 @@ function(add_engine_tests MODULE)
 endfunction()
 
 add_engine_tests(common)
-add_engine_tests(client)
-add_engine_tests(server)
+
+if(RTYPE_CLIENT)
+    add_engine_tests(client)
+endif()
+
+if(RTYPE_SERVER)
+    add_engine_tests(server)
+endif()

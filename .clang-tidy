@@ -13,7 +13,3 @@ Checks: >
 WarningsAsErrors: "*"
 HeaderFilterRegex: "include/.*"
 FormatStyle: "file"
-
-ExtraArgs:
-  - "-isysroot"
-  - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
