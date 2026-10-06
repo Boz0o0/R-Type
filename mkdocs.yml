@@ -1,0 +1,31 @@
+site_name: R-Type
+site_url: https://boz0o0.github.io/R-Type/
+repo_url: https://github.com/Boz0o0/R-Type
+repo_name: Boz0o0/R-Type
+docs_dir: docs
+
+theme:
+  name: material
+  logo: assets/ampersand-logo-light.svg
+  favicon: assets/ampersand-logo.svg
+  palette:
+    - scheme: slate
+      toggle: { icon: material/brightness-4, name: Light mode }
+    - scheme: default
+      toggle: { icon: material/brightness-7, name: Dark mode }
+  features: [navigation.sections, navigation.indexes, navigation.instant, content.code.copy, search.highlight]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Ampersand Engine ↗: https://boz0o0.github.io/Ampersand-Engine/
