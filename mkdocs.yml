@@ -6,8 +6,6 @@ docs_dir: docs
 
 theme:
   name: material
-  logo: assets/ampersand-logo-light.svg
-  favicon: assets/ampersand-logo.svg
   palette:
     - scheme: slate
       toggle: { icon: material/brightness-4, name: Light mode }
