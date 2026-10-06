@@ -2,7 +2,6 @@
 .vscode
 
 build/
-rtype_server
-rtype_client
+ampersand_engine
 
 docs/doxygen/
