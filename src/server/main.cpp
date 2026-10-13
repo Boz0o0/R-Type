@@ -1,6 +1,7 @@
 #include <array>
 #include <asio.hpp>
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <string>
 
@@ -23,7 +24,10 @@ int32_t main(int32_t argc, char** argv) {
       socket.send_to(asio::buffer(std::string("ok")), client);
     }
   } catch (const std::exception& e) {
-    std::cerr << "[server] error: " << e.what() << '\n';
+    std::fprintf(stderr, "[server] error: %s\n", e.what());
+    return 84;
+  } catch (...) {
+    std::fprintf(stderr, "[server] unknown error\n");
     return 84;
   }
   return 0;

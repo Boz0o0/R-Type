@@ -1,6 +1,7 @@
 #include <array>
 #include <asio.hpp>
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <string>
 
@@ -26,7 +27,10 @@ int32_t main(int32_t argc, char** argv) {
     std::cout << "[client] received from " << sender << ": "
               << std::string(buffer.data(), len) << '\n';
   } catch (const std::exception& e) {
-    std::cerr << "[client] error: " << e.what() << '\n';
+    std::fprintf(stderr, "[client] error: %s\n", e.what());
+    return 84;
+  } catch (...) {
+    std::fprintf(stderr, "[client] unknown error\n");
     return 84;
   }
   return 0;

@@ -37,12 +37,13 @@ CPMAddPackage(
 
 if(asio_ADDED)
     find_package(Threads REQUIRED)
-    add_library(asio INTERFACE)
-    target_include_directories(asio SYSTEM INTERFACE ${asio_SOURCE_DIR}/asio/include)
-    target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
-    target_link_libraries(asio INTERFACE Threads::Threads)
+    add_library(asio STATIC ${asio_SOURCE_DIR}/asio/src/asio.cpp)
+    target_include_directories(asio SYSTEM PUBLIC ${asio_SOURCE_DIR}/asio/include)
+    target_compile_definitions(asio PUBLIC ASIO_STANDALONE ASIO_SEPARATE_COMPILATION)
+    target_link_libraries(asio PUBLIC Threads::Threads)
     if(WIN32)
-        target_link_libraries(asio INTERFACE ws2_32 wsock32)
+        target_compile_definitions(asio PUBLIC _WIN32_WINNT=0x0A00)
+        target_link_libraries(asio PUBLIC ws2_32 mswsock)
     endif()
 endif()
 
