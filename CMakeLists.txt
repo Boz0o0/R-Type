@@ -28,6 +28,24 @@ if(BUILD_TESTING)
     )
 endif()
 
+CPMAddPackage(
+    NAME asio
+    GITHUB_REPOSITORY chriskohlhoff/asio
+    GIT_TAG asio-1-30-2
+    DOWNLOAD_ONLY YES
+)
+
+if(asio_ADDED)
+    find_package(Threads REQUIRED)
+    add_library(asio INTERFACE)
+    target_include_directories(asio SYSTEM INTERFACE ${asio_SOURCE_DIR}/asio/include)
+    target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
+    target_link_libraries(asio INTERFACE Threads::Threads)
+    if(WIN32)
+        target_link_libraries(asio INTERFACE ws2_32 wsock32)
+    endif()
+endif()
+
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
