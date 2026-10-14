@@ -11,11 +11,17 @@ function(add_project_module MODULE)
     )
     target_compile_features(${MODULE}
         PUBLIC
-            cxx_std_17
+            cxx_std_20
     )
 endfunction()
 
 add_project_module(common)
+
+target_link_libraries(common
+    PUBLIC
+        ampersand_core
+        ampersand_physics
+)
 
 if(RTYPE_CLIENT)
     if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS 
