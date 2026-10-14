@@ -38,7 +38,9 @@ To build only one of them, turn the other off with `-DRTYPE_CLIENT=OFF` or `-DRT
 .
 ├── ampersand-engine/   # Ampersand Engine, included as a git subtree
 ├── cmake/              # CMake helpers (CPM)
-├── docs/               # MkDocs documentation
+├── docs/
+│   ├── doxygen/        # Doxygen output (generated, not committed)
+│   └── mkdocs/         # MkDocs documentation
 ├── src/
 │   ├── client/         # Game client
 │   ├── common/         # Code shared by the client and the server
