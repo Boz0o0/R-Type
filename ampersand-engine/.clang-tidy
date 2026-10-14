@@ -7,13 +7,14 @@ Checks: >
   performance-*,
   readability-*,
   -modernize-use-trailing-return-type,
+  -bugprone-easily-swappable-parameters,
   -readability-braces-around-statements,
   -readability-magic-numbers
 
 WarningsAsErrors: "*"
-HeaderFilterRegex: "include/.*"
+HeaderFilterRegex: "include/ampersand/.*"
 FormatStyle: "file"
 
-ExtraArgs:
+ExtraArgsBefore:
   - "-isysroot"
   - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"

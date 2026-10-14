@@ -8,12 +8,13 @@ function(add_engine_module MODULE)
 
     target_include_directories(ampersand_${MODULE}
         PUBLIC
+            "${PROJECT_SOURCE_DIR}/include"
             "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 
     target_compile_features(ampersand_${MODULE}
         PUBLIC
-            cxx_std_17
+            cxx_std_20
     )
 endfunction()
 
@@ -34,6 +35,7 @@ if(AMPERSAND_MODULE_AUDIO)
     target_link_libraries(ampersand_audio
         PUBLIC
             ampersand_core
+            SFML::Audio
     )
 endif()
 
@@ -52,6 +54,7 @@ if(AMPERSAND_MODULE_NET)
     target_link_libraries(ampersand_net
         PUBLIC
             ampersand_core
+            asio
     )
 endif()
 
@@ -65,10 +68,18 @@ if(AMPERSAND_MODULE_PHYSICS)
 endif()
 
 if(AMPERSAND_MODULE_RENDER)
+    if(NOT AMPERSAND_MODULE_INPUT)
+        message(FATAL_ERROR "AMPERSAND_MODULE_INPUT must be enabled when the render module is enabled")
+    endif()
+
     add_engine_module(render)
 
     target_link_libraries(ampersand_render
         PUBLIC
             ampersand_core
+            ampersand_input
+            SFML::Graphics
+            SFML::Window
+            SFML::System
     )
 endif()
