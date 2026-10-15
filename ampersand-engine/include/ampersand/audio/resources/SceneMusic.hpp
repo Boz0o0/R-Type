@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ampersand/audio/Music.hpp>
+#include <ampersand/audio/MusicId.hpp>
 
 namespace ampersand::audio {
 
