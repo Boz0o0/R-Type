@@ -1,7 +1,7 @@
 #pragma once
 
-#include <ampersand/audio/Music.hpp>
-#include <ampersand/audio/Sound.hpp>
+#include <ampersand/audio/MusicId.hpp>
+#include <ampersand/audio/SoundId.hpp>
 #include <variant>
 
 namespace ampersand::audio {
