@@ -1,8 +1,8 @@
 #pragma once
 
-#include <ampersand/audio/Music.hpp>
-#include <ampersand/audio/Sound.hpp>
-#include <ampersand/audio/Voice.hpp>
+#include <ampersand/audio/MusicId.hpp>
+#include <ampersand/audio/SoundId.hpp>
+#include <ampersand/audio/VoiceId.hpp>
 #include <ampersand/core/math/Vec3.hpp>
 #include <filesystem>
 
