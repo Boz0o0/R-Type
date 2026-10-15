@@ -4,7 +4,7 @@ The engine is split into modules, each built as its own static library.
 For why we split it this way, see [Design decisions](../decisions.md#separation-of-modules).
 
 The render module depends on input because its window event stream includes
-keyboard events defined by the input module.
+keyboard and mouse events defined by the input module.
 For the renderer API and usage, see [Render](rendering.md).
 
 | Module   | CMake target        | Option                     | Sources        | Tests            |
