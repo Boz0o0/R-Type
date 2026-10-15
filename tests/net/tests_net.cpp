@@ -119,13 +119,14 @@ TEST(UdpSocket, MovedFromSocketThrows) {
     std::array<std::byte, 8> buffer{};
     Endpoint sender;
 
-    // NOLINTBEGIN(bugprone-use-after-move): checking the moved-from state
+    // NOLINTBEGIN(bugprone-use-after-move,clang-analyzer-cplusplus.Move):
+    // checking the moved-from state
     EXPECT_THROW((void)first.localPort(), NetError);
     EXPECT_THROW(first.send("hello", {.address = "127.0.0.1",
                                       .port = second.localPort()}),
                  NetError);
     EXPECT_THROW((void)first.receive(buffer, sender), NetError);
-    // NOLINTEND(bugprone-use-after-move)
+    // NOLINTEND(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
 }
 
 TEST(UdpSocket, MoveAssignmentKeepsTheSocket) {
