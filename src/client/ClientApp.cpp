@@ -34,6 +34,14 @@ std::optional<input::Event> pollWindow(core::ecs::World& world) {
     } else if (const auto* released =
                    std::get_if<input::KeyReleased>(&*event)) {
       return *released;
+    } else if (const auto* clicked =
+                   std::get_if<input::MousePressed>(&*event)) {
+      return *clicked;
+    } else if (const auto* unclicked =
+                   std::get_if<input::MouseReleased>(&*event)) {
+      return *unclicked;
+    } else if (const auto* moved = std::get_if<input::MouseMoved>(&*event)) {
+      return *moved;
     } else if (std::holds_alternative<input::FocusLost>(*event)) {
       return input::FocusLost{};
     }
