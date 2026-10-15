@@ -11,5 +11,5 @@ Checks: >
   -readability-magic-numbers
 
 WarningsAsErrors: "*"
-HeaderFilterRegex: "include/.*"
+HeaderFilterRegex: "/src/(client|common|server)/"
 FormatStyle: "file"
