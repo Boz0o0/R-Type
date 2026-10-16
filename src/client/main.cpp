@@ -1,31 +1,46 @@
+#include <ampersand/net/UdpSocket.hpp>
 #include <array>
-#include <asio.hpp>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <thread>
+
+using ampersand::net::Endpoint;
+using ampersand::net::UdpSocket;
 
 int32_t main(int32_t argc, char** argv) {
   try {
     const std::string host = argc > 1 ? argv[1] : "127.0.0.1";
-    const std::string port = argc > 2 ? argv[2] : "4242";
+    const uint16_t port =
+        argc > 2 ? static_cast<uint16_t>(std::stoi(argv[2])) : 4242;
 
-    asio::io_context ioContext;
-    asio::ip::udp::resolver resolver(ioContext);
-    const asio::ip::udp::endpoint server =
-        *resolver.resolve(asio::ip::udp::v4(), host, port).begin();
+    const Endpoint server = UdpSocket::resolve(host, port);
+    UdpSocket socket;
 
-    asio::ip::udp::socket socket(ioContext);
-    socket.open(asio::ip::udp::v4());
+    socket.send("hello", server);
+    std::cout << "[client] sent to " << server.toString() << ": hello\n";
 
-    socket.send_to(asio::buffer(std::string("hello")), server);
-    std::cout << "[client] sent to " << server << ": hello\n";
-
-    std::array<char, 1024> buffer{};
-    asio::ip::udp::endpoint sender;
-    const std::size_t len = socket.receive_from(asio::buffer(buffer), sender);
-    std::cout << "[client] received from " << sender << ": "
-              << std::string(buffer.data(), len) << '\n';
+    // receive() never blocks, so poll until the reply arrives or we give up.
+    std::array<std::byte, 1024> buffer{};
+    Endpoint sender;
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (const auto length = socket.receive(buffer, sender)) {
+        std::cout << "[client] received from " << sender.toString() << ": "
+                  << std::string(reinterpret_cast<const char*>(buffer.data()),
+                                 *length)
+                  << '\n';
+        return 0;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    std::fprintf(stderr, "[client] error: no reply from %s\n",
+                 server.toString().c_str());
+    return 84;
   } catch (const std::exception& e) {
     std::fprintf(stderr, "[client] error: %s\n", e.what());
     return 84;
@@ -33,5 +48,4 @@ int32_t main(int32_t argc, char** argv) {
     std::fprintf(stderr, "[client] unknown error\n");
     return 84;
   }
-  return 0;
 }
