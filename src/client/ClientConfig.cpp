@@ -11,8 +11,8 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
     return std::nullopt;
   }
   if (args.size() > 1) {
-    config.host = args[1];
-    if (config.host.empty()) {
+    config._host = args[1];
+    if (config._host.empty()) {
       return std::nullopt;
     }
   }
@@ -21,10 +21,13 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
     if (!port) {
       return std::nullopt;
     }
-    config.port = *port;
+    config._port = *port;
   }
   return config;
 }
+
+const std::string& ClientConfig::host() const { return this->_host; }
+std::uint16_t ClientConfig::port() const { return this->_port; }
 
 std::optional<std::uint16_t> ClientConfig::parsePort(const std::string& text) {
   std::uint16_t port = 0;

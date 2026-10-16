@@ -1,33 +1,40 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
 #include <string>
+#include <utility>
 #include <vector>
 
 using rtype::client::ClientConfig;
+using HostAndPort = std::pair<std::string, std::uint16_t>;
 
-static std::optional<ClientConfig> parse(std::vector<std::string> words) {
+static std::optional<HostAndPort> parse(std::vector<std::string> words) {
   std::vector<char*> args;
   args.reserve(words.size());
   for (std::string& word : words) {
     args.push_back(word.data());
   }
-  return ClientConfig::fromArguments(args);
+  const auto config = ClientConfig::fromArguments(args);
+  if (!config) {
+    return std::nullopt;
+  }
+  return HostAndPort{config->host(), config->port()};
 }
 
 TEST(ClientConfig, UsesDefaultsWithoutArguments) {
-  EXPECT_EQ(parse({"r-type_client"}), ClientConfig{});
+  EXPECT_EQ(parse({"r-type_client"}), HostAndPort("127.0.0.1", 4242));
 }
 
 TEST(ClientConfig, ReadsHostOnly) {
-  const ClientConfig expected{.host = "10.0.0.2", .port = 4242};
-  EXPECT_EQ(parse({"r-type_client", "10.0.0.2"}), expected);
+  EXPECT_EQ(parse({"r-type_client", "10.0.0.2"}),
+            HostAndPort("10.0.0.2", 4242));
 }
 
 TEST(ClientConfig, ReadsHostAndPort) {
-  const ClientConfig expected{.host = "10.0.0.2", .port = 5000};
-  EXPECT_EQ(parse({"r-type_client", "10.0.0.2", "5000"}), expected);
+  EXPECT_EQ(parse({"r-type_client", "10.0.0.2", "5000"}),
+            HostAndPort("10.0.0.2", 5000));
 }
 
 TEST(ClientConfig, RejectsInvalidPorts) {
