@@ -53,7 +53,6 @@ if(RTYPE_CLIENT)
             ampersand_input
             ampersand_render
             ampersand_audio
-            asio
     )
 endif()
 
@@ -79,6 +78,5 @@ if(RTYPE_SERVER)
             ampersand_core
             ampersand_net
             ampersand_physics
-            asio
     )
 endif()
