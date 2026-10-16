@@ -11,5 +11,5 @@ Checks: >
   -readability-magic-numbers
 
 WarningsAsErrors: "*"
-HeaderFilterRegex: "include/.*"
+HeaderFilterRegex: "include/rtype/.*"
 FormatStyle: "file"

@@ -33,6 +33,10 @@ if(RTYPE_CLIENT)
     add_project_module(client)
     
     target_link_libraries(client
+        PUBLIC
+            ampersand_core
+            ampersand_input
+            ampersand_render
         PRIVATE
             common
     )

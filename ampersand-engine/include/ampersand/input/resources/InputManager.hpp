@@ -10,7 +10,7 @@ namespace ampersand::input {
 
 /** @brief Any input event. */
 using Event = std::variant<KeyPressed, KeyReleased, MousePressed, MouseReleased,
-                           MouseMoved>;
+                           MouseMoved, FocusLost>;
 
 /**
  * @brief Input of the current frame: the events that happened, the keys and

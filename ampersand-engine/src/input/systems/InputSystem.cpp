@@ -47,4 +47,16 @@ void InputSystem::apply(InputManager& manager, const MouseMoved& moved) {
     manager.events.emplace_back(moved);
 }
 
+void InputSystem::apply(InputManager& manager, const FocusLost& /*lost*/) {
+    for (const Key key : manager.keysDown) {
+        manager.events.emplace_back(KeyReleased{key});
+    }
+    for (const Button button : manager.buttonsDown) {
+        manager.events.emplace_back(
+            MouseReleased{.button{button}, .position{manager.mouse}});
+    }
+    manager.keysDown.clear();
+    manager.buttonsDown.clear();
+}
+
 }  // namespace ampersand::input

@@ -64,6 +64,9 @@ private:
     /** @brief Moves the mouse and adds the event. */
     static void apply(InputManager& manager, const MouseMoved& moved);
 
+    /** @brief Releases each held key and button, adding their events. */
+    static void apply(InputManager& manager, const FocusLost& lost);
+
     Poll _poll;
 };
 

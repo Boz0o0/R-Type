@@ -23,6 +23,7 @@ struct Resized {
  */
 using Event =
     std::variant<Closed, Resized, input::KeyPressed, input::KeyReleased,
-                 input::MousePressed, input::MouseReleased, input::MouseMoved>;
+                 input::MousePressed, input::MouseReleased, input::MouseMoved,
+                 input::FocusLost>;
 
 }  // namespace ampersand::render

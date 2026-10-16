@@ -167,6 +167,15 @@ window does not have the same ratio as `size`, the image is stretched.
 
 `IRenderer` (`window.renderer`) can also draw without the ECS: `beginFrame`,
 then `draw` (with a `Sprite`, a `Text` or a `Rectangle`, `Circle` or `Line`),
-then `endFrame`. The
-`RenderSystem` already does `beginFrame` and `endFrame`, so use one or the
-other, not both in the same frame.
+then `endFrame`. The `RenderSystem` already does `beginFrame` and `endFrame`,
+so use one or the other, not both in the same frame.
+
+## Limits
+
+| Rule       | Value                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| Dimensions | 2D only: `z` is the draw order, not a depth                                              |
+| Components | `Sprite` and `Text` only: shapes (`Rectangle`, `Circle`, `Line`) are drawn by hand       |
+| Camera     | one for the whole window, stretched if the window does not have the ratio of its `size`  |
+| Assets     | a failed load returns `0`, and an entity with an unknown id is not drawn                 |
+| Window     | one per `Renderer`; only `isOpen` acts on it, `size` and `title` are read-only           |

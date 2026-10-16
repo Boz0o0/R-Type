@@ -8,8 +8,8 @@ namespace ampersand::input {
 /**
  * @brief Enumeration of supported keyboard keys.
  *
- * Letters follow the layout of the keyboard: on AZERTY, the key at the place
- * of the QWERTY W is Z.
+ * A key is a physical position on the keyboard, named after the QWERTY
+ * layout: on AZERTY, the key labelled Z is Key::W.
  */
 enum class Key : std::uint8_t {
     A,
@@ -110,5 +110,11 @@ struct MouseMoved {
     /** @brief Position of the mouse in the window, in pixels. */
     core::math::Vec2i position;
 };
+
+/**
+ * @brief Event triggered when the window loses the focus: its keys and mouse
+ * buttons are no longer reported until it gets it back.
+ */
+struct FocusLost {};
 
 }  // namespace ampersand::input
