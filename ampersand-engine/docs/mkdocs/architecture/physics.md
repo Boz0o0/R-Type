@@ -118,3 +118,12 @@ origin, `bounds` is just an offset and a size from `position`.
 `worldBounds(transform, collider)` gives the hitbox in the world. The rotation is
 ignored: hitboxes are rectangles that never turn. Two hitboxes that only touch by
 an edge do not collide.
+
+## Limits
+
+| Rule       | Value                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| Hitboxes   | one rectangle per entity, the rotation is ignored                                        |
+| Layers     | only entities on the same `z` collide; the game filters the other pairs by components    |
+| Edges      | two hitboxes that only touch by an edge do not collide                                   |
+| Cost       | every pair of hitboxes is tested each frame            |

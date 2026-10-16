@@ -54,7 +54,7 @@ The game adds its own components, resources and systems in the same way. The
 ones given by the engine are described in their module, for example
 [Physics](physics.md).
 
-## Overview
+## Storage
 
 ```mermaid
 graph TD
@@ -271,9 +271,10 @@ the World, so types that cannot be copied or moved (window, socket) work.
 
 !!! note "Interfaces"
     Resources are found by their **exact type**: after
-    `addResource<SfmlRenderer>(...)`, `getResource<IRenderer>()` does not find it.
-    To share an object through an interface, add it as that type, for example
-    `world.addResource<IRenderer*>(&renderer)`.
+    `addResource<SfmlAudioEngine>(...)`, `getResource<IAudioEngine>()` throws
+    `ResourceNotFound`. To share an object through its interface, put a
+    reference to the interface in a resource (see`AudioListener` ([Audio](audio.md)) and
+    `Renderer` ([Render](render.md#window))).
 
 ## Entities as keys
 
@@ -315,4 +316,3 @@ log them and keep running.
 | Memory            | rows and versions are reserved at construction (about 2.6 MB for 10 000 entities)           |
 | Threads           | a World is used by **one thread**. Several worlds can run in different threads.            |
 | Library           | component and resource numbers are global to the program, so the engine must be a **static** library |
-| Events            | none: modules check the pools themselves (for example `owners<Networked>()`)                |
