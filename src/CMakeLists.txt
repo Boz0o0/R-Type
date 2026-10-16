@@ -7,6 +7,7 @@ function(add_project_module MODULE)
     add_library(${MODULE} STATIC ${SOURCES})
     target_include_directories(${MODULE}
         PUBLIC
+            "${PROJECT_SOURCE_DIR}/include"
             "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     target_compile_features(${MODULE}

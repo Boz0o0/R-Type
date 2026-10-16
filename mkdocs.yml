@@ -29,6 +29,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Network Protocol:
+      - Protocol: protocol/specification.md
+      - Code: protocol/implementation.md
   - Ampersand Engine:
       - Documentation ↗: https://boz0o0.github.io/Ampersand-Engine/
       - Source code ↗: https://github.com/Boz0o0/Ampersand-Engine
