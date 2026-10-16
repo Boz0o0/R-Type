@@ -5,21 +5,8 @@
 
 namespace rtype::client {
 
-namespace {
-
-std::optional<std::uint16_t> parsePort(const std::string& text) {
-  std::uint16_t port = 0;
-  const char* const end = text.data() + text.size();
-  const auto [last, error] = std::from_chars(text.data(), end, port);
-  if (error != std::errc{} || last != end || port == 0) {
-    return std::nullopt;
-  }
-  return port;
-}
-
-}  // namespace
-
-std::optional<ClientConfig> parseArguments(std::span<char* const> args) {
+std::optional<ClientConfig> ClientConfig::fromArguments(
+    std::span<char* const> args) {
   ClientConfig config;
   if (args.size() > 3) {
     return std::nullopt;
@@ -38,6 +25,16 @@ std::optional<ClientConfig> parseArguments(std::span<char* const> args) {
     config.port = *port;
   }
   return config;
+}
+
+std::optional<std::uint16_t> ClientConfig::parsePort(const std::string& text) {
+  std::uint16_t port = 0;
+  const char* const end = text.data() + text.size();
+  const auto [last, error] = std::from_chars(text.data(), end, port);
+  if (error != std::errc{} || last != end || port == 0) {
+    return std::nullopt;
+  }
+  return port;
 }
 
 }  // namespace rtype::client

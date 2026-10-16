@@ -7,20 +7,15 @@
 #include "client/ClientConfig.hpp"
 
 using rtype::client::ClientConfig;
-using rtype::client::parseArguments;
 
-namespace {
-
-std::optional<ClientConfig> parse(std::vector<std::string> words) {
+static std::optional<ClientConfig> parse(std::vector<std::string> words) {
   std::vector<char*> args;
   args.reserve(words.size());
   for (std::string& word : words) {
     args.push_back(word.data());
   }
-  return parseArguments(args);
+  return ClientConfig::fromArguments(args);
 }
-
-}  // namespace
 
 TEST(ClientConfig, UsesDefaultsWithoutArguments) {
   EXPECT_EQ(parse({"r-type_client"}), ClientConfig{});
