@@ -1,6 +1,5 @@
-#include "client/ClientConfig.hpp"
-
 #include <charconv>
+#include <rtype/client/ClientConfig.hpp>
 #include <system_error>
 
 namespace rtype::client {

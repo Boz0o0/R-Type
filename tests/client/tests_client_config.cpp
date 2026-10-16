@@ -1,10 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <optional>
+#include <rtype/client/ClientConfig.hpp>
 #include <string>
 #include <vector>
-
-#include "client/ClientConfig.hpp"
 
 using rtype::client::ClientConfig;
 

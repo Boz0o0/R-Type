@@ -2,10 +2,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <rtype/client/ClientApp.hpp>
+#include <rtype/client/ClientConfig.hpp>
 #include <span>
-
-#include "client/ClientApp.hpp"
-#include "client/ClientConfig.hpp"
 
 int32_t main(int32_t argc, char** argv) {
   using rtype::client::ClientApp;

@@ -9,8 +9,7 @@
 #include <ampersand/render/systems/RenderSystem.hpp>
 #include <cstdint>
 #include <optional>
-
-#include "client/ClientConfig.hpp"
+#include <rtype/client/ClientConfig.hpp>
 
 namespace rtype::client {
 

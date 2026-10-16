@@ -1,10 +1,9 @@
-#include "client/ClientApp.hpp"
-
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/render/resources/Camera.hpp>
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
+#include <rtype/client/ClientApp.hpp>
 #include <stdexcept>
 #include <utility>
 #include <variant>
