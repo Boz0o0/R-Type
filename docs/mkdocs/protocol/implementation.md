@@ -6,8 +6,9 @@ How the [protocol](specification.md) is done in the code.
 
 The engine's `net` module only sends and receives raw bytes
 (`ampersand::net::UdpSocket`). It doesn't know anything about R-Type. The
-R-Type packets are in `src/common/protocol/`, so both the client and the
-server can use them.
+R-Type packets are in the `common` module, so both the client and the server
+can use them. Like in the engine, headers and sources are kept apart:
+headers in `include/rtype/common/protocol/`, sources in `src/common/protocol/`.
 
 ```mermaid
 flowchart LR
@@ -19,11 +20,11 @@ flowchart LR
 
 | File | What's inside |
 | --- | --- |
-| `Protocol.hpp` | constants (port, sizes, timeouts...), packet types, enums, `isReliable()` |
+| `Protocol.hpp/.cpp` | constants (port, sizes, timeouts...), packet types, enums, `isReliable()` |
 | `PacketHeader.hpp` | the 12-byte header |
 | `Packets.hpp` | one struct per packet (`ConnectRequest`, `EntitySpawn`, ...) |
-| `BinaryWriter.hpp` | writes numbers/strings in big-endian into a buffer |
-| `BinaryReader.hpp` | reads them back, checks we never go past the end |
+| `BinaryWriter.hpp/.cpp` | writes numbers/strings in big-endian into a buffer |
+| `BinaryReader.hpp/.cpp` | reads them back, checks we never go past the end |
 | `PacketCodec.hpp/.cpp` | `encode()` and `decode()` |
 | `tests/common/tests_protocol.cpp` | unit tests |
 
@@ -47,7 +48,7 @@ Send a packet:
 
 ```cpp
 #include <ampersand/net/UdpSocket.hpp>
-#include "common/protocol/PacketCodec.hpp"
+#include <rtype/common/protocol/PacketCodec.hpp>
 
 namespace proto = rtype::protocol;
 

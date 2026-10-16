@@ -8,7 +8,7 @@ Quick facts:
 - Transport: **UDP** only (IPv4)
 - Default port: **4242**
 - Binary protocol, current version: **1**
-- Code: `src/common/protocol/` (see [Implementation](implementation.md))
+- Code: `include/rtype/common/protocol/` and `src/common/protocol/` (see [Implementation](implementation.md))
 
 The server runs the game. The client only sends the player's inputs and draws
 what the server tells it. If the client and the server disagree, the server
