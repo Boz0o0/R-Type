@@ -4,9 +4,9 @@
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/render/Color.hpp>
 #include <ampersand/render/Event.hpp>
-#include <ampersand/render/Font.hpp>
+#include <ampersand/render/FontId.hpp>
 #include <ampersand/render/Primitive.hpp>
-#include <ampersand/render/Texture.hpp>
+#include <ampersand/render/TextureId.hpp>
 #include <ampersand/render/WindowConfig.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <ampersand/render/components/Text.hpp>

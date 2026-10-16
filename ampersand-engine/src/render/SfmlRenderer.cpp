@@ -31,19 +31,14 @@ core::math::Vec2u SfmlRenderer::size() const {
 
 std::optional<Event> SfmlRenderer::pollEvent() {
     while (const auto event = this->window_.pollEvent()) {
-        if (event->is<sf::Event::Closed>()) return Closed{};
-        if (const auto* const resized = event->getIf<sf::Event::Resized>()) {
+        if (event->is<sf::Event::Resized>()) {
             this->updateDefaultView();
             if (!this->customView_) this->window_.setView(this->defaultView_);
-            return Resized{{resized->size.x, resized->size.y}};
         }
-        if (const auto* const keyPressed =
-                event->getIf<sf::Event::KeyPressed>()) {
-            return ampersand::input::KeyPressed{toKey(keyPressed->code)};
-        }
-        if (const auto* const keyReleased =
-                event->getIf<sf::Event::KeyReleased>()) {
-            return ampersand::input::KeyReleased{toKey(keyReleased->code)};
+        const auto converted = event->visit(
+            [](const auto& sfmlEvent) { return toEvent(sfmlEvent); });
+        if (converted) {
+            return converted;
         }
     }
     return std::nullopt;
@@ -94,87 +89,99 @@ void SfmlRenderer::beginFrame(Color clear) {
 void SfmlRenderer::draw(const Sprite& sprite,
                         const core::Transform& transform) {
     this->drawCommands_.push_back({
-        layerFor(transform),
-        [this, sprite, transform] {
-            const auto texture = this->textures_.find(sprite.texture);
-            if (texture == this->textures_.end()) return;
+        .layer = layerFor(transform),
+        .draw =
+            [this, sprite, transform] {
+                const auto texture = this->textures_.find(sprite.texture);
+                if (texture == this->textures_.end()) return;
 
-            sf::Sprite renderedSprite(texture->second);
-            if (sprite.source.width > 0 && sprite.source.height > 0) {
-                renderedSprite.setTextureRect(
-                    sf::IntRect({sprite.source.x, sprite.source.y},
-                                {sprite.source.width, sprite.source.height}));
-            }
-            renderedSprite.setColor(toSfColor(sprite.color));
-            applyTransform(renderedSprite, transform);
-            this->window_.draw(renderedSprite);
-        },
+                sf::Sprite renderedSprite(texture->second);
+                if (sprite.source.width > 0 && sprite.source.height > 0) {
+                    renderedSprite.setTextureRect(sf::IntRect(
+                        {sprite.source.x, sprite.source.y},
+                        {sprite.source.width, sprite.source.height}));
+                }
+                renderedSprite.setColor(toSfColor(sprite.color));
+                applyTransform(renderedSprite, transform);
+                this->window_.draw(renderedSprite);
+            },
     });
 }
 
 void SfmlRenderer::draw(const Rectangle& rectangle,
                         const core::Transform& transform) {
     this->drawCommands_.push_back({
-        layerFor(transform),
-        [this, rectangle, transform] {
-            sf::RectangleShape shape({rectangle.size.x, rectangle.size.y});
-            shape.setFillColor(toSfColor(rectangle.fill));
-            shape.setOutlineColor(toSfColor(rectangle.outline));
-            shape.setOutlineThickness(rectangle.outlineThickness);
-            applyTransform(shape, transform);
-            this->window_.draw(shape);
-        },
+        .layer = layerFor(transform),
+        .draw =
+            [this, rectangle, transform] {
+                sf::RectangleShape shape({rectangle.size.x, rectangle.size.y});
+                shape.setFillColor(toSfColor(rectangle.fill));
+                shape.setOutlineColor(toSfColor(rectangle.outline));
+                shape.setOutlineThickness(rectangle.outlineThickness);
+                applyTransform(shape, transform);
+                this->window_.draw(shape);
+            },
     });
 }
 
 void SfmlRenderer::draw(const Circle& circle,
                         const core::Transform& transform) {
     this->drawCommands_.push_back({
-        layerFor(transform),
-        [this, circle, transform] {
-            sf::CircleShape shape(circle.radius);
-            shape.setFillColor(toSfColor(circle.fill));
-            shape.setOutlineColor(toSfColor(circle.outline));
-            shape.setOutlineThickness(circle.outlineThickness);
-            applyTransform(shape, transform);
-            this->window_.draw(shape);
-        },
+        .layer = layerFor(transform),
+        .draw =
+            [this, circle, transform] {
+                sf::CircleShape shape(circle.radius);
+                shape.setFillColor(toSfColor(circle.fill));
+                shape.setOutlineColor(toSfColor(circle.outline));
+                shape.setOutlineThickness(circle.outlineThickness);
+                applyTransform(shape, transform);
+                this->window_.draw(shape);
+            },
     });
 }
 
 void SfmlRenderer::draw(const Line& line, const core::Transform& transform) {
     this->drawCommands_.push_back({
-        layerFor(transform),
-        [this, line, transform] {
-            sf::Transformable transformable;
-            applyTransform(transformable, transform);
-            const sf::Color color = toSfColor(line.color);
-            const std::array<sf::Vertex, 2> vertices{
-                {
-                    {.position = {line.start.x, line.start.y}, .color = color},
-                    {.position = {line.end.x, line.end.y}, .color = color},
-                },
-            };
-            this->window_.draw(vertices.data(), vertices.size(),
-                               sf::PrimitiveType::Lines,
-                               sf::RenderStates(transformable.getTransform()));
-        },
+        .layer = layerFor(transform),
+        .draw =
+            [this, line, transform] {
+                sf::Transformable transformable;
+                applyTransform(transformable, transform);
+                const sf::Color color = toSfColor(line.color);
+                const std::array<sf::Vertex, 2> vertices{
+                    {
+                        {
+                            .position = {line.start.x, line.start.y},
+                            .color = color,
+                        },
+                        {
+                            .position = {line.end.x, line.end.y},
+                            .color = color,
+                        },
+                    },
+                };
+                this->window_.draw(
+                    vertices.data(), vertices.size(), sf::PrimitiveType::Lines,
+                    sf::RenderStates(transformable.getTransform()));
+            },
     });
 }
 
 void SfmlRenderer::draw(const Text& text, const core::Transform& transform) {
     const auto ownedText = std::make_shared<const Text>(text);
     this->drawCommands_.push_back({
-        layerFor(transform),
-        [this, ownedText, transform] {
-            const auto font = this->fonts_.find(ownedText->font);
-            if (font == this->fonts_.end()) return;
+        .layer = layerFor(transform),
+        .draw =
+            [this, ownedText, transform] {
+                const auto font = this->fonts_.find(ownedText->font);
+                if (font == this->fonts_.end()) return;
 
-            sf::Text drawable(font->second, ownedText->value, ownedText->size);
-            drawable.setFillColor(toSfColor(ownedText->color));
-            applyTransform(drawable, transform);
-            this->window_.draw(drawable);
-        },
+                sf::Text drawable(font->second, ownedText->value,
+                                  ownedText->size);
+                drawable.setFillColor(toSfColor(ownedText->color));
+                applyTransform(drawable, transform);
+                this->window_.draw(drawable);
+            },
     });
 }
 

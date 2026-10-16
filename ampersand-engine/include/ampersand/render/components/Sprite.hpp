@@ -2,7 +2,7 @@
 
 #include <ampersand/core/math/Rect.hpp>
 #include <ampersand/render/Color.hpp>
-#include <ampersand/render/Texture.hpp>
+#include <ampersand/render/TextureId.hpp>
 #include <cstdint>
 
 namespace ampersand::render {
