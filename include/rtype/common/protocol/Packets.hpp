@@ -2,10 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <rtype/common/protocol/Protocol.hpp>
 #include <string>
 #include <vector>
-
-#include "common/protocol/Protocol.hpp"
 
 /**
  * @file Packets.hpp

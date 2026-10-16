@@ -1,19 +1,17 @@
-#include "common/protocol/PacketCodec.hpp"
-
 #include <cstddef>
 #include <cstdint>
+#include <rtype/common/protocol/BinaryReader.hpp>
+#include <rtype/common/protocol/BinaryWriter.hpp>
+#include <rtype/common/protocol/PacketCodec.hpp>
+#include <rtype/common/protocol/PacketHeader.hpp>
+#include <rtype/common/protocol/Packets.hpp>
+#include <rtype/common/protocol/Protocol.hpp>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include "common/protocol/BinaryReader.hpp"
-#include "common/protocol/BinaryWriter.hpp"
-#include "common/protocol/PacketHeader.hpp"
-#include "common/protocol/Packets.hpp"
-#include "common/protocol/Protocol.hpp"
 
 namespace rtype::protocol {
 

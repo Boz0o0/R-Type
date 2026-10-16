@@ -2,13 +2,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <rtype/common/protocol/PacketHeader.hpp>
+#include <rtype/common/protocol/Packets.hpp>
 #include <span>
 #include <string_view>
 #include <variant>
 #include <vector>
-
-#include "common/protocol/PacketHeader.hpp"
-#include "common/protocol/Packets.hpp"
 
 namespace rtype::protocol {
 

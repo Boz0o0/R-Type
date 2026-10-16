@@ -5,11 +5,10 @@
 #include <cstdint>
 #include <limits>
 #include <random>
+#include <rtype/common/protocol/PacketCodec.hpp>
 #include <span>
 #include <variant>
 #include <vector>
-
-#include "common/protocol/PacketCodec.hpp"
 
 using namespace rtype::protocol;
 

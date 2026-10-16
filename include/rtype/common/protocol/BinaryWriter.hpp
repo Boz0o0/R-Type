@@ -1,15 +1,13 @@
 #pragma once
 
-#include <bit>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <rtype/common/protocol/Protocol.hpp>
 #include <string_view>
 #include <type_traits>
 #include <vector>
-
-#include "common/protocol/Protocol.hpp"
 
 namespace rtype::protocol {
 
@@ -38,9 +36,7 @@ class BinaryWriter {
   }
 
   /** @brief Appends a float as its IEEE 754 bits. */
-  void writeFloat(float value) {
-    this->write(std::bit_cast<std::uint32_t>(value));
-  }
+  void writeFloat(float value);
 
   /** @brief Appends an enum as its underlying integer. */
   template <typename E>
@@ -54,15 +50,7 @@ class BinaryWriter {
    *
    * @throws ProtocolError If the string is longer than 255 bytes.
    */
-  void writeString(std::string_view value) {
-    if (value.size() > std::numeric_limits<std::uint8_t>::max()) {
-      throw ProtocolError("string longer than 255 bytes");
-    }
-    this->write(static_cast<std::uint8_t>(value.size()));
-    for (const char character : value) {
-      this->_buffer.push_back(static_cast<std::byte>(character));
-    }
-  }
+  void writeString(std::string_view value);
 
   /** @brief Total size of the buffer. */
   [[nodiscard]] std::size_t size() const noexcept {

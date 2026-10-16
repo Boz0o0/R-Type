@@ -1,8 +1,7 @@
 #pragma once
 
 #include <cstdint>
-
-#include "common/protocol/Protocol.hpp"
+#include <rtype/common/protocol/Protocol.hpp>
 
 namespace rtype::protocol {
 

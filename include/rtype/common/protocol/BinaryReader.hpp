@@ -1,7 +1,5 @@
 #pragma once
 
-#include <bit>
-#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -45,18 +43,7 @@ class BinaryReader {
   }
 
   /** @brief Reads a float; NaN and infinities are rejected. */
-  [[nodiscard]] bool readFloat(float& out) noexcept {
-    std::uint32_t bits = 0;
-    if (!this->read(bits)) {
-      return false;
-    }
-    const auto value = std::bit_cast<float>(bits);
-    if (!std::isfinite(value)) {
-      return false;
-    }
-    out = value;
-    return true;
-  }
+  [[nodiscard]] bool readFloat(float& out) noexcept;
 
   /**
    * @brief Reads an enum and checks it is not above its last value.
@@ -82,18 +69,7 @@ class BinaryReader {
    * @param out Filled with the string read.
    * @param maxLength Longest length accepted, in bytes.
    */
-  [[nodiscard]] bool readString(std::string& out, std::size_t maxLength) {
-    std::uint8_t length = 0;
-    if (!this->read(length) || length > maxLength ||
-        length > this->remaining()) {
-      return false;
-    }
-    out.assign(
-        reinterpret_cast<const char*>(this->_data.data() + this->_offset),
-        length);
-    this->_offset += length;
-    return true;
-  }
+  [[nodiscard]] bool readString(std::string& out, std::size_t maxLength);
 
   /** @brief Number of bytes not read yet. */
   [[nodiscard]] std::size_t remaining() const noexcept {

@@ -171,8 +171,7 @@ class ProtocolError : public std::runtime_error {
    *
    * @param message Description of the error.
    */
-  explicit ProtocolError(const std::string& message)
-      : std::runtime_error("Protocol error: " + message) {}
+  explicit ProtocolError(const std::string& message);
 };
 
 }  // namespace rtype::protocol
