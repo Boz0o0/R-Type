@@ -25,23 +25,25 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
 
 nav:
   - Home: index.md
   - Getting started: getting-started.md
-  - Adding a feature: adding-a-feature.md #ptet rename add a component et pr l'ecs jsp
   - Architecture:
       - architecture/index.md
       - ECS: architecture/ecs.md
-      - Physics: architecture/physics.md
       - Modules: architecture/modules.md
-      - Render: architecture/rendering.md
-      - Audio: architecture/audio.md
-      - Networking: architecture/networking.md
+      - Physics: architecture/physics.md
+      - Render: architecture/render.md
       - Input: architecture/input.md
+      - Audio: architecture/audio.md
+      - Net: architecture/net.md
   - Design decisions: decisions.md
+  - Changelog: changelog.md
   - R-Type:
       - Documentation ↗: https://boz0o0.github.io/R-Type/
       - Source code ↗: https://github.com/Boz0o0/R-Type

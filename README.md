@@ -34,7 +34,7 @@ Every module depends on `core`.
 | Core    | `ampersand_core`    | `AMPERSAND_MODULE_CORE`    |
 | Audio   | `ampersand_audio`   | `AMPERSAND_MODULE_AUDIO`   |
 | Input   | `ampersand_input`   | `AMPERSAND_MODULE_INPUT`   |
-| Network | `ampersand_net`     | `AMPERSAND_MODULE_NET`     |
+| Net     | `ampersand_net`     | `AMPERSAND_MODULE_NET`     |
 | Physics | `ampersand_physics` | `AMPERSAND_MODULE_PHYSICS` |
 | Render  | `ampersand_render`  | `AMPERSAND_MODULE_RENDER`  |
 
