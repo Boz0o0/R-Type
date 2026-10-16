@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ampersand/render/Color.hpp>
-#include <ampersand/render/Font.hpp>
+#include <ampersand/render/FontId.hpp>
 #include <string>
 
 namespace ampersand::render {
