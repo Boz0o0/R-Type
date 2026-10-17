@@ -52,6 +52,14 @@ Nothing is saved for now: no score, no save.
 
 To follow it over time: the server logs every dropped packet and every failed tick, the CI runs clang-tidy and the tests on every pull request, and every dependency has a fixed version, so updating one is a choice we make.
 
+## Accessibility
+For the game to be as accessible as possible, we plan:
+
+- colors that colorblind players can tell apart, and/or different shapes;
+- big enough and readable text;
+- controls that each player can change;
+- simple menus and no fast flashes (or the possibility to disable this).
+
 ## Documentation: MkDocs + Doxygen
 MkDocs (Material theme) to have the documentation as a website with a menu, a search bar and diagrams, published by the CI, as the subject requires (it's modern !).
 Doxygen to have the documentation of the code itself. 
