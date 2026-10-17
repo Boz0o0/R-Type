@@ -22,35 +22,45 @@
 
 ## Documentation
 
-The full documentation can be found **[here](https://boz0o0.github.io/Ampersand-Engine/)**.
+The full documentation is **[here](https://boz0o0.github.io/Ampersand-Engine/)**.
 
 ## Modules
 
-The engine is split into libraries so that you only compile what you need.
-Every module depends on `core`.
+Each module is a static library. A game only builds the modules it uses.
 
-| Module  | CMake target        | Option                     |
-| ------- | ------------------- | -------------------------- |
-| Core    | `ampersand_core`    | `AMPERSAND_MODULE_CORE`    |
-| Audio   | `ampersand_audio`   | `AMPERSAND_MODULE_AUDIO`   |
-| Input   | `ampersand_input`   | `AMPERSAND_MODULE_INPUT`   |
-| Net     | `ampersand_net`     | `AMPERSAND_MODULE_NET`     |
-| Physics | `ampersand_physics` | `AMPERSAND_MODULE_PHYSICS` |
-| Render  | `ampersand_render`  | `AMPERSAND_MODULE_RENDER`  |
+| Module  | CMake target        | Needs             |
+| ------- | ------------------- | ----------------- |
+| Core    | `ampersand_core`    |                   |
+| Physics | `ampersand_physics` | core              |
+| Input   | `ampersand_input`   | core              |
+| Render  | `ampersand_render`  | core, input, SFML |
+| Audio   | `ampersand_audio`   | core, SFML        |
+| Net     | `ampersand_net`     | core, Asio        |
 
-All modules are enabled by default.
+All modules are on by default. Turn one off with `AMPERSAND_MODULE_<NAME>=OFF`
+(e.g. `AMPERSAND_MODULE_RENDER=OFF`).
 
-Unit tests are triggered by `AMPERSAND_BUILD_TESTS`, which is `ON` only when the engine is the top-level project.
+## Use it in a game
 
-## Getting started
+```cmake
+include(FetchContent)
+FetchContent_Declare(ampersand
+    GIT_REPOSITORY https://github.com/Boz0o0/Ampersand-Engine.git
+    GIT_TAG v0.1.0
+)
+FetchContent_MakeAvailable(ampersand)
 
-### Requirements
+target_link_libraries(my_game PRIVATE ampersand_render ampersand_physics)
+```
 
-- CMake 3.24+
-- A C++20 compiler (GCC 10+, Clang 12+ or MSVC 2019 16.10+)
-- Git (dependencies are fetched with [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake))
+```cpp
+#include <ampersand/core/ecs/World.hpp>
+```
 
-### Build and test
+## Build the engine
+
+Needs CMake 3.24+, a C++20 compiler and Git. The dependencies (SFML, Asio,
+GoogleTest) are downloaded by CMake.
 
 ```sh
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
@@ -58,14 +68,14 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-See [Getting started](https://boz0o0.github.io/Ampersand-Engine/getting-started/) for module options, build output and more.
-
 ## Project structure
 
 ```
 .
-├── cmake/        # CMake helpers (CPM)
-├── docs/         # MkDocs documentation
-├── src/          # Engine modules (core, audio, input, net, physics, render)
-└── tests/        # Unit tests, one folder per module
+├── include/ampersand/  # Public headers, one folder per module
+├── src/                # Sources, one folder per module
+├── tests/              # Unit tests, one folder per module
+├── docs/               # Documentation (MkDocs)
+├── cmake/              # CPM.cmake (downloads the dependencies)
+└── CHANGELOG.md        # Changes of each version
 ```
