@@ -1,11 +1,14 @@
 #include <algorithm>
+#include <ampersand/audio/resources/AudioListener.hpp>
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/render/resources/Camera.hpp>
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
+#include <rtype/client/AssetLoader.hpp>
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Controls.hpp>
+#include <rtype/client/Hud.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
@@ -15,6 +18,7 @@
 
 namespace rtype::client {
 
+namespace audio = ampersand::audio;
 namespace core = ampersand::core;
 namespace input = ampersand::input;
 namespace render = ampersand::render;
@@ -40,7 +44,12 @@ void ClientApp::run() {
       render::ClearColor{.value = SPACE_COLOR});
   const auto& keys = this->_world.addResource<input::InputManager>();
   auto& clock = this->_world.addResource<core::Clock>();
-  WorldMirror worldMirror(this->_world, EntitySprites{});
+  this->_world.addResource<audio::AudioListener>(
+      audio::AudioListener{.engine = this->_audioEngine});
+  const Assets assets = AssetLoader::load(this->_backend, this->_audioEngine,
+                                          this->_config.assetsDirectory());
+  WorldMirror worldMirror(this->_world, assets.looks);
+  Hud hud(this->_world, assets.font);
 
   auto previous = std::chrono::steady_clock::now();
   while (window.isOpen) {
@@ -55,18 +64,24 @@ void ClientApp::run() {
       window.isOpen = false;
     }
     this->_connection.update(now);
+    hud.showConnection(this->_connection.state(), this->_connection.playerId(),
+                       this->_connection.rejectReason());
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
-      applyPacket(worldMirror, packet);
+      applyPacket(worldMirror, hud, packet);
     }
     this->_connection.sendInput(Controls::inputMask(keys.keysDown));
     this->_movementSystem.update(this->_world);
+    this->_animationSystem.update(this->_world);
+    this->_explosionSystem.update(this->_world);
+    this->_audioSystem.update(this->_world);
     this->_renderSystem.update(this->_world);
   }
   this->_connection.disconnect();
 }
 
-void ClientApp::applyPacket(WorldMirror& worldMirror,
+void ClientApp::applyPacket(WorldMirror& worldMirror, Hud& hud,
                             const protocol::Payload& packet) {
+  hud.apply(packet);
   if (const auto* spawn = std::get_if<protocol::EntitySpawn>(&packet)) {
     worldMirror.spawn(*spawn);
   } else if (const auto* snapshot =
