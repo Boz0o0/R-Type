@@ -31,6 +31,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Gameplay: gameplay.md
+  - Design decisions: decisions.md
   - Network Protocol:
       - Protocol: protocol/specification.md
       - Code: protocol/implementation.md
