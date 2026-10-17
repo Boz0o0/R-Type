@@ -12,8 +12,10 @@
 #include <rtype/common/protocol/Protocol.hpp>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace rtype::client {
 
@@ -27,8 +29,18 @@ ServerConnection::ServerConnection(const std::string& host, std::uint16_t port,
       _playerName(std::move(playerName)) {}
 
 void ServerConnection::update(Clock::time_point now) {
-  this->receivePackets();
+  this->receivePackets(now);
+  std::erase_if(this->_handledSequences, [now](const auto& entry) {
+    return now - entry.second > DUPLICATE_WINDOW;
+  });
 
+  if (this->_state == State::Connected &&
+      now - this->_lastReceived > SERVER_TIMEOUT) {
+    this->_state = State::Disconnected;
+    std::cerr << "[client] lost the server " << this->_server.toString()
+              << '\n';
+    return;
+  }
   if (this->_state == State::Connecting) {
     if (this->_lastSend && now - *this->_lastSend < CONNECT_RETRY_DELAY) {
       return;
@@ -64,6 +76,20 @@ void ServerConnection::disconnect() {
   this->_state = State::Disconnected;
 }
 
+void ServerConnection::sendInput(std::uint8_t inputMask) {
+  if (this->_state != State::Connected) {
+    return;
+  }
+  this->send(protocol::PlayerInput{
+      .clientTick = this->_clientTick++,
+      .inputMask = inputMask,
+  });
+}
+
+std::vector<protocol::Payload> ServerConnection::takePackets() {
+  return std::exchange(this->_gamePackets, {});
+}
+
 ServerConnection::State ServerConnection::state() const noexcept {
   return this->_state;
 }
@@ -81,7 +107,7 @@ std::uint32_t ServerConnection::lastServerTick() const noexcept {
   return this->_lastServerTick;
 }
 
-void ServerConnection::receivePackets() {
+void ServerConnection::receivePackets(Clock::time_point now) {
   // +1 so that a datagram too large is reported as such instead of being cut.
   std::array<std::byte, protocol::MAX_DATAGRAM_SIZE + 1> buffer{};
   Endpoint from;
@@ -93,8 +119,13 @@ void ServerConnection::receivePackets() {
               protocol::DecodeError::None) {
         continue;  // not from our server, or invalid: drop it
       }
+      this->_lastReceived = now;
       if (packet.header.isReliable()) {
         this->send(protocol::Ack{.sequence = packet.header.sequence});
+        if (!this->_handledSequences.try_emplace(packet.header.sequence, now)
+                 .second) {
+          continue;
+        }
       }
       this->handlePacket(packet);
     }
@@ -129,10 +160,12 @@ void ServerConnection::handlePacket(const protocol::Packet& packet) {
     }
   } else if (const auto* ping = std::get_if<protocol::Ping>(&payload)) {
     this->send(protocol::Pong{.timestampMs = ping->timestampMs});
-  } else if (const auto* snapshot =
-                 std::get_if<protocol::WorldSnapshot>(&payload)) {
-    this->_lastServerTick =
-        std::max(this->_lastServerTick, snapshot->serverTick);
+  } else if (packet.header.type >= protocol::PacketType::GameStart) {
+    if (const auto* snapshot = std::get_if<protocol::WorldSnapshot>(&payload)) {
+      this->_lastServerTick =
+          std::max(this->_lastServerTick, snapshot->serverTick);
+    }
+    this->_gamePackets.push_back(payload);
   }
 }
 

@@ -1,5 +1,6 @@
 #include <charconv>
 #include <rtype/client/ClientConfig.hpp>
+#include <rtype/common/protocol/Protocol.hpp>
 #include <system_error>
 
 namespace rtype::client {
@@ -7,7 +8,7 @@ namespace rtype::client {
 std::optional<ClientConfig> ClientConfig::fromArguments(
     std::span<char* const> args) {
   ClientConfig config;
-  if (args.size() > 3) {
+  if (args.size() > 4) {
     return std::nullopt;
   }
   if (args.size() > 1) {
@@ -23,11 +24,19 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
     }
     config._port = *port;
   }
+  if (args.size() > 3) {
+    config._name = args[3];
+    if (config._name.empty() ||
+        config._name.size() > protocol::MAX_PLAYER_NAME_LENGTH) {
+      return std::nullopt;
+    }
+  }
   return config;
 }
 
 const std::string& ClientConfig::host() const { return this->_host; }
 std::uint16_t ClientConfig::port() const { return this->_port; }
+const std::string& ClientConfig::name() const { return this->_name; }
 
 std::optional<std::uint16_t> ClientConfig::parsePort(const std::string& text) {
   std::uint16_t port = 0;

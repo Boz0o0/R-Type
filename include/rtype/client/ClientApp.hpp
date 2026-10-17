@@ -4,6 +4,7 @@
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <ampersand/input/systems/InputSystem.hpp>
+#include <ampersand/physics/systems/MovementSystem.hpp>
 #include <ampersand/render/Color.hpp>
 #include <ampersand/render/SfmlRenderer.hpp>
 #include <ampersand/render/systems/RenderSystem.hpp>
@@ -11,6 +12,8 @@
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
 #include <rtype/client/ServerConnection.hpp>
+#include <rtype/client/WorldMirror.hpp>
+#include <rtype/common/protocol/PacketCodec.hpp>
 
 namespace rtype::client {
 
@@ -30,16 +33,20 @@ class ClientApp {
       .g = 4,
       .b = 14,
   };
-  static constexpr const char* PLAYER_NAME = "Player";
+  // A longer frame (window dragged, debugger) would make entities jump.
+  static constexpr float MAX_FRAME_TIME = 0.1F;
 
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);
+  static void applyPacket(WorldMirror& worldMirror,
+                          const protocol::Payload& packet);
 
   ClientConfig _config;
   ServerConnection _connection;
   ampersand::render::SfmlRenderer _backend;
   ampersand::core::ecs::World _world;
   ampersand::input::InputSystem _inputSystem;
+  ampersand::physics::MovementSystem _movementSystem;
   ampersand::render::RenderSystem _renderSystem;
 };
 
