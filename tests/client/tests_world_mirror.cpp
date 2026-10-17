@@ -1,24 +1,33 @@
 #include <gtest/gtest.h>
 
+#include <ampersand/audio/components/AudioSource.hpp>
 #include <ampersand/core/components/Transform.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
+#include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <cstdint>
+#include <rtype/client/EntityLooks.hpp>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/client/components/Explosion.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/common/resources/Deaths.hpp>
 #include <stdexcept>
+#include <variant>
 
+using ampersand::audio::AudioSource;
+using ampersand::audio::SoundRef;
 using ampersand::core::Transform;
 using ampersand::core::ecs::Entity;
 using ampersand::core::ecs::World;
 using ampersand::physics::Velocity;
+using ampersand::render::Animation;
 using ampersand::render::Sprite;
-using rtype::client::EntitySprites;
+using rtype::client::EntityLooks;
+using rtype::client::Explosion;
 using rtype::client::WorldMirror;
 using rtype::common::DeathReason;
 using rtype::common::EntityKind;
@@ -27,20 +36,33 @@ using rtype::protocol::EntitySpawn;
 using rtype::protocol::EntityState;
 using rtype::protocol::WorldSnapshot;
 
-// Each sprite gets its own texture id so the tests can tell them apart.
-static EntitySprites testSprites() {
-  EntitySprites sprites;
+// Each look gets its own texture id so the tests can tell them apart. The
+// enemy is 20x20 at scale 3 and animated, the explosion is 10x10.
+static EntityLooks testLooks() {
+  EntityLooks looks;
   for (std::uint32_t player = 0; player < rtype::protocol::MAX_PLAYERS;
        ++player) {
-    sprites.ships[player].texture = player;
+    looks.ships[player].sprite.texture = player;
   }
-  sprites.enemy.texture = 10;
-  sprites.playerMissile.texture = 11;
-  sprites.enemyMissile.texture = 12;
-  sprites.powerUp.texture = 13;
-  sprites.obstacle.texture = 14;
-  sprites.scale = 3.0F;
-  return sprites;
+  looks.enemy.sprite.texture = 10;
+  looks.enemy.animation = Animation{
+      .frames = {{0, 0, 20, 20}, {20, 0, 20, 20}},
+      .frameDuration = 0.1F,
+  };
+  looks.enemy.scale = 3.0F;
+  looks.playerMissile.sprite.texture = 11;
+  looks.enemyMissile.sprite.texture = 12;
+  looks.powerUp.sprite.texture = 13;
+  looks.obstacle.sprite.texture = 14;
+  looks.explosion.sprite.texture = 15;
+  looks.explosion.animation = Animation{
+      .frames = {{0, 0, 10, 10}, {10, 0, 10, 10}},
+      .frameDuration = 0.1F,
+      .loop = false,
+  };
+  looks.shootSound = 1;
+  looks.explosionSound = 2;
+  return looks;
 }
 
 static EntitySpawn spawnPacket(
@@ -72,7 +94,7 @@ static float positionX(World& world, const WorldMirror& mirror,
 
 TEST(WorldMirror, SpawnsTheEntityWhereTheServerSays) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
 
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
@@ -89,7 +111,7 @@ TEST(WorldMirror, SpawnsTheEntityWhereTheServerSays) {
 
 TEST(WorldMirror, PicksTheSpriteOfEachKind) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
 
   mirror.spawn(spawnPacket(1, EntityKind::PlayerMissile));
   mirror.spawn(spawnPacket(2, EntityKind::EnemyMissile));
@@ -104,7 +126,7 @@ TEST(WorldMirror, PicksTheSpriteOfEachKind) {
 
 TEST(WorldMirror, GivesEachShipTheSpriteOfItsOwner) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
 
   for (std::uint8_t owner = 0; owner < rtype::protocol::MAX_PLAYERS; ++owner) {
     mirror.spawn(spawnPacket(owner + 1U, EntityKind::Ship, owner));
@@ -117,7 +139,7 @@ TEST(WorldMirror, GivesEachShipTheSpriteOfItsOwner) {
 
 TEST(WorldMirror, IgnoresASpawnItAlreadyHas) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   EntitySpawn again = spawnPacket(7, EntityKind::Enemy);
@@ -130,7 +152,7 @@ TEST(WorldMirror, IgnoresASpawnItAlreadyHas) {
 
 TEST(WorldMirror, SnapshotMovesKnownEntities) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
@@ -153,7 +175,7 @@ TEST(WorldMirror, SnapshotMovesKnownEntities) {
 
 TEST(WorldMirror, SnapshotSkipsUnknownEntities) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
@@ -169,7 +191,7 @@ TEST(WorldMirror, SnapshotSkipsUnknownEntities) {
 
 TEST(WorldMirror, IgnoresASnapshotOlderThanTheLastOne) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
@@ -187,7 +209,7 @@ TEST(WorldMirror, IgnoresASnapshotOlderThanTheLastOne) {
 // Big snapshots are split into several packets with the same tick.
 TEST(WorldMirror, AcceptsSeveralSnapshotsWithTheSameTick) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(1, EntityKind::Enemy));
   mirror.spawn(spawnPacket(2, EntityKind::Enemy));
 
@@ -206,7 +228,7 @@ TEST(WorldMirror, AcceptsSeveralSnapshotsWithTheSameTick) {
 
 TEST(WorldMirror, DestroyRemovesTheEntity) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
   const Entity entity = entityOf(mirror, 7);
 
@@ -219,7 +241,7 @@ TEST(WorldMirror, DestroyRemovesTheEntity) {
 
 TEST(WorldMirror, DestroyOfAnUnknownIdChangesNothing) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.destroy(
@@ -232,7 +254,7 @@ TEST(WorldMirror, DestroyOfAnUnknownIdChangesNothing) {
 // Reliable packets can arrive out of order: the destroy may come first.
 TEST(WorldMirror, DropsASpawnThatArrivesAfterItsDestroy) {
   World world;
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
 
   mirror.destroy(EntityDestroy{.entityId = 7, .reason = DeathReason::Killed});
   mirror.spawn(spawnPacket(7, EntityKind::Enemy));
@@ -241,14 +263,87 @@ TEST(WorldMirror, DropsASpawnThatArrivesAfterItsDestroy) {
   EXPECT_FALSE(mirror.find(7).has_value());
 }
 
+TEST(WorldMirror, AnimatedLookStartsOnItsFirstFrame) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
+
+  const Entity entity = entityOf(mirror, 7);
+  ASSERT_TRUE(world.has<Animation>(entity));
+  EXPECT_EQ(world.get<Animation>(entity).frames.size(), 2U);
+  EXPECT_EQ(world.get<Sprite>(entity).source.width, 20);
+  EXPECT_EQ(world.get<Sprite>(entity).source.x, 0);
+}
+
+TEST(WorldMirror, OnlyPlayerMissilesPlayTheShootSound) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+
+  mirror.spawn(spawnPacket(1, EntityKind::PlayerMissile));
+  mirror.spawn(spawnPacket(2, EntityKind::EnemyMissile));
+
+  const Entity shot = entityOf(mirror, 1);
+  ASSERT_TRUE(world.has<AudioSource>(shot));
+  EXPECT_EQ(std::get<SoundRef>(world.get<AudioSource>(shot).source).id, 1U);
+  EXPECT_TRUE(world.get<AudioSource>(shot).playing);
+  EXPECT_FALSE(world.has<AudioSource>(entityOf(mirror, 2)));
+}
+
+TEST(WorldMirror, KilledEnemyExplodesOnItsCenter) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
+
+  mirror.destroy(EntityDestroy{.entityId = 7, .reason = DeathReason::Killed});
+
+  ASSERT_EQ(world.owners<Explosion>().size(), 1U);
+  const Entity explosion = world.owners<Explosion>().front();
+  // Enemy at (100, 200), 60x60: center (130, 230). Explosion 10x10.
+  const auto& position = world.get<Transform>(explosion).position;
+  EXPECT_FLOAT_EQ(position.x, 125.0F);
+  EXPECT_FLOAT_EQ(position.y, 225.0F);
+  EXPECT_GT(position.z, 0.0F);
+  EXPECT_EQ(world.get<Sprite>(explosion).texture, 15U);
+  EXPECT_FALSE(world.get<Animation>(explosion).loop);
+  EXPECT_EQ(std::get<SoundRef>(world.get<AudioSource>(explosion).source).id,
+            2U);
+}
+
+TEST(WorldMirror, MissilesAndEntitiesLeavingTheScreenDoNotExplode) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(1, EntityKind::PlayerMissile));
+  mirror.spawn(spawnPacket(2, EntityKind::Enemy));
+
+  mirror.destroy(EntityDestroy{.entityId = 1, .reason = DeathReason::Killed});
+  mirror.destroy(
+      EntityDestroy{.entityId = 2, .reason = DeathReason::OutOfScreen});
+
+  EXPECT_TRUE(world.owners<Explosion>().empty());
+  EXPECT_EQ(mirror.size(), 0U);
+}
+
 // A full World refuses new entities: the spawn is dropped, nothing crashes.
 TEST(WorldMirror, DropsASpawnWhenTheWorldIsFull) {
   World world(1);
-  WorldMirror mirror(world, testSprites());
+  WorldMirror mirror(world, testLooks());
   mirror.spawn(spawnPacket(1, EntityKind::Enemy));
 
   EXPECT_NO_THROW(mirror.spawn(spawnPacket(2, EntityKind::Enemy)));
 
   EXPECT_EQ(mirror.size(), 1U);
   EXPECT_FALSE(mirror.find(2).has_value());
+}
+
+TEST(WorldMirror, KilledEnemyInAFullWorldJustDisappears) {
+  World world(1);
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
+
+  EXPECT_NO_THROW(mirror.destroy(
+      EntityDestroy{.entityId = 7, .reason = DeathReason::Killed}));
+
+  EXPECT_TRUE(world.owners<Explosion>().empty());
+  EXPECT_EQ(mirror.size(), 0U);
 }
