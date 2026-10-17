@@ -32,6 +32,7 @@ nav:
   - Architecture: architecture.md
   - Gameplay: gameplay.md
   - Design decisions: decisions.md
+  - Contributing: contributing.md
   - Network Protocol:
       - Protocol: protocol/specification.md
       - Code: protocol/implementation.md
