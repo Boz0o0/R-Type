@@ -3,6 +3,7 @@
 #include <ampersand/physics/resources/Collisions.hpp>
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
+#include <rtype/common/components/Projectile.hpp>
 #include <rtype/common/components/Team.hpp>
 #include <rtype/common/resources/Deaths.hpp>
 #include <rtype/common/systems/DamageSystem.hpp>
@@ -35,7 +36,7 @@ void DamageSystem::hit(World& world, Deaths& deaths, Entity attacker,
           {.entity = target, .reason = DeathReason::Killed});
     }
   }
-  if (!world.has<Health>(attacker)) {
+  if (world.has<Projectile>(attacker)) {
     world.remove<Damage>(attacker);
     deaths.entities.push_back(
         {.entity = attacker, .reason = DeathReason::Killed});

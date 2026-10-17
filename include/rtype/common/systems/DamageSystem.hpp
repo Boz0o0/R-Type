@@ -11,8 +11,8 @@ namespace rtype::common {
  * @brief Turns the Collisions of the tick into damage and deaths.
  *
  * For each pair that touches, an entity with a Damage removes its amount from
- * the Health of the other one. An entity whose Health reaches 0 dies, and an
- * entity with a Damage but no Health (a missile) dies on its first hit.
+ * the Health of the other one. An entity whose Health reaches 0 dies, and a
+ * Projectile dies on its first hit.
  * Entities whose Team is on the same side do not hurt each other.
  * Deaths are added to the Deaths resource; nothing is destroyed here.
  */

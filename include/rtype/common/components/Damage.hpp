@@ -8,7 +8,7 @@ namespace rtype::common {
  * @brief Hit points removed from each entity with a Health that this entity
  *        touches.
  *
- * An entity with a Damage but no Health (a missile) dies on its first hit.
+ * A Projectile (a missile) dies on its first hit.
  */
 struct Damage {
   /** @brief Hit points removed per hit. */
