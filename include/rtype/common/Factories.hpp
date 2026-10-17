@@ -3,6 +3,7 @@
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
+#include <optional>
 #include <rtype/common/components/Kind.hpp>
 
 namespace rtype::common {
@@ -15,10 +16,10 @@ namespace rtype::common {
  *
  * @param world World to create it in.
  * @param position Top-left corner of the ship.
- * @return The ship.
+ * @return The ship, or std::nullopt if the World is full.
  * @throws ResourceNotFound if the World has no Spawns.
  */
-ampersand::core::ecs::Entity createShip(
+std::optional<ampersand::core::ecs::Entity> createShip(
     ampersand::core::ecs::World& world,
     const ampersand::core::math::Vec2f& position);
 
@@ -31,10 +32,10 @@ ampersand::core::ecs::Entity createShip(
  *
  * @param world World to create it in.
  * @param position Top-left corner of the enemy.
- * @return The enemy.
+ * @return The enemy, or std::nullopt if the World is full.
  * @throws ResourceNotFound if the World has no Spawns.
  */
-ampersand::core::ecs::Entity createEnemy(
+std::optional<ampersand::core::ecs::Entity> createEnemy(
     ampersand::core::ecs::World& world,
     const ampersand::core::math::Vec2f& position);
 
@@ -47,11 +48,11 @@ ampersand::core::ecs::Entity createEnemy(
  * @param world World holding the shooter.
  * @param kind Kind of the missile.
  * @param shooter Entity that fires, with a Transform.
- * @return The missile.
+ * @return The missile, or std::nullopt if the World is full.
  * @throws std::invalid_argument if kind is not a missile.
  * @throws ResourceNotFound if the World has no Spawns.
  */
-ampersand::core::ecs::Entity createMissile(
+std::optional<ampersand::core::ecs::Entity> createMissile(
     ampersand::core::ecs::World& world, EntityKind kind,
     ampersand::core::ecs::Entity shooter);
 

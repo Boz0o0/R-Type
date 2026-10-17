@@ -1,10 +1,12 @@
 #include <ampersand/core/components/Transform.hpp>
+#include <ampersand/core/ecs/ECSExceptions.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/core/math/Vec3.hpp>
 #include <ampersand/physics/components/BoxCollider.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
+#include <optional>
 #include <rtype/common/Factories.hpp>
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
@@ -22,8 +24,14 @@ using ampersand::core::ecs::World;
 using ampersand::physics::BoxCollider;
 using ampersand::physics::Velocity;
 
-Entity createShip(World& world, const ampersand::core::math::Vec2f& position) {
-  const Entity ship = world.create();
+std::optional<Entity> createShip(World& world,
+                                 const ampersand::core::math::Vec2f& position) {
+  Entity ship;
+  try {
+    ship = world.create();
+  } catch (const ampersand::core::ecs::EntityLimitReached&) {
+    return std::nullopt;
+  }
   world.add(ship, ampersand::core::Transform{
                       .position = {position.x, position.y, 0.0F}});
   world.add(ship, Kind{.kind = EntityKind::Ship});
@@ -37,8 +45,14 @@ Entity createShip(World& world, const ampersand::core::math::Vec2f& position) {
   return ship;
 }
 
-Entity createEnemy(World& world, const ampersand::core::math::Vec2f& position) {
-  const Entity enemy = world.create();
+std::optional<Entity> createEnemy(
+    World& world, const ampersand::core::math::Vec2f& position) {
+  Entity enemy;
+  try {
+    enemy = world.create();
+  } catch (const ampersand::core::ecs::EntityLimitReached&) {
+    return std::nullopt;
+  }
   world.add(enemy, ampersand::core::Transform{
                        .position = {position.x, position.y, 0.0F}});
   world.add(enemy, Kind{.kind = EntityKind::Enemy});
@@ -55,13 +69,19 @@ Entity createEnemy(World& world, const ampersand::core::math::Vec2f& position) {
   return enemy;
 }
 
-Entity createMissile(World& world, EntityKind kind, Entity shooter) {
+std::optional<Entity> createMissile(World& world, EntityKind kind,
+                                    Entity shooter) {
   if (kind != EntityKind::PlayerMissile && kind != EntityKind::EnemyMissile) {
     throw std::invalid_argument("createMissile: not a missile kind");
   }
   const ampersand::core::math::Vec3f position =
       world.get<ampersand::core::Transform>(shooter).position;
-  const Entity missile = world.create();
+  Entity missile;
+  try {
+    missile = world.create();
+  } catch (const ampersand::core::ecs::EntityLimitReached&) {
+    return std::nullopt;
+  }
   world.add(missile, ampersand::core::Transform{.position = position});
   world.add(missile, Kind{.kind = kind});
   world.add(missile, Projectile{});
