@@ -1,9 +1,14 @@
+#include <algorithm>
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/render/resources/Camera.hpp>
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
 #include <rtype/client/ClientApp.hpp>
+#include <rtype/client/Controls.hpp>
+#include <rtype/client/WorldMirror.hpp>
+#include <rtype/common/protocol/PacketCodec.hpp>
+#include <rtype/common/protocol/Packets.hpp>
 #include <stdexcept>
 #include <utility>
 #include <variant>
@@ -16,7 +21,8 @@ namespace render = ampersand::render;
 
 ClientApp::ClientApp(ClientConfig config)
     : _config(std::move(config)),
-      _connection(this->_config.host(), this->_config.port(), PLAYER_NAME),
+      _connection(this->_config.host(), this->_config.port(),
+                  this->_config.name()),
       _inputSystem(pollWindow) {}
 
 void ClientApp::run() {
@@ -34,22 +40,46 @@ void ClientApp::run() {
       render::ClearColor{.value = SPACE_COLOR});
   const auto& keys = this->_world.addResource<input::InputManager>();
   auto& clock = this->_world.addResource<core::Clock>();
+  WorldMirror worldMirror(this->_world, EntitySprites{});
 
   auto previous = std::chrono::steady_clock::now();
   while (window.isOpen) {
     const auto now = std::chrono::steady_clock::now();
-    clock.dt = std::chrono::duration<float>(now - previous).count();
+    clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
+                        MAX_FRAME_TIME);
     clock.elapsed += clock.dt;
     previous = now;
 
-    this->_connection.update(now);
     this->_inputSystem.update(this->_world);
     if (keys.keysDown.contains(input::Key::Escape)) {
       window.isOpen = false;
     }
+    this->_connection.update(now);
+    if (this->_connection.hasEnded()) {
+      // ServerConnection already printed why.
+      throw std::runtime_error("the connection to the server ended");
+    }
+    for (const protocol::Payload& packet : this->_connection.takePackets()) {
+      applyPacket(worldMirror, packet);
+    }
+    this->_connection.sendInput(Controls::inputMask(keys.keysDown));
+    this->_movementSystem.update(this->_world);
     this->_renderSystem.update(this->_world);
   }
   this->_connection.disconnect();
+}
+
+void ClientApp::applyPacket(WorldMirror& worldMirror,
+                            const protocol::Payload& packet) {
+  if (const auto* spawn = std::get_if<protocol::EntitySpawn>(&packet)) {
+    worldMirror.spawn(*spawn);
+  } else if (const auto* snapshot =
+                 std::get_if<protocol::WorldSnapshot>(&packet)) {
+    worldMirror.applySnapshot(*snapshot);
+  } else if (const auto* destroyed =
+                 std::get_if<protocol::EntityDestroy>(&packet)) {
+    worldMirror.destroy(*destroyed);
+  }
 }
 
 std::optional<input::Event> ClientApp::pollWindow(core::ecs::World& world) {
