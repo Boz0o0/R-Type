@@ -45,21 +45,30 @@ an error if one is missing. The list of the modules and their options is in
 
 ## Using the engine in a game
 
-!!! tip "FetchContent"
-    The engine will soon be released on GitHub, so you will be able to use it with
-    [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html).
-
-Put the engine in the game's repository, then add it and link the modules the
-game uses:
+Get the engine with
+[FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html),
+then link the modules the game uses:
 
 ```cmake
-add_subdirectory(ampersand-engine)
+include(FetchContent)
+
+set(AMPERSAND_MODULE_NET OFF)  # optional: turn off what the game does not use
+
+FetchContent_Declare(ampersand
+    GIT_REPOSITORY https://github.com/Boz0o0/Ampersand-Engine.git
+    GIT_TAG v0.1.0
+)
+FetchContent_MakeAvailable(ampersand)
 
 target_link_libraries(my_game PRIVATE ampersand_render ampersand_physics)
 ```
 
-Linking a module also gives its include folder and the modules it depends on.
-Every header is under `ampersand/<module>/`:
+If the engine is copied in the game's repository instead (like R-Type, with a
+git subtree), replace the FetchContent part with
+`add_subdirectory(ampersand-engine)`.
+
+Linking a module also gives its headers and the modules it needs. Every header
+is under `ampersand/<module>/`:
 
 ```cpp
 #include <ampersand/core/ecs/World.hpp>
