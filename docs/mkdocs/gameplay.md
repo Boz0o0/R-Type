@@ -1,108 +1,71 @@
 # Gameplay
 
-
 ## Concepts
 
-| Name            | Kind      | What it does                                                                      |
-| --------------- | --------- | --------------------------------------------------------------------------------- |
-| `Health`        | component | hit points: `current` and `max`; the entity dies when `current` reaches 0         |
-| `Damage`        | component | hit points removed from each entity with a `Health` it touches                    |
-| `Team`          | component | `side` of the entity (`Players` or `Enemies`): no damage inside a side (see [Teams](#teams)) |
-| `Kind`          | component | what the entity is (`Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile`)             |
-| `Weapon`        | component | fires a `missile` every `cooldown` seconds while `firing` (see [Shooting](#shooting)) |
-| `Projectile`    | component | tag of a missile: dies on its first hit                                           |
-| `Deaths`        | resource  | entities that died during the tick, and why (`reason`)                            |
-| `DamageSystem`  | system    | turns the `Collisions` of the tick into damage, adds the dead to `Deaths`         |
-| `ShootingSystem` | system   | creates the missiles of the `Weapon`s that are firing                             |
-| `CleanupSystem` | system    | destroys the entities of `Deaths`, then empties it                                |
+| Name             | Type      | Role                                                         |
+| ---------------- | --------- | ------------------------------------------------------------ |
+| `Health`         | component | hit points (`current`, `max`), dies at 0                     |
+| `Damage`         | component | hit points removed from what it touches                      |
+| `Team`           | component | `Players` or `Enemies`, no damage inside a team              |
+| `Kind`           | component | what it is: `Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile` |
+| `Weapon`         | component | fires a `missile` every `cooldown` seconds while `firing`    |
+| `Projectile`     | component | tag, dies on its first hit                                   |
+| `Deaths`         | resource  | entities dead this tick, and why                             |
+| `Spawns`         | resource  | entities created this tick                                   |
+| `ShootingSystem` | system    | creates the missiles                                         |
+| `DamageSystem`   | system    | applies the damage of the `Collisions`, fills `Deaths`       |
+| `CleanupSystem`  | system    | destroys `Deaths`, empties `Deaths` and `Spawns`             |
 
-An entity is what its components make it:
+## Entities
 
-| Entity  | Components                        | Behaviour                                 |
-| ------- | --------------------------------- | ----------------------------------------- |
-| Ship    | `Health`, `Team`, `Weapon`                | loses hit points, dies at 0               |
-| Ennemy   | `Health`, `Damage`, `Team`, `Weapon`      | also hurts what touches it                |
-| Missile | `Damage`, `Projectile`, `Team`, `Kind`    | hurts what it touches, dies on first hit  |
-| Destroyable tile | `Health`, `Damage`, no `Team`    | hurts and is hurt by every side           |
-| Wall    | `Damage`, no `Health`, no `Team`  | hurts every side, never dies              |
+Always create an entity with a factory: it adds all the components and fills
+`Spawns`.
 
-## Example
+| Factory                | Health | Damage | Team      | Speed     | Size  | Weapon                        |
+| ---------------------- | ------ | ------ | --------- | --------- | ----- | ----------------------------- |
+| `createShip`           | 3      | none   | `Players` | 0         | 64x32 | `PlayerMissile` / 0.25 s, off |
+| `createEnemy`          | 2      | 1      | `Enemies` | 200 left  | 64x64 | `EnemyMissile` / 1.5 s, on    |
+| `createMissile` player | none   | 1      | shooter's | 800 right | 16x4  | none                          |
+| `createMissile` enemy  | none   | 1      | shooter's | 400 left  | 8x8   | none                          |
 
 ```cpp
-namespace common = rtype::common;
-namespace physics = ampersand::physics;
+const Entity ship = common::createShip(world, {100, 500});
+world.get<common::Weapon>(ship).firing = true;  // shoot
+```
 
+## Tick
+
+```cpp
 world.addResource<ampersand::core::Clock>();
 world.addResource<physics::Collisions>();
 world.addResource<common::Deaths>();
-
-physics::MovementSystem movement;
-physics::CollisionSystem collision;
-common::ShootingSystem shooting;
-common::DamageSystem damage;
-common::CleanupSystem cleanup;
+world.addResource<common::Spawns>();
 
 while (running) {
-  shooting.update(world);  // before the movement
-  movement.update(world);
-  collision.update(world);
-  damage.update(world);  // after the collisions
-  for (const common::Death& death : world.getResource<common::Deaths>().entities) {
-    // server: send ENTITY_DESTROY for death.entity
-  }
-  cleanup.update(world);  // always last
+  shooting.update(world);   // 1. before the movement
+  movement.update(world);   // 2. engine
+  collision.update(world);  // 3. engine
+  damage.update(world);     // 4. after the collisions
+  // 5. server: send Spawns (ENTITY_SPAWN) and Deaths (ENTITY_DESTROY)
+  cleanup.update(world);    // 6. always last
 }
 ```
 
-## Deaths
+## Rules
 
-No system destroys an entity in the middle of the tick: it adds it to `Deaths`
-instead. The entity stays alive until the `CleanupSystem`, so the systems after
-it can still read it (the server sends why it died), and nobody destroys an
-entity another system is looping on.
-
-An entity is in `Deaths` at most once per tick, even when two missiles kill it
-at the same time.
-
-## Shooting
-
-A `Weapon` says when to fire and which `missile`. While `firing` is true, the
-`ShootingSystem` calls `createMissile` every `cooldown` seconds. The missile
-starts at the position of the shooter, with the `Team` of the shooter: it goes
-through the ships of its side. Whoever holds the trigger sets `firing`: always
-`true` for an enemy, the shoot key for a player.
-
-```cpp
-world.add(ship, common::Weapon{.cooldown = 0.25F,
-                               .firing = true,
-                               .missile = common::EntityKind::PlayerMissile});
-```
-
-What a missile is (velocity, damage, hitbox) lives in `createMissile`, one case
-per kind:
-
-| Kind            | Velocity         | Damage | Hitbox |
-| --------------- | ---------------- | ------ | ------ |
-| `PlayerMissile` | 800 to the right | 1      | 16x4   |
-| `EnemyMissile`  | 400 to the left  | 1      | 8x8    |
-
-## Teams
-
-A ship and its missiles get the same `Team`, and so do an enemy and its
-missiles: a `Damage` never hurts a `Health` of its own side, so players do not
-shoot each other and enemies do not hurt each other. A missile also goes through
-the ships of its side without dying.
-
-An entity without a `Team` has no side: it hurts and is hurt by everyone.
-
-```cpp
-world.add(ship, common::Team{.side = common::Side::Players});
-world.add(missile, common::Team{.side = common::Side::Players});
-```
+- **Deaths**: no system destroys an entity during the tick. The entity goes in
+  `Deaths`, and the `CleanupSystem` destroys it at the end. An entity is in
+  `Deaths` only once per tick.
+- **Teams**: a missile gets the `Team` of its shooter, so it does not hurt its
+  own team. No `Team` = hurts and is hurt by everyone.
+- **Missiles**: a `Projectile` dies on its first hit, even if it touches several
+  entities in the same tick.
+- **Walls**: `Damage` without `Health` and without `Projectile` never dies.
+- **Collisions**: only between entities with the same z. All factories use z = 0.
 
 ## Limits
 
-| Rule    | Value                                                                              |
-| ------- | ---------------------------------------------------------------------------------- |
-| Damage  | only on contact (from the `Collisions`), once per pair and per tick                |
-| Missile | dies on its first hit, even if it touched several entities in the same tick       |
+- Damage only on contact, once per pair and per tick.
+- Nothing removes what leaves the screen yet: a missile that hits nothing never
+  dies.
+- `Spawns` only has the entities created by a factory.
