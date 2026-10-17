@@ -135,13 +135,16 @@ TEST(WorldMirror, SnapshotMovesKnownEntities) {
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
-      .entities = {EntityState{
-          .entityId = 7,
-          .x = 300.0F,
-          .y = 400.0F,
-          .velocityX = 0.0F,
-          .velocityY = 25.0F,
-      }},
+      .entities =
+          {
+              EntityState{
+                  .entityId = 7,
+                  .x = 300.0F,
+                  .y = 400.0F,
+                  .velocityX = 0.0F,
+                  .velocityY = 25.0F,
+              },
+          },
   });
 
   const Entity entity = entityOf(mirror, 7);
@@ -158,8 +161,11 @@ TEST(WorldMirror, SnapshotSkipsUnknownEntities) {
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
-      .entities = {EntityState{.entityId = 99, .x = 1.0F},
-                   EntityState{.entityId = 7, .x = 300.0F}},
+      .entities =
+          {
+              EntityState{.entityId = 99, .x = 1.0F},
+              EntityState{.entityId = 7, .x = 300.0F},
+          },
   });
 
   EXPECT_EQ(mirror.size(), 1U);
