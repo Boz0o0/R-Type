@@ -44,11 +44,11 @@ if(RTYPE_CLIENT)
             ampersand_audio
     )
     
-    add_executable(rtype_client
+    add_executable(r-type_client
         client/main.cpp
     )
     
-    target_link_libraries(rtype_client
+    target_link_libraries(r-type_client
         PRIVATE
             client
             ampersand_core
@@ -83,11 +83,11 @@ if(RTYPE_SERVER)
             ampersand_physics
     )
     
-    add_executable(rtype_server
+    add_executable(r-type_server
         server/main.cpp
     )
     
-    target_link_libraries(rtype_server
+    target_link_libraries(r-type_server
         PRIVATE
             server
             ampersand_core
