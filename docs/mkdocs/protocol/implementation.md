@@ -4,11 +4,13 @@ How the [protocol](specification.md) is done in the code.
 
 ## Where is it
 
-The engine's `net` module only sends and receives raw bytes
-(`ampersand::net::UdpSocket`). It doesn't know anything about R-Type. The
-R-Type packets are in the `common` module, so both the client and the server
-can use them. Like in the engine, headers and sources are kept apart:
-headers in `include/rtype/common/protocol/`, sources in `src/common/protocol/`.
+The engine's `net` module sends and receives raw bytes
+(`ampersand::net::UdpSocket`) and has the generic tools to write and read
+big-endian values (`ampersand::net::BinaryWriter` / `BinaryReader`). It doesn't
+know anything about R-Type. The R-Type packets are in the `common` module, so
+both the client and the server can use them. Like in the engine, headers and
+sources are kept apart: headers in `include/rtype/common/protocol/`, sources in
+`src/common/protocol/`.
 
 ```mermaid
 flowchart LR
@@ -16,6 +18,7 @@ flowchart LR
     Server --> Protocol
     Client --> Udp["engine: net::UdpSocket"]
     Server --> Udp
+    Protocol --> Binary["engine: net::BinaryWriter / BinaryReader"]
 ```
 
 | File | What's inside |
@@ -23,10 +26,15 @@ flowchart LR
 | `Protocol.hpp/.cpp` | constants (port, sizes, timeouts...), packet types, enums, `isReliable()` |
 | `PacketHeader.hpp` | the 12-byte header |
 | `Packets.hpp` | one struct per packet (`ConnectRequest`, `EntitySpawn`, ...) |
-| `BinaryWriter.hpp/.cpp` | writes numbers/strings in big-endian into a buffer |
-| `BinaryReader.hpp/.cpp` | reads them back, checks we never go past the end |
 | `PacketCodec.hpp/.cpp` | `encode()` and `decode()` |
 | `tests/common/tests_protocol.cpp` | unit tests |
+
+The byte tools live in the engine (`ampersand-engine/include/ampersand/net/`):
+
+| File | What's inside |
+| --- | --- |
+| `BinaryWriter.hpp/.cpp` | writes numbers/strings in big-endian into a buffer |
+| `BinaryReader.hpp/.cpp` | reads them back, checks we never go past the end |
 
 ## Why we did it like this
 
@@ -103,11 +111,41 @@ while (auto length = socket.receive(buffer, from)) {
     value to an enum, put it at the end and update `last` in
     `PacketCodec.cpp`.
 
+## Server loop
+
+The server runs two threads, in `src/server/` (headers in
+`include/rtype/server/`):
+
+```mermaid
+flowchart LR
+    Socket["UdpSocket"] -->|"receive + decode()"| Net["Network thread<br/>(ServerNetwork)"]
+    Net -->|"push"| Queue["MessageQueue<br/>(std::mutex)"]
+    Queue -->|"drain, each tick"| Game["Game thread<br/>(GameServer, 60 Hz)"]
+    Game -->|"send()"| Socket
+```
+
+- **Network thread** (`ServerNetwork`): reads every datagram, runs `decode()`
+  and pushes the valid packets into a `MessageQueue`. Bad packets (empty, too
+  short, bad magic...) are logged and dropped there, they never reach the
+  game. The queue is bounded (`MAX_QUEUED_MESSAGES`), so a flood can't eat all
+  the memory.
+- **Game thread** (`GameServer::run`): 60 times per second, even when no
+  client sends anything, it takes the queued packets, updates the `World`, and
+  sends a `WORLD_SNAPSHOT` to every client every 2 ticks (30 per second).
+- The socket is shared by both threads, so every use of it locks a mutex.
+- `Ctrl+C` stops the loop: the server sends `DISCONNECT(server shutdown)` to
+  every client and exits.
+
+On the client, `ServerConnection` sends `CONNECT_REQUEST` every 500 ms (10
+tries max) until the server answers `CONNECT_ACCEPT` with its player id, then
+sends a `PING` every second so the server doesn't time it out.
+
 ## TODO
 
-For now the code only turns packets into bytes and back. Still to do in the
-client/server:
+Still to do in the client/server:
 
 - [ ] Resending reliable packets and ignoring duplicates
-- [ ] Player list on the server (IP + port -> player), ping/pong, timeouts
+- [x] Player list on the server (IP + port -> player), PING/PONG, server-side timeouts
+- [ ] `PLAYER_JOINED` / `PLAYER_LEFT` / `ENTITY_SPAWN` when a player joins or leaves
+- [ ] Entities in `WORLD_SNAPSHOT` (empty for now, only `serverTick` moves)
 - [ ] Limit the number of packets per IP

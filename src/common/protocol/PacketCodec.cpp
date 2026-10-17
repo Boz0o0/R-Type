@@ -1,7 +1,7 @@
+#include <ampersand/net/BinaryReader.hpp>
+#include <ampersand/net/BinaryWriter.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <rtype/common/protocol/BinaryReader.hpp>
-#include <rtype/common/protocol/BinaryWriter.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/PacketHeader.hpp>
 #include <rtype/common/protocol/Packets.hpp>
@@ -14,6 +14,9 @@
 #include <vector>
 
 namespace rtype::protocol {
+
+using ampersand::net::BinaryReader;
+using ampersand::net::BinaryWriter;
 
 namespace {
 

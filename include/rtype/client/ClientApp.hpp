@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
+#include <rtype/client/ServerConnection.hpp>
 
 namespace rtype::client {
 
@@ -25,12 +26,17 @@ class ClientApp {
   static constexpr float WORLD_HEIGHT = 1080.0F;
   static constexpr ampersand::core::math::Vec2u WINDOW_SIZE{1280, 720};
   static constexpr ampersand::render::Color SPACE_COLOR{
-      .r = 4, .g = 4, .b = 14};
+      .r = 4,
+      .g = 4,
+      .b = 14,
+  };
+  static constexpr const char* PLAYER_NAME = "Player";
 
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);
 
   ClientConfig _config;
+  ServerConnection _connection;
   ampersand::render::SfmlRenderer _backend;
   ampersand::core::ecs::World _world;
   ampersand::input::InputSystem _inputSystem;

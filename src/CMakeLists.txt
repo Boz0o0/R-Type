@@ -21,6 +21,7 @@ add_project_module(common)
 target_link_libraries(common
     PUBLIC
         ampersand_core
+        ampersand_net
         ampersand_physics
 )
 
@@ -34,11 +35,11 @@ if(RTYPE_CLIENT)
     
     target_link_libraries(client
         PUBLIC
+            common
             ampersand_core
             ampersand_input
+            ampersand_net
             ampersand_render
-        PRIVATE
-            common
     )
     
     add_executable(rtype_client
@@ -65,8 +66,11 @@ if(RTYPE_SERVER)
     add_project_module(server)
     
     target_link_libraries(server
-        PRIVATE
+        PUBLIC
             common
+            ampersand_core
+            ampersand_net
+            ampersand_physics
     )
     
     add_executable(rtype_server

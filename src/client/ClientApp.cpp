@@ -15,7 +15,9 @@ namespace input = ampersand::input;
 namespace render = ampersand::render;
 
 ClientApp::ClientApp(ClientConfig config)
-    : _config(std::move(config)), _inputSystem(pollWindow) {}
+    : _config(std::move(config)),
+      _connection(this->_config.host(), this->_config.port(), PLAYER_NAME),
+      _inputSystem(pollWindow) {}
 
 void ClientApp::run() {
   auto& window = this->_world.addResource<render::Renderer>(
@@ -24,9 +26,10 @@ void ClientApp::run() {
   if (!window.isOpen) {
     throw std::runtime_error("cannot open the window");
   }
-  this->_world.addResource<render::Camera>(
-      render::Camera{.center = {WORLD_WIDTH / 2.0F, WORLD_HEIGHT / 2.0F},
-                     .size = {WORLD_WIDTH, WORLD_HEIGHT}});
+  this->_world.addResource<render::Camera>(render::Camera{
+      .center = {WORLD_WIDTH / 2.0F, WORLD_HEIGHT / 2.0F},
+      .size = {WORLD_WIDTH, WORLD_HEIGHT},
+  });
   this->_world.addResource<render::ClearColor>(
       render::ClearColor{.value = SPACE_COLOR});
   const auto& keys = this->_world.addResource<input::InputManager>();
@@ -39,12 +42,14 @@ void ClientApp::run() {
     clock.elapsed += clock.dt;
     previous = now;
 
+    this->_connection.update(now);
     this->_inputSystem.update(this->_world);
     if (keys.keysDown.contains(input::Key::Escape)) {
       window.isOpen = false;
     }
     this->_renderSystem.update(this->_world);
   }
+  this->_connection.disconnect();
 }
 
 std::optional<input::Event> ClientApp::pollWindow(core::ecs::World& world) {
