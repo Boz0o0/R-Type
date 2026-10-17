@@ -3,6 +3,7 @@
 #include <ampersand/physics/resources/Collisions.hpp>
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
+#include <rtype/common/components/Team.hpp>
 #include <rtype/common/resources/Deaths.hpp>
 #include <rtype/common/systems/DamageSystem.hpp>
 
@@ -22,7 +23,8 @@ void DamageSystem::update(World& world) {
 
 void DamageSystem::hit(World& world, Deaths& deaths, Entity attacker,
                        Entity target) {
-  if (!world.has<Damage>(attacker) || !world.has<Health>(target)) {
+  if (!world.has<Damage>(attacker) || !world.has<Health>(target) ||
+      isSameSide(world, attacker, target)) {
     return;
   }
   auto& health = world.get<Health>(target);
@@ -38,6 +40,11 @@ void DamageSystem::hit(World& world, Deaths& deaths, Entity attacker,
     deaths.entities.push_back(
         {.entity = attacker, .reason = DeathReason::Killed});
   }
+}
+
+bool DamageSystem::isSameSide(World& world, Entity first, Entity second) {
+  return world.has<Team>(first) && world.has<Team>(second) &&
+         world.get<Team>(first).side == world.get<Team>(second).side;
 }
 
 }  // namespace rtype::common

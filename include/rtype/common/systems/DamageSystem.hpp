@@ -13,6 +13,7 @@ namespace rtype::common {
  * For each pair that touches, an entity with a Damage removes its amount from
  * the Health of the other one. An entity whose Health reaches 0 dies, and an
  * entity with a Damage but no Health (a missile) dies on its first hit.
+ * Entities whose Team is on the same side do not hurt each other.
  * Deaths are added to the Deaths resource; nothing is destroyed here.
  */
 class DamageSystem final : public ampersand::core::ecs::ISystem {
@@ -39,6 +40,18 @@ class DamageSystem final : public ampersand::core::ecs::ISystem {
   static void hit(ampersand::core::ecs::World& world, Deaths& deaths,
                   ampersand::core::ecs::Entity attacker,
                   ampersand::core::ecs::Entity target);
+
+  /**
+   * @brief Checks whether two entities both have a Team, on the same side.
+   *
+   * @param world World holding both entities.
+   * @param first First entity.
+   * @param second Second entity.
+   * @return true if they are on the same side, so they do not hurt each other.
+   */
+  [[nodiscard]] static bool isSameSide(ampersand::core::ecs::World& world,
+                                       ampersand::core::ecs::Entity first,
+                                       ampersand::core::ecs::Entity second);
 };
 
 }  // namespace rtype::common
