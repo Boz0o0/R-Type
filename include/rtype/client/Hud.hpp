@@ -49,7 +49,7 @@ class Hud {
   static constexpr float SCREEN_CENTER_X = 960.0F;
   static constexpr ampersand::render::Color BANNER_COLOR{
       .r = 255, .g = 220, .b = 80};
-  static constexpr float CHAR_WIDTH = 0.55F;
+  static constexpr float LETTER_WIDTH = 0.55F;
 
   [[nodiscard]] static std::string playerLabel(std::uint8_t playerId);
   [[nodiscard]] static std::string rejectText(

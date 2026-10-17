@@ -149,7 +149,7 @@ void Hud::setBanner(std::string value) {
   }
   this->_world.get<core::Transform>(this->_banner).position.x =
       SCREEN_CENTER_X - (static_cast<float>(value.size()) *
-                         static_cast<float>(BANNER_SIZE) * CHAR_WIDTH / 2.0F);
+                         static_cast<float>(BANNER_SIZE) * LETTER_WIDTH / 2.0F);
   this->setText(this->_banner, std::move(value));
 }
 
