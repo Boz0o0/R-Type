@@ -10,17 +10,29 @@
 using rtype::client::ClientConfig;
 using HostAndPort = std::pair<std::string, std::uint16_t>;
 
-static std::optional<HostAndPort> parse(std::vector<std::string> words) {
+static std::optional<ClientConfig> configOf(std::vector<std::string> words) {
   std::vector<char*> args;
   args.reserve(words.size());
   for (std::string& word : words) {
     args.push_back(word.data());
   }
-  const auto config = ClientConfig::fromArguments(args);
+  return ClientConfig::fromArguments(args);
+}
+
+static std::optional<HostAndPort> parse(std::vector<std::string> words) {
+  const auto config = configOf(std::move(words));
   if (!config) {
     return std::nullopt;
   }
   return HostAndPort{config->host(), config->port()};
+}
+
+static std::optional<std::string> nameOf(std::vector<std::string> words) {
+  const auto config = configOf(std::move(words));
+  if (!config) {
+    return std::nullopt;
+  }
+  return config->name();
 }
 
 TEST(ClientConfig, UsesDefaultsWithoutArguments) {
@@ -49,6 +61,24 @@ TEST(ClientConfig, RejectsEmptyHost) {
 }
 
 TEST(ClientConfig, RejectsExtraArguments) {
-  EXPECT_FALSE(
-      parse({"r-type_client", "localhost", "4242", "extra"}).has_value());
+  EXPECT_FALSE(parse({"r-type_client", "localhost", "4242", "Bob", "extra"})
+                   .has_value());
+}
+
+TEST(ClientConfig, UsesPlayerAsTheDefaultName) {
+  EXPECT_EQ(nameOf({"r-type_client"}), "Player");
+}
+
+TEST(ClientConfig, ReadsTheName) {
+  EXPECT_EQ(nameOf({"r-type_client", "localhost", "4242", "Bob"}), "Bob");
+  EXPECT_EQ(nameOf({"r-type_client", "localhost", "4242", "SixteenLetters!!"}),
+            "SixteenLetters!!");
+}
+
+TEST(ClientConfig, RejectsEmptyOrTooLongNames) {
+  for (const char* name : {"", "SeventeenLetters!"}) {
+    EXPECT_FALSE(
+        nameOf({"r-type_client", "localhost", "4242", name}).has_value())
+        << "name: \"" << name << '"';
+  }
 }

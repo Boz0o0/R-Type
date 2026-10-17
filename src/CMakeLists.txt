@@ -39,6 +39,7 @@ if(RTYPE_CLIENT)
             ampersand_core
             ampersand_input
             ampersand_net
+            ampersand_physics
             ampersand_render
     )
     
