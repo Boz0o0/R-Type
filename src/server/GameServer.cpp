@@ -168,8 +168,7 @@ void GameServer::welcome(ClientSession& session, Clock::time_point now) {
     }
   }
   for (const EntityInfo& entity : this->_game.entities()) {
-    this->sendTo(session, this->toPacket(EntitySpawned{.entity = entity}),
-                 now);
+    this->sendTo(session, this->toPacket(EntitySpawned{.entity = entity}), now);
   }
   for (const PlayerChanged& state : this->_game.playerStates()) {
     this->sendTo(session, this->toPacket(state), now);

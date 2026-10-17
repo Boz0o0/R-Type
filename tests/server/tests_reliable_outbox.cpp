@@ -12,8 +12,7 @@ using rtype::server::ReliableOutbox;
 
 namespace {
 
-const ReliableOutbox::Clock::time_point START =
-    ReliableOutbox::Clock::now();
+const ReliableOutbox::Clock::time_point START = ReliableOutbox::Clock::now();
 
 std::vector<std::byte> bytes(std::uint8_t value) {
   return {std::byte{value}, std::byte{value}};
@@ -68,8 +67,8 @@ TEST(ReliableOutbox, GivesUpAfterTheLastAttempt) {
   auto now = START;
 
   // The first send was done by add(), so MAX_SEND_ATTEMPTS - 1 resends.
-  for (std::uint32_t attempt = 1;
-       attempt < rtype::protocol::MAX_SEND_ATTEMPTS; ++attempt) {
+  for (std::uint32_t attempt = 1; attempt < rtype::protocol::MAX_SEND_ATTEMPTS;
+       ++attempt) {
     now += ReliableOutbox::RESEND_INTERVAL;
     ASSERT_TRUE(resend(outbox, now));
   }

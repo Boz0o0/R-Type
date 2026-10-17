@@ -34,8 +34,7 @@ using common::EntityKind;
 using common::Kind;
 namespace InputFlag = protocol::InputFlag;
 
-Game::Game(std::uint32_t seed)
-    : _waves({SCREEN_WIDTH, SCREEN_HEIGHT}, seed) {
+Game::Game(std::uint32_t seed) : _waves({SCREEN_WIDTH, SCREEN_HEIGHT}, seed) {
   this->_world.addResource<ampersand::core::Clock>();
   this->_world.addResource<ampersand::physics::Collisions>();
   this->_world.addResource<common::Deaths>();
@@ -212,8 +211,7 @@ void Game::steer(Entity ship, std::uint8_t inputMask) {
   if (arrows.x != 0.0F && arrows.y != 0.0F) {
     speed *= DIAGONAL_FACTOR;
   }
-  this->_world.get<Velocity>(ship).value = {arrows.x * speed,
-                                            arrows.y * speed};
+  this->_world.get<Velocity>(ship).value = {arrows.x * speed, arrows.y * speed};
   this->_world.get<common::Weapon>(ship).firing =
       (inputMask & InputFlag::SHOOT) != 0;
 }
@@ -373,7 +371,8 @@ PlayerChanged Game::stateOf(std::uint8_t playerId, const Player& player) {
   }
   return PlayerChanged{
       .playerId = playerId,
-      .health = static_cast<std::uint8_t>(std::clamp<std::int32_t>(health, 0, 255)),
+      .health =
+          static_cast<std::uint8_t>(std::clamp<std::int32_t>(health, 0, 255)),
       .lives = player.lives,
       .score = player.score,
   };
@@ -383,8 +382,9 @@ EntityInfo Game::infoOf(Entity entity) {
   const auto& position = this->_world.get<Transform>(entity).position;
   EntityInfo info{
       .id = this->_world.get<NetworkId>(entity).value,
-      .kind = this->_world.has<Kind>(entity) ? this->_world.get<Kind>(entity).kind
-                                             : EntityKind::Obstacle,
+      .kind = this->_world.has<Kind>(entity)
+                  ? this->_world.get<Kind>(entity).kind
+                  : EntityKind::Obstacle,
       .position = {position.x, position.y},
   };
   if (this->_world.has<common::Owner>(entity)) {

@@ -38,10 +38,9 @@ void OutOfScreenSystem::update(ampersand::core::ecs::World& world) {
         (box.x > this->_screen.x + this->_screen.width && velocity.x >= 0.0F) ||
         (box.y + box.height < this->_screen.y && velocity.y <= 0.0F) ||
         (box.y > this->_screen.y + this->_screen.height && velocity.y >= 0.0F);
-    const bool alreadyDead =
-        std::ranges::any_of(deaths.entities, [entity](const Death& death) {
-          return death.entity == entity;
-        });
+    const bool alreadyDead = std::ranges::any_of(
+        deaths.entities,
+        [entity](const Death& death) { return death.entity == entity; });
     if (gone && !alreadyDead) {
       deaths.entities.push_back(
           {.entity = entity, .reason = DeathReason::OutOfScreen});

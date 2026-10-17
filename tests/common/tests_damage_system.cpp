@@ -156,10 +156,8 @@ TEST(DamageSystem, RemembersWhatDealtTheLastHit) {
   DamageSystem{}.update(world);
 
   const auto& deaths = world.getResource<Deaths>().entities;
-  const auto death =
-      std::ranges::find_if(deaths, [enemy](const Death& entry) {
-        return entry.entity == enemy;
-      });
+  const auto death = std::ranges::find_if(
+      deaths, [enemy](const Death& entry) { return entry.entity == enemy; });
   ASSERT_NE(death, deaths.end());
   ASSERT_TRUE(death->killer.has_value());
   EXPECT_EQ(*death->killer, lastShot);
