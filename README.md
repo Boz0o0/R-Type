@@ -44,8 +44,8 @@ To build only one of them, turn the other off with `-DRTYPE_CLIENT=OFF` or `-DRT
 Start the server, then one client per player (4 players max):
 
 ```sh
-./build/bin/r-type_server [port]          # default port: 4242
-./build/bin/r-type_client [host] [port]   # default: 127.0.0.1 4242
+./build/bin/r-type_server [port]                 # default port: 4242
+./build/bin/r-type_client [host] [port] [name]   # default: 127.0.0.1 4242 Player
 ```
 
 Stop the server with `Ctrl+C`: it tells every client before closing.

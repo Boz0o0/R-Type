@@ -51,6 +51,9 @@ The two threads only share the socket (behind a mutex) and a bounded
 
 One loop, once per frame:
 
-1. `ServerConnection`: connects to the server, then sends a `PING` every second.
-2. `InputSystem` (engine): reads the keyboard and the mouse.
-3. `RenderSystem` (engine): draws the `World` in a 1920x1080 view.
+1. `InputSystem` (engine): reads the keyboard and the mouse.
+2. `ServerConnection`: connects to the server, then sends a `PING` every second. The client stops if the server refuses it, does not answer, or goes silent for 5 seconds.
+3. `WorldMirror`: applies the packets of the server to the local `World`
+4. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
+5. `MovementSystem` (engine): moves the entities with their speed between two snapshots.
+6. `RenderSystem` (engine): draws the `World`. The game area is 1920x1080, scaled to fit the window.
