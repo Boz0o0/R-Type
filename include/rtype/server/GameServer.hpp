@@ -1,18 +1,22 @@
 #pragma once
 
-#include <ampersand/core/ecs/World.hpp>
 #include <ampersand/net/UdpSocket.hpp>
-#include <ampersand/physics/systems/MovementSystem.hpp>
 #include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <random>
+#include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/server/Game.hpp>
+#include <rtype/server/GameEvents.hpp>
+#include <rtype/server/ReliableOutbox.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace rtype::server {
 
@@ -23,15 +27,22 @@ struct ClientSession {
   std::string name;
   /** @brief When the last valid packet of this client arrived. */
   std::chrono::steady_clock::time_point lastSeen;
+  /** @brief clientTick of the newest PLAYER_INPUT used. */
+  std::optional<std::uint32_t> lastInputTick;
+  /** @brief Reliable packets sent to this client, waiting for their ACK. */
+  ReliableOutbox outbox;
 };
 
 /**
- * @brief The game thread of the server.
+ * @brief The game thread of the server: the link between the clients and
+ *        the Game.
  *
  * run() calls step() SERVER_TICK_RATE times per second, whether clients send
  * something or not. Each step handles the packets queued by the network
- * thread, updates the World, and sends a WORLD_SNAPSHOT to every client
- * SNAPSHOT_RATE times per second.
+ * thread (joins, inputs, ACKs...), runs one tick of the Game, sends its
+ * events to every client, and sends a WORLD_SNAPSHOT SNAPSHOT_RATE times per
+ * second. Reliable packets without ACK are sent again; a client that stays
+ * silent, or never acknowledges them, is removed and the others are told.
  */
 class GameServer {
  public:
@@ -47,13 +58,17 @@ class GameServer {
   /** @brief Silence after which a client is removed. */
   static constexpr std::chrono::milliseconds CLIENT_TIMEOUT{
       protocol::TIMEOUT_MS};
+  /** @brief DISCONNECT is not reliable, so it is sent this many times. */
+  static constexpr std::uint32_t DISCONNECT_REPEAT = 3;
 
   /**
    * @brief Creates an empty game.
    *
    * @param network Where packets come from and go to; must outlive the game.
+   * @param seed Seed of the random parts of the Game.
    */
-  explicit GameServer(ServerNetwork& network);
+  explicit GameServer(ServerNetwork& network,
+                      std::uint32_t seed = std::random_device{}());
 
   /**
    * @brief Runs a tick every TICK_DURATION until stopRequested becomes true,
@@ -64,7 +79,7 @@ class GameServer {
   /**
    * @brief Runs one tick.
    *
-   * @param now Current time, used for the client timeouts.
+   * @param now Current time, used for the client timeouts and the resends.
    */
   void step(Clock::time_point now);
 
@@ -73,6 +88,9 @@ class GameServer {
 
   /** @brief Number of clients in the game. */
   [[nodiscard]] std::size_t playerCount() const noexcept;
+
+  /** @brief The game logic, to inspect it (tests). */
+  [[nodiscard]] Game& game() noexcept;
 
  private:
   /**
@@ -83,21 +101,49 @@ class GameServer {
 
   void handleMessages(Clock::time_point now);
   void handleMessage(const IncomingMessage& message, Clock::time_point now);
+  void handleInput(ClientSession& session, const protocol::PlayerInput& input);
   void acceptPlayer(const ampersand::net::Endpoint& from,
                     const std::string& name, Clock::time_point now);
-  void removePlayer(std::uint8_t playerId, std::string_view reason);
+  /** @brief Sends a new client everything it needs to join the game. */
+  void welcome(ClientSession& session, Clock::time_point now);
+  void removePlayer(std::uint8_t playerId, protocol::DisconnectReason reason,
+                    Clock::time_point now);
   void dropSilentPlayers(Clock::time_point now);
-  void update();
+  void resendReliable(Clock::time_point now);
+  void broadcastEvents(const std::vector<GameEvent>& events,
+                       Clock::time_point now);
   void broadcastSnapshot();
   void shutdown();
+
+  /**
+   * @brief Sends a payload to one client; a reliable one is kept until its
+   *        ACK arrives.
+   */
+  void sendTo(ClientSession& session, const protocol::Payload& payload,
+              Clock::time_point now);
+  /** @brief sendTo() every client. */
+  void broadcast(const protocol::Payload& payload, Clock::time_point now);
+
+  /** @brief The packet that tells the clients about an event. */
+  [[nodiscard]] protocol::Payload toPacket(const GameEvent& event) const;
 
   /** @brief The client playing from this address, or nullptr. */
   [[nodiscard]] ClientSession* findSession(
       const ampersand::net::Endpoint& endpoint);
 
+  /** @brief Whether a name is valid UTF-8 without control characters. */
+  [[nodiscard]] static bool isValidName(std::string_view name);
+  /**
+   * @brief Bytes of the UTF-8 character that starts a non-empty text, or 0 if
+   *        it is invalid or a control character.
+   */
+  [[nodiscard]] static std::size_t characterLength(std::string_view text);
+  /** @brief Name of a DisconnectReason, for logs. */
+  [[nodiscard]] static std::string_view toString(
+      protocol::DisconnectReason reason);
+
   ServerNetwork& _network;
-  ampersand::core::ecs::World _world;
-  ampersand::physics::MovementSystem _movementSystem;
+  Game _game;
   /** @brief Indexed by player id; empty slots are free ids. */
   std::array<std::optional<ClientSession>, protocol::MAX_PLAYERS> _sessions;
   std::uint32_t _tick{0};

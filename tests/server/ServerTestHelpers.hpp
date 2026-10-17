@@ -10,6 +10,7 @@
 #include <rtype/server/ServerNetwork.hpp>
 #include <span>
 #include <thread>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -67,6 +68,37 @@ std::optional<T> stepUntil(GameServer& game, TestClient& client,
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return std::nullopt;
+}
+
+/**
+ * @brief Runs ticks of the game for a while and returns every packet the
+ *        client received meanwhile, in order.
+ */
+inline std::vector<protocol::Packet> collect(
+    GameServer& game, TestClient& client, GameServer::Clock::time_point now,
+    std::chrono::milliseconds wait = std::chrono::milliseconds(200)) {
+  const auto deadline = std::chrono::steady_clock::now() + wait;
+  std::vector<protocol::Packet> packets;
+  while (std::chrono::steady_clock::now() < deadline) {
+    game.step(now);
+    while (auto packet = client.poll()) {
+      packets.push_back(std::move(*packet));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return packets;
+}
+
+/** @brief The payloads of type T in a list of packets. */
+template <typename T>
+std::vector<T> payloadsOf(const std::vector<protocol::Packet>& packets) {
+  std::vector<T> found;
+  for (const protocol::Packet& packet : packets) {
+    if (const auto* payload = std::get_if<T>(&packet.payload)) {
+      found.push_back(*payload);
+    }
+  }
+  return found;
 }
 
 /** @brief Waits until the network thread has queued at least one message. */

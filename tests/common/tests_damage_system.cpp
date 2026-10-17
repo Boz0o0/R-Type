@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <cstdint>
@@ -141,4 +142,23 @@ TEST(DamageSystem, ContactDamageWithoutProjectileDoesNotDie) {
   EXPECT_EQ(world.get<Health>(enemy).current, 2);  // the ship has no Damage
   EXPECT_EQ(deathsOf(world, enemy), 0);
   EXPECT_TRUE(world.has<Damage>(enemy));
+}
+
+TEST(DamageSystem, RemembersWhatDealtTheLastHit) {
+  World world;
+  addGameplayResources(world);
+  const Entity enemy = target(world, 2);
+  const Entity firstShot = missile(world, 1);
+  const Entity lastShot = missile(world, 1);
+  touch(world, firstShot, enemy);
+  touch(world, enemy, lastShot);
+
+  DamageSystem{}.update(world);
+
+  const auto& deaths = world.getResource<Deaths>().entities;
+  const auto death = std::ranges::find_if(
+      deaths, [enemy](const Death& entry) { return entry.entity == enemy; });
+  ASSERT_NE(death, deaths.end());
+  ASSERT_TRUE(death->killer.has_value());
+  EXPECT_EQ(*death->killer, lastShot);
 }

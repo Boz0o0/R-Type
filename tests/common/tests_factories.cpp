@@ -8,6 +8,7 @@
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
+#include <rtype/common/components/Owner.hpp>
 #include <rtype/common/components/Projectile.hpp>
 #include <rtype/common/components/Team.hpp>
 #include <rtype/common/components/Weapon.hpp>
@@ -96,4 +97,22 @@ TEST(Factories, ReturnNothingWhenTheWorldIsFull) {
   EXPECT_FALSE(
       createMissile(world, EntityKind::PlayerMissile, *ship).has_value());
   EXPECT_EQ(world.getResource<Spawns>().entities.size(), 1U);
+}
+
+TEST(Factories, MissileBelongsToThePlayerWhoFired) {
+  World world;
+  addGameplayResources(world);
+  const auto ship = createShip(world, {100.0F, 500.0F});
+  const auto enemy = createEnemy(world, {1500.0F, 500.0F});
+  ASSERT_TRUE(ship && enemy);
+  world.add(*ship, Owner{.playerId = 2});
+
+  const auto playerShot =
+      createMissile(world, EntityKind::PlayerMissile, *ship);
+  const auto enemyShot = createMissile(world, EntityKind::EnemyMissile, *enemy);
+
+  ASSERT_TRUE(playerShot && enemyShot);
+  ASSERT_TRUE(world.has<Owner>(*playerShot));
+  EXPECT_EQ(world.get<Owner>(*playerShot).playerId, 2);
+  EXPECT_FALSE(world.has<Owner>(*enemyShot));
 }
