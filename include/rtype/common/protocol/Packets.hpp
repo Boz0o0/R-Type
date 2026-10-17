@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/common/resources/Deaths.hpp>
 #include <string>
 #include <vector>
 
@@ -101,7 +103,8 @@ struct EntitySpawn {
   static constexpr PacketType TYPE = PacketType::EntitySpawn;
   /** @brief Server-wide id, never reused during a game. */
   std::uint32_t entityId{};
-  EntityType entityType{};
+  /** @brief What it is, so the client knows which sprite to draw. */
+  common::EntityKind entityType{};
   /** @brief Player that owns it (ship, missile), or NO_OWNER. */
   std::uint8_t ownerId{NO_OWNER};
   /** @brief Position in world units (pixels of a 1920x1080 screen). */
@@ -116,7 +119,7 @@ struct EntitySpawn {
 struct EntityDestroy {
   static constexpr PacketType TYPE = PacketType::EntityDestroy;
   std::uint32_t entityId{};
-  DestroyReason reason{};
+  common::DeathReason reason{};
 };
 
 /** @brief State of one entity inside a WORLD_SNAPSHOT, 20 bytes. */

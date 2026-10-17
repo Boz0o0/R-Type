@@ -102,23 +102,6 @@ inline constexpr std::uint8_t SHOOT = 0x10;
 inline constexpr std::uint8_t ALL = 0x1F;
 }  // namespace InputFlag
 
-/** @brief Kind of an entity, so the client knows which sprite to draw. */
-enum class EntityType : std::uint8_t {
-  Player = 0,
-  Bydos = 1,
-  PlayerMissile = 2,
-  EnemyMissile = 3,
-  PowerUp = 4,
-  Obstacle = 5,
-};
-
-/** @brief Why an entity left the world. */
-enum class DestroyReason : std::uint8_t {
-  Killed = 0,
-  OutOfScreen = 1,
-  Collected = 2,
-};
-
 /** @brief Why a player left the game. */
 enum class DisconnectReason : std::uint8_t {
   Quit = 0,

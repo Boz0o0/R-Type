@@ -4,16 +4,22 @@
 
 namespace rtype::common {
 
-/** @brief What an entity is. */
+/**
+ * @brief What an entity is.
+ */
 enum class EntityKind : std::uint8_t {
   /** @brief Ship of a player. */
-  Ship,
+  Ship = 0,
   /** @brief Enemy. */
-  Enemy,
+  Enemy = 1,
   /** @brief Missile fired by a player. */
-  PlayerMissile,
+  PlayerMissile = 2,
   /** @brief Missile fired by an enemy. */
-  EnemyMissile,
+  EnemyMissile = 3,
+  /** @brief Bonus a player can pick up. */
+  PowerUp = 4,
+  /** @brief Part of the level, like a wall. */
+  Obstacle = 5,
 };
 
 /**

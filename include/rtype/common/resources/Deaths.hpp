@@ -6,10 +6,16 @@
 
 namespace rtype::common {
 
-/** @brief Why an entity died. */
+/**
+ * @brief Why an entity died.
+ */
 enum class DeathReason : std::uint8_t {
   /** @brief Its Health reached 0, or it is a missile that hit something. */
-  Killed,
+  Killed = 0,
+  /** @brief It left the screen. */
+  OutOfScreen = 1,
+  /** @brief A player picked it up (collectible). */
+  Collected = 2,
 };
 
 /** @brief One entity that died and why */
