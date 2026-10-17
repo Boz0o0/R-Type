@@ -11,6 +11,7 @@
 #include <ampersand/render/SfmlRenderer.hpp>
 #include <ampersand/render/systems/AnimationSystem.hpp>
 #include <ampersand/render/systems/RenderSystem.hpp>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
@@ -38,8 +39,9 @@ class ClientApp {
       .g = 4,
       .b = 14,
   };
-  // A longer frame (window dragged, debugger) would make entities jump.
+
   static constexpr float MAX_FRAME_TIME = 0.1F;
+  static constexpr std::chrono::seconds END_SCREEN_TIME{3};
 
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);

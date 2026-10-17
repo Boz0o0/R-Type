@@ -5,6 +5,7 @@
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
+#include <optional>
 #include <rtype/client/AssetLoader.hpp>
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Controls.hpp>
@@ -52,6 +53,7 @@ void ClientApp::run() {
   Hud hud(this->_world, assets.font);
 
   auto previous = std::chrono::steady_clock::now();
+  std::optional<std::chrono::steady_clock::time_point> endedAt;
   while (window.isOpen) {
     const auto now = std::chrono::steady_clock::now();
     clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
@@ -66,6 +68,13 @@ void ClientApp::run() {
     this->_connection.update(now);
     hud.showConnection(this->_connection.state(), this->_connection.playerId(),
                        this->_connection.rejectReason());
+    if (this->_connection.hasEnded()) {
+      // The HUD shows why for a moment; ServerConnection printed it too.
+      endedAt = endedAt.value_or(now);
+      if (now - *endedAt > END_SCREEN_TIME) {
+        throw std::runtime_error("the connection to the server ended");
+      }
+    }
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, hud, packet);
     }

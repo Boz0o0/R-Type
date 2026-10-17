@@ -1,6 +1,7 @@
 #include <ampersand/audio/SoundId.hpp>
 #include <ampersand/audio/components/AudioSource.hpp>
 #include <ampersand/core/components/Transform.hpp>
+#include <ampersand/core/ecs/ECSExceptions.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
@@ -34,8 +35,12 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
       this->_destroyed.contains(packet.entityId)) {
     return;
   }
-  const core::ecs::Entity entity =
+  const std::optional<core::ecs::Entity> created =
       this->create(this->lookFor(packet), {packet.x, packet.y});
+  if (!created) {
+    return;
+  }
+  const core::ecs::Entity entity = *created;
   this->_world.add(entity, physics::Velocity{
                                .value = {packet.velocityX, packet.velocityY},
                            });
@@ -115,9 +120,14 @@ const Look& WorldMirror::lookFor(const protocol::EntitySpawn& packet) const {
   return this->_looks.ships[packet.ownerId % protocol::MAX_PLAYERS];
 }
 
-core::ecs::Entity WorldMirror::create(const Look& look,
-                                      core::math::Vec2f position) {
-  const core::ecs::Entity entity = this->_world.create();
+std::optional<core::ecs::Entity> WorldMirror::create(
+    const Look& look, core::math::Vec2f position) {
+  core::ecs::Entity entity;
+  try {
+    entity = this->_world.create();
+  } catch (const core::ecs::EntityLimitReached&) {
+    return std::nullopt;
+  }
   this->_world.add(entity, core::Transform{
                                .position = {position.x, position.y, 0.0F},
                                .scale = {look.scale, look.scale, 1.0F},
@@ -144,9 +154,13 @@ void WorldMirror::explode(const core::Transform& transform,
   const float centerY =
       transform.position.y +
       (static_cast<float>(sprite.source.height) * transform.scale.y / 2.0F);
-  const core::ecs::Entity explosion = this->create(
+  const std::optional<core::ecs::Entity> created = this->create(
       look, {centerX - (static_cast<float>(frame.width) * look.scale / 2.0F),
              centerY - (static_cast<float>(frame.height) * look.scale / 2.0F)});
+  if (!created) {
+    return;
+  }
+  const core::ecs::Entity explosion = *created;
   this->_world.get<core::Transform>(explosion).position.z = EXPLOSION_LAYER;
   this->_world.add(explosion, Explosion{});
   this->play(explosion, this->_looks.explosionSound, EXPLOSION_VOLUME);

@@ -323,3 +323,27 @@ TEST(WorldMirror, MissilesAndEntitiesLeavingTheScreenDoNotExplode) {
   EXPECT_TRUE(world.owners<Explosion>().empty());
   EXPECT_EQ(mirror.size(), 0U);
 }
+
+// A full World refuses new entities: the spawn is dropped, nothing crashes.
+TEST(WorldMirror, DropsASpawnWhenTheWorldIsFull) {
+  World world(1);
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(1, EntityKind::Enemy));
+
+  EXPECT_NO_THROW(mirror.spawn(spawnPacket(2, EntityKind::Enemy)));
+
+  EXPECT_EQ(mirror.size(), 1U);
+  EXPECT_FALSE(mirror.find(2).has_value());
+}
+
+TEST(WorldMirror, KilledEnemyInAFullWorldJustDisappears) {
+  World world(1);
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
+
+  EXPECT_NO_THROW(mirror.destroy(
+      EntityDestroy{.entityId = 7, .reason = DeathReason::Killed}));
+
+  EXPECT_TRUE(world.owners<Explosion>().empty());
+  EXPECT_EQ(mirror.size(), 0U);
+}

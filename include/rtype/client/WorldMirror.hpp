@@ -42,8 +42,8 @@ class WorldMirror {
   };
 
   [[nodiscard]] const Look& lookFor(const protocol::EntitySpawn& packet) const;
-  ampersand::core::ecs::Entity create(const Look& look,
-                                      ampersand::core::math::Vec2f position);
+  std::optional<ampersand::core::ecs::Entity> create(
+      const Look& look, ampersand::core::math::Vec2f position);
   void explode(const ampersand::core::Transform& transform,
                const ampersand::render::Sprite& sprite);
   void play(ampersand::core::ecs::Entity entity,
