@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <optional>
 #include <rtype/common/protocol/Packets.hpp>
@@ -24,7 +25,12 @@ GameServer::GameServer(ServerNetwork& network) : _network(network) {
 void GameServer::run(const std::atomic<bool>& stopRequested) {
   auto nextTick = Clock::now();
   while (!stopRequested) {
-    this->step(Clock::now());
+    try {
+      this->step(Clock::now());
+    } catch (const std::exception& error) {
+      std::cerr << "[server] tick " << this->_tick
+                << " failed: " << error.what() << '\n';
+    }
     nextTick += TICK_DURATION;
     const auto now = Clock::now();
     if (now - nextTick > MAX_LAG) {
