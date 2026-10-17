@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 
@@ -81,20 +82,20 @@ std::size_t WorldMirror::size() const noexcept {
 const render::Sprite& WorldMirror::spriteFor(
     const protocol::EntitySpawn& packet) const {
   switch (packet.entityType) {
-    case protocol::EntityType::Bydos:
-      return this->_sprites.bydos;
-    case protocol::EntityType::PlayerMissile:
+    case common::EntityKind::Enemy:
+      return this->_sprites.enemy;
+    case common::EntityKind::PlayerMissile:
       return this->_sprites.playerMissile;
-    case protocol::EntityType::EnemyMissile:
+    case common::EntityKind::EnemyMissile:
       return this->_sprites.enemyMissile;
-    case protocol::EntityType::PowerUp:
+    case common::EntityKind::PowerUp:
       return this->_sprites.powerUp;
-    case protocol::EntityType::Obstacle:
+    case common::EntityKind::Obstacle:
       return this->_sprites.obstacle;
-    case protocol::EntityType::Player:
+    case common::EntityKind::Ship:
       break;
   }
-  return this->_sprites.players[packet.ownerId % protocol::MAX_PLAYERS];
+  return this->_sprites.ships[packet.ownerId % protocol::MAX_PLAYERS];
 }
 
 }  // namespace rtype::client

@@ -7,8 +7,10 @@
 #include <ampersand/render/components/Sprite.hpp>
 #include <cstdint>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/common/resources/Deaths.hpp>
 #include <stdexcept>
 
 using ampersand::core::Transform;
@@ -18,11 +20,11 @@ using ampersand::physics::Velocity;
 using ampersand::render::Sprite;
 using rtype::client::EntitySprites;
 using rtype::client::WorldMirror;
-using rtype::protocol::DestroyReason;
+using rtype::common::DeathReason;
+using rtype::common::EntityKind;
 using rtype::protocol::EntityDestroy;
 using rtype::protocol::EntitySpawn;
 using rtype::protocol::EntityState;
-using rtype::protocol::EntityType;
 using rtype::protocol::WorldSnapshot;
 
 // Each sprite gets its own texture id so the tests can tell them apart.
@@ -30,9 +32,9 @@ static EntitySprites testSprites() {
   EntitySprites sprites;
   for (std::uint32_t player = 0; player < rtype::protocol::MAX_PLAYERS;
        ++player) {
-    sprites.players[player].texture = player;
+    sprites.ships[player].texture = player;
   }
-  sprites.bydos.texture = 10;
+  sprites.enemy.texture = 10;
   sprites.playerMissile.texture = 11;
   sprites.enemyMissile.texture = 12;
   sprites.powerUp.texture = 13;
@@ -42,11 +44,11 @@ static EntitySprites testSprites() {
 }
 
 static EntitySpawn spawnPacket(
-    std::uint32_t entityId, EntityType type,
+    std::uint32_t entityId, EntityKind kind,
     std::uint8_t ownerId = rtype::protocol::NO_OWNER) {
   return EntitySpawn{
       .entityId = entityId,
-      .entityType = type,
+      .entityType = kind,
       .ownerId = ownerId,
       .x = 100.0F,
       .y = 200.0F,
@@ -72,7 +74,7 @@ TEST(WorldMirror, SpawnsTheEntityWhereTheServerSays) {
   World world;
   WorldMirror mirror(world, testSprites());
 
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   EXPECT_EQ(mirror.size(), 1U);
   const Entity entity = entityOf(mirror, 7);
@@ -85,14 +87,14 @@ TEST(WorldMirror, SpawnsTheEntityWhereTheServerSays) {
   EXPECT_EQ(world.get<Sprite>(entity).texture, 10U);
 }
 
-TEST(WorldMirror, PicksTheSpriteOfEachEntityType) {
+TEST(WorldMirror, PicksTheSpriteOfEachKind) {
   World world;
   WorldMirror mirror(world, testSprites());
 
-  mirror.spawn(spawnPacket(1, EntityType::PlayerMissile));
-  mirror.spawn(spawnPacket(2, EntityType::EnemyMissile));
-  mirror.spawn(spawnPacket(3, EntityType::PowerUp));
-  mirror.spawn(spawnPacket(4, EntityType::Obstacle));
+  mirror.spawn(spawnPacket(1, EntityKind::PlayerMissile));
+  mirror.spawn(spawnPacket(2, EntityKind::EnemyMissile));
+  mirror.spawn(spawnPacket(3, EntityKind::PowerUp));
+  mirror.spawn(spawnPacket(4, EntityKind::Obstacle));
 
   EXPECT_EQ(world.get<Sprite>(entityOf(mirror, 1)).texture, 11U);
   EXPECT_EQ(world.get<Sprite>(entityOf(mirror, 2)).texture, 12U);
@@ -100,12 +102,12 @@ TEST(WorldMirror, PicksTheSpriteOfEachEntityType) {
   EXPECT_EQ(world.get<Sprite>(entityOf(mirror, 4)).texture, 14U);
 }
 
-TEST(WorldMirror, GivesEachPlayerShipTheSpriteOfItsOwner) {
+TEST(WorldMirror, GivesEachShipTheSpriteOfItsOwner) {
   World world;
   WorldMirror mirror(world, testSprites());
 
   for (std::uint8_t owner = 0; owner < rtype::protocol::MAX_PLAYERS; ++owner) {
-    mirror.spawn(spawnPacket(owner + 1U, EntityType::Player, owner));
+    mirror.spawn(spawnPacket(owner + 1U, EntityKind::Ship, owner));
   }
 
   for (std::uint8_t owner = 0; owner < rtype::protocol::MAX_PLAYERS; ++owner) {
@@ -116,9 +118,9 @@ TEST(WorldMirror, GivesEachPlayerShipTheSpriteOfItsOwner) {
 TEST(WorldMirror, IgnoresASpawnItAlreadyHas) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
-  EntitySpawn again = spawnPacket(7, EntityType::Bydos);
+  EntitySpawn again = spawnPacket(7, EntityKind::Enemy);
   again.x = 500.0F;
   mirror.spawn(again);
 
@@ -129,7 +131,7 @@ TEST(WorldMirror, IgnoresASpawnItAlreadyHas) {
 TEST(WorldMirror, SnapshotMovesKnownEntities) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
@@ -152,7 +154,7 @@ TEST(WorldMirror, SnapshotMovesKnownEntities) {
 TEST(WorldMirror, SnapshotSkipsUnknownEntities) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
@@ -168,7 +170,7 @@ TEST(WorldMirror, SnapshotSkipsUnknownEntities) {
 TEST(WorldMirror, IgnoresASnapshotOlderThanTheLastOne) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
@@ -186,8 +188,8 @@ TEST(WorldMirror, IgnoresASnapshotOlderThanTheLastOne) {
 TEST(WorldMirror, AcceptsSeveralSnapshotsWithTheSameTick) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(1, EntityType::Bydos));
-  mirror.spawn(spawnPacket(2, EntityType::Bydos));
+  mirror.spawn(spawnPacket(1, EntityKind::Enemy));
+  mirror.spawn(spawnPacket(2, EntityKind::Enemy));
 
   mirror.applySnapshot(WorldSnapshot{
       .serverTick = 10,
@@ -205,10 +207,10 @@ TEST(WorldMirror, AcceptsSeveralSnapshotsWithTheSameTick) {
 TEST(WorldMirror, DestroyRemovesTheEntity) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
   const Entity entity = entityOf(mirror, 7);
 
-  mirror.destroy(EntityDestroy{.entityId = 7, .reason = DestroyReason::Killed});
+  mirror.destroy(EntityDestroy{.entityId = 7, .reason = DeathReason::Killed});
 
   EXPECT_EQ(mirror.size(), 0U);
   EXPECT_FALSE(mirror.find(7).has_value());
@@ -218,10 +220,10 @@ TEST(WorldMirror, DestroyRemovesTheEntity) {
 TEST(WorldMirror, DestroyOfAnUnknownIdChangesNothing) {
   World world;
   WorldMirror mirror(world, testSprites());
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   mirror.destroy(
-      EntityDestroy{.entityId = 99, .reason = DestroyReason::OutOfScreen});
+      EntityDestroy{.entityId = 99, .reason = DeathReason::OutOfScreen});
 
   EXPECT_EQ(mirror.size(), 1U);
   EXPECT_TRUE(mirror.find(7).has_value());
@@ -232,8 +234,8 @@ TEST(WorldMirror, DropsASpawnThatArrivesAfterItsDestroy) {
   World world;
   WorldMirror mirror(world, testSprites());
 
-  mirror.destroy(EntityDestroy{.entityId = 7, .reason = DestroyReason::Killed});
-  mirror.spawn(spawnPacket(7, EntityType::Bydos));
+  mirror.destroy(EntityDestroy{.entityId = 7, .reason = DeathReason::Killed});
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
 
   EXPECT_EQ(mirror.size(), 0U);
   EXPECT_FALSE(mirror.find(7).has_value());

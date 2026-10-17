@@ -15,8 +15,8 @@
 namespace rtype::client {
 
 struct EntitySprites {
-  std::array<ampersand::render::Sprite, protocol::MAX_PLAYERS> players;
-  ampersand::render::Sprite bydos;
+  std::array<ampersand::render::Sprite, protocol::MAX_PLAYERS> ships;
+  ampersand::render::Sprite enemy;
   ampersand::render::Sprite playerMissile;
   ampersand::render::Sprite enemyMissile;
   ampersand::render::Sprite powerUp;
