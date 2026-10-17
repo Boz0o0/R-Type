@@ -19,7 +19,8 @@ class ShootingSystem final : public ampersand::core::ecs::ISystem {
    * fired.
    *
    * @param world World holding the entities and the Clock resource.
-   * @throws ResourceNotFound if the World has no Clock.
+   * @throws ResourceNotFound if the World has no Clock, or no Spawns when a
+   *         Weapon fires.
    */
   void update(ampersand::core::ecs::World& world) override;
 };
