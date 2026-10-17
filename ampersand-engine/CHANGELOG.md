@@ -24,6 +24,10 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+### Added
+
+- **Net**: `BinaryWriter` and `BinaryReader`, to write values in big-endian into a byte buffer and read them back with bounds checks.
+
 ## [0.1.0] - 2026-10-16
 
 First release, with the very base of the engine.
