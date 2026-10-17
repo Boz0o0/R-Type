@@ -284,8 +284,8 @@ Health, lives or score of a player changed.
 | --- | --- | --- | --- |
 | 0 | `playerId` | `u8` | 0 to 3 |
 | 1 | `health` | `u8` | 0 = ship destroyed |
-| 2 | `lives` | `u8` | |
-| 3 | `score` | `u32` | |
+| 2 | `lives` | `u8` | ships left, counting the one on screen (or coming back). 0 = out of the game |
+| 3 | `score` | `u32` | 100 points per Bydos shot down |
 
 #### GAME_OVER (0x27)
 
@@ -361,15 +361,19 @@ sequenceDiagram
   CONNECT_REQUEST again, the server sends the same CONNECT_ACCEPT again, it
   doesn't create a new player.
 - The server refuses when there are already 4 players, when the name is not
-  valid UTF-8, or (if it wants) when the game already started. If the version
-  is different, it answers "wrong version".
+  valid UTF-8 or holds control characters, or (if it wants) when the game
+  already started. If the version is different, it answers "wrong version".
+  Our server lets players join a running game.
 - After accepting, the server sends the new client everything it needs:
-  a PLAYER_JOINED per player (him included) and an ENTITY_SPAWN per entity.
-  The other clients get a PLAYER_JOINED and the ENTITY_SPAWN of the new ship.
+  a PLAYER_JOINED per player (him included), an ENTITY_SPAWN per entity, a
+  PLAYER_STATE per other player, and GAME_START if a game is running.
+  The other clients get a PLAYER_JOINED, then everyone gets the ENTITY_SPAWN
+  and the PLAYER_STATE of the new ship on the next tick.
 
 ## During the game
 
-- The server sends GAME_START when the game starts.
+- The server sends GAME_START when the game starts: as soon as the first
+  player joins. A player who joins later gets it right away.
 - The client sends PLAYER_INPUT every frame (at least 60 per second) and right
   away when a key changes. The server uses the last input of each player at
   each tick. Inputs sent before GAME_START are ignored.
@@ -377,7 +381,11 @@ sequenceDiagram
   the client moves the entities with their speed so it looks smooth.
 - Every event (spawn, missile fired, death, score change...) is sent to
   **all** the clients as a reliable packet.
-- At the end the server sends GAME_OVER.
+- At the end the server sends GAME_OVER: "defeat" when every ship is lost
+  (each player has 3 lives, a lost ship comes back after 2 seconds),
+  "victory" when every wave of Bydos is beaten. Every entity left is
+  destroyed (ENTITY_DESTROY), and 5 seconds later a new game starts with a
+  new GAME_START.
 
 ## Disconnection and timeout
 
@@ -422,8 +430,10 @@ memory or read outside the buffer.
 - The answer to an unknown IP (CONNECT_REJECT, 13 bytes) is always smaller
   than the request (at least 14 bytes), so the server can't be used for a
   DDoS amplification attack.
-- The server should limit how many packets one IP can send per second (around
-  200) and drop the rest.
+- The server accepts at most 500 packets per second from one sender (IP +
+  port) and drops the rest. It counts per IP + port, not per IP, so that
+  several players can play from the same machine; it counts at most 1024
+  senders per second, so spoofed addresses can't make it use more memory.
 
 ## Constants
 
