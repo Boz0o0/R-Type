@@ -35,7 +35,16 @@ std::vector<IncomingMessage> ServerNetwork::receive() {
 
 void ServerNetwork::send(const protocol::Payload& payload,
                          const Endpoint& target) {
-  const auto datagram = protocol::encode(payload, this->_sequence++);
+  this->sendDatagram(this->encode(payload).bytes, target);
+}
+
+OutgoingDatagram ServerNetwork::encode(const protocol::Payload& payload) {
+  const std::uint32_t sequence = this->_sequence++;
+  return {.sequence = sequence, .bytes = protocol::encode(payload, sequence)};
+}
+
+void ServerNetwork::sendDatagram(std::span<const std::byte> datagram,
+                                 const Endpoint& target) {
   try {
     const std::scoped_lock lock(this->_socketMutex);
     this->_socket.send(datagram, target);
@@ -61,13 +70,14 @@ bool ServerNetwork::receiveOne(std::span<std::byte> buffer) {
     const std::scoped_lock lock(this->_socketMutex);
     length = this->_socket.receive(buffer, from);
   } catch (const NetError& error) {
-    // Windows reports an ICMP "port unreachable" from a closed client as a
-    // receive error: it must not stop the thread.
     std::cerr << "[server] " << error.what() << '\n';
     return false;
   }
   if (!length) {
     return false;
+  }
+  if (!this->_rateLimiter.allow(from, RateLimiter::Clock::now())) {
+    return true;
   }
 
   protocol::Packet packet;
