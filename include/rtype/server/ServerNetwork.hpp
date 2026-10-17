@@ -8,6 +8,7 @@
 #include <mutex>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/server/MessageQueue.hpp>
+#include <rtype/server/RateLimiter.hpp>
 #include <span>
 #include <stop_token>
 #include <thread>
@@ -21,13 +22,22 @@ struct IncomingMessage {
   protocol::Packet packet;
 };
 
+/** @brief An encoded packet, ready to be sent (and sent again). */
+struct OutgoingDatagram {
+  /** @brief Sequence written in its header. */
+  std::uint32_t sequence{};
+  /** @brief Its bytes, header included. */
+  std::vector<std::byte> bytes;
+};
+
 /**
  * @brief The network thread of the server.
  *
  * As soon as it is built, a thread reads every datagram that arrives on the
  * socket, decodes it and pushes it into a MessageQueue. Datagrams that
  * protocol::decode() refuses (empty, too short, bad magic...) are logged and
- * dropped: they never reach the game and never crash the server.
+ * dropped: they never reach the game and never crash the server. So are the
+ * datagrams of a sender past MAX_PACKETS_PER_SECOND.
  *
  * The game thread takes the messages with receive() and answers with send().
  * Both threads share the socket, so every use of it locks a mutex.
@@ -36,6 +46,15 @@ class ServerNetwork {
  public:
   /** @brief Most messages waiting between two game ticks; more are dropped. */
   static constexpr std::size_t MAX_QUEUED_MESSAGES = 4096;
+  /**
+   * @brief Datagrams accepted per second from one sender (IP + port).
+   *
+   * A client sends an input per frame (up to 144 with vsync on a fast
+   * screen), an ACK per event and a PING per second: this leaves it room.
+   */
+  static constexpr std::uint32_t MAX_PACKETS_PER_SECOND = 500;
+  /** @brief Senders counted per second; datagrams of more are dropped. */
+  static constexpr std::size_t MAX_SENDERS_PER_SECOND = 1024;
 
   /**
    * @brief Binds the socket and starts the network thread.
@@ -74,6 +93,22 @@ class ServerNetwork {
   void send(const protocol::Payload& payload,
             const ampersand::net::Endpoint& target);
 
+  /**
+   * @brief Encodes a payload with the next sequence of the server, without
+   *        sending it, so that it can be sent again with the same bytes.
+   *
+   * @throws protocol::ProtocolError If the payload breaks the protocol.
+   */
+  [[nodiscard]] OutgoingDatagram encode(const protocol::Payload& payload);
+
+  /**
+   * @brief Sends bytes already encoded. Can be called from any thread.
+   *
+   * A send that fails is logged and dropped, like send().
+   */
+  void sendDatagram(std::span<const std::byte> datagram,
+                    const ampersand::net::Endpoint& target);
+
  private:
   /** @brief Wait between two polls of the socket when nothing arrived. */
   static constexpr std::chrono::milliseconds IDLE_DELAY{1};
@@ -93,6 +128,11 @@ class ServerNetwork {
   ampersand::net::UdpSocket _socket;
   std::atomic<std::uint32_t> _sequence{0};
   MessageQueue<IncomingMessage> _queue{MAX_QUEUED_MESSAGES};
+  /** @brief Only used by the network thread. */
+  RateLimiter _rateLimiter{{
+      .packetsPerSecond = MAX_PACKETS_PER_SECOND,
+      .senders = MAX_SENDERS_PER_SECOND,
+  }};
   // Last member: started once everything above is built, and stopped (then
   // joined) before anything above is destroyed.
   std::jthread _thread;
