@@ -13,13 +13,15 @@ void ShootingSystem::update(ampersand::core::ecs::World& world) {
   const float deltaTime = world.getResource<ampersand::core::Clock>().dt;
   for (const ampersand::core::ecs::Entity entity : world.owners<Weapon>()) {
     auto& weapon = world.get<Weapon>(entity);
-    weapon.remaining -= deltaTime;
     if (!weapon.firing || !world.has<ampersand::core::Transform>(entity)) {
-      weapon.remaining = std::max(weapon.remaining, 0.0F);
-    } else if (weapon.remaining <= 0.0F) {
+      weapon.remaining = std::max(weapon.remaining - deltaTime, 0.0F);
+      continue;
+    }
+    if (weapon.remaining <= 0.0F) {
       weapon.remaining = std::max(weapon.remaining + weapon.cooldown, 0.0F);
       createMissile(world, weapon.missile, entity);
     }
+    weapon.remaining -= deltaTime;
   }
 }
 

@@ -7,7 +7,7 @@
 | `Health`         | component | hit points (`current`, `max`), dies at 0                     |
 | `Damage`         | component | hit points removed from what it touches                      |
 | `Team`           | component | `Players` or `Enemies`, no damage inside a team              |
-| `Kind`           | component | what it is: `Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile` |
+| `Kind`           | component | what it is: `Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile`, `PowerUp`, `Obstacle` (sent to the clients, values never change) |
 | `Weapon`         | component | fires a `missile` every `cooldown` seconds while `firing`    |
 | `Projectile`     | component | tag, dies on its first hit                                   |
 | `Deaths`         | resource  | entities dead this tick, and why                             |
@@ -29,8 +29,9 @@ Always create an entity with a factory: it adds all the components and fills
 | `createMissile` enemy  | none   | 1      | shooter's | 400 left  | 8x8   | none                          |
 
 ```cpp
-const Entity ship = common::createShip(world, {100, 500});
-world.get<common::Weapon>(ship).firing = true;  // shoot
+if (const auto ship = common::createShip(world, {100, 500})) {
+  world.get<common::Weapon>(*ship).firing = true;  // shoot
+}
 ```
 
 ## Tick
@@ -69,3 +70,4 @@ while (running) {
 - Nothing removes what leaves the screen yet: a missile that hits nothing never
   dies.
 - `Spawns` only has the entities created by a factory.
+- A factory returns nothing (`std::nullopt`) when the World is full.
