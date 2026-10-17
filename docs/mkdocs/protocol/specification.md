@@ -101,10 +101,11 @@ on the "yes" packets and only on them.
 
 ### Enums
 
-**EntityType**: `0` player, `1` Bydos, `2` player missile, `3` enemy missile,
-`4` power-up, `5` obstacle.
+**EntityKind** (`rtype::common`, in `Kind.hpp`): `0` ship, `1` enemy, `2` player
+missile, `3` enemy missile, `4` power-up, `5` obstacle.
 
-**DestroyReason**: `0` killed, `1` out of screen, `2` collected.
+**DeathReason** (`rtype::common`, in `Deaths.hpp`): `0` killed, `1` out of
+screen, `2` collected.
 
 **DisconnectReason**: `0` quit, `1` timeout, `2` kicked, `3` server shutdown.
 
@@ -234,7 +235,7 @@ A new entity appears: a ship, a Bydos, a missile, a power-up...
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
 | 0 | `entityId` | `u32` | unique id, never reused in the same game |
-| 4 | `entityType` | `EntityType` | tells the client which sprite to use |
+| 4 | `entityType` | `EntityKind` | tells the client which sprite to use |
 | 5 | `ownerId` | `u8` | player who owns it, or `0xFF` |
 | 6 | `x` | `f32` | position |
 | 10 | `y` | `f32` | |
@@ -250,7 +251,7 @@ An entity is removed.
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
 | 0 | `entityId` | `u32` | |
-| 4 | `reason` | `DestroyReason` | only "killed" shows an explosion |
+| 4 | `reason` | `DeathReason` | only "killed" shows an explosion |
 
 #### WORLD_SNAPSHOT (0x25)
 

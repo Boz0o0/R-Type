@@ -90,7 +90,7 @@ TEST(protocol, round_trip_game_packets) {
 
   const auto spawn = roundTrip(EntitySpawn{
       .entityId = 99,
-      .entityType = EntityType::Bydos,
+      .entityType = rtype::common::EntityKind::Enemy,
       .ownerId = NO_OWNER,
       .x = 1920.5F,
       .y = -12.25F,
@@ -98,15 +98,15 @@ TEST(protocol, round_trip_game_packets) {
       .velocityY = 0.0F,
   });
   EXPECT_EQ(spawn.entityId, 99U);
-  EXPECT_EQ(spawn.entityType, EntityType::Bydos);
+  EXPECT_EQ(spawn.entityType, rtype::common::EntityKind::Enemy);
   EXPECT_EQ(spawn.ownerId, NO_OWNER);
   EXPECT_FLOAT_EQ(spawn.x, 1920.5F);
   EXPECT_FLOAT_EQ(spawn.y, -12.25F);
   EXPECT_FLOAT_EQ(spawn.velocityX, -200.0F);
 
-  const auto destroy = roundTrip(
-      EntityDestroy{.entityId = 5, .reason = DestroyReason::OutOfScreen});
-  EXPECT_EQ(destroy.reason, DestroyReason::OutOfScreen);
+  const auto destroy = roundTrip(EntityDestroy{
+      .entityId = 5, .reason = rtype::common::DeathReason::OutOfScreen});
+  EXPECT_EQ(destroy.reason, rtype::common::DeathReason::OutOfScreen);
 
   const auto state = roundTrip(
       PlayerState{.playerId = 0, .health = 3, .lives = 2, .score = 79500});
