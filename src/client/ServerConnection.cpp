@@ -94,6 +94,12 @@ ServerConnection::State ServerConnection::state() const noexcept {
   return this->_state;
 }
 
+bool ServerConnection::hasEnded() const noexcept {
+  return this->_state == State::Rejected ||
+         this->_state == State::Unreachable ||
+         this->_state == State::Disconnected;
+}
+
 std::optional<std::uint8_t> ServerConnection::playerId() const noexcept {
   return this->_playerId;
 }

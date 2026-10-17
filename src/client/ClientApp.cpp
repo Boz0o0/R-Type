@@ -55,6 +55,10 @@ void ClientApp::run() {
       window.isOpen = false;
     }
     this->_connection.update(now);
+    if (this->_connection.hasEnded()) {
+      // ServerConnection already printed why.
+      throw std::runtime_error("the connection to the server ended");
+    }
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, packet);
     }

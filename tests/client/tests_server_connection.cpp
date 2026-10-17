@@ -124,6 +124,7 @@ TEST(ServerConnection, ConnectsWhenTheServerAccepts) {
   updateUntilStateChanges(connection, START);
 
   EXPECT_EQ(connection.state(), State::Connected);
+  EXPECT_FALSE(connection.hasEnded());
   EXPECT_EQ(connection.playerId(), 2);
   // CONNECT_ACCEPT is reliable, so the client acknowledges it.
   const Packet ack = server.receive();
@@ -141,6 +142,7 @@ TEST(ServerConnection, StopsWhenTheServerRejects) {
   updateUntilStateChanges(connection, START);
 
   EXPECT_EQ(connection.state(), State::Rejected);
+  EXPECT_TRUE(connection.hasEnded());
   EXPECT_EQ(connection.rejectReason(), RejectReason::ServerFull);
   EXPECT_FALSE(connection.playerId().has_value());
 }
@@ -163,9 +165,11 @@ TEST(ServerConnection, RetriesThenGivesUp) {
         std::holds_alternative<ConnectRequest>(server.receive().payload));
   }
   EXPECT_EQ(connection.state(), State::Connecting);
+  EXPECT_FALSE(connection.hasEnded());
 
   connection.update(now);
   EXPECT_EQ(connection.state(), State::Unreachable);
+  EXPECT_TRUE(connection.hasEnded());
 }
 
 TEST(ServerConnection, IgnoresGarbageAndOtherSenders) {
@@ -254,6 +258,7 @@ TEST(ServerConnection, DisconnectsWhenTheServerGoesSilent) {
   connection.update(START + ServerConnection::SERVER_TIMEOUT +
                     std::chrono::milliseconds(1));
   EXPECT_EQ(connection.state(), State::Disconnected);
+  EXPECT_TRUE(connection.hasEnded());
 }
 
 TEST(ServerConnection, SendsInputOnlyOnceConnected) {

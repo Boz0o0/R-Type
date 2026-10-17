@@ -240,3 +240,15 @@ TEST(WorldMirror, DropsASpawnThatArrivesAfterItsDestroy) {
   EXPECT_EQ(mirror.size(), 0U);
   EXPECT_FALSE(mirror.find(7).has_value());
 }
+
+// A full World refuses new entities: the spawn is dropped, nothing crashes.
+TEST(WorldMirror, DropsASpawnWhenTheWorldIsFull) {
+  World world(1);
+  WorldMirror mirror(world, testSprites());
+  mirror.spawn(spawnPacket(1, EntityKind::Enemy));
+
+  EXPECT_NO_THROW(mirror.spawn(spawnPacket(2, EntityKind::Enemy)));
+
+  EXPECT_EQ(mirror.size(), 1U);
+  EXPECT_FALSE(mirror.find(2).has_value());
+}

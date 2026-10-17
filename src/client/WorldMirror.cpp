@@ -1,4 +1,5 @@
 #include <ampersand/core/components/Transform.hpp>
+#include <ampersand/core/ecs/ECSExceptions.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
@@ -25,8 +26,13 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
       this->_destroyed.contains(packet.entityId)) {
     return;
   }
+  core::ecs::Entity entity;
+  try {
+    entity = this->_world.create();
+  } catch (const core::ecs::EntityLimitReached&) {
+    return;
+  }
   const float scale = this->_sprites.scale;
-  const core::ecs::Entity entity = this->_world.create();
   this->_world.add(entity, core::Transform{
                                .position = {packet.x, packet.y, 0.0F},
                                .scale = {scale, scale, 1.0F},

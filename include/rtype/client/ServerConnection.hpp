@@ -85,6 +85,8 @@ class ServerConnection {
   [[nodiscard]] std::vector<protocol::Payload> takePackets();
 
   [[nodiscard]] State state() const noexcept;
+  /** @brief Rejected, Unreachable or Disconnected: nothing more will come. */
+  [[nodiscard]] bool hasEnded() const noexcept;
   /** @brief Id given by the server, once connected. */
   [[nodiscard]] std::optional<std::uint8_t> playerId() const noexcept;
   /** @brief Why the server refused us, once rejected. */
