@@ -201,7 +201,7 @@ bool readPayload(BinaryReader& reader, PlayerLeft& payload) {
 
 bool readPayload(BinaryReader& reader, EntitySpawn& payload) {
   return reader.read(payload.entityId) &&
-         reader.readEnum(payload.entityType, EntityType::Obstacle) &&
+         reader.readEnum(payload.entityType, common::EntityKind::Obstacle) &&
          reader.read(payload.ownerId) &&
          (payload.ownerId == NO_OWNER || isPlayerId(payload.ownerId)) &&
          reader.readFloat(payload.x) && reader.readFloat(payload.y) &&
@@ -211,7 +211,7 @@ bool readPayload(BinaryReader& reader, EntitySpawn& payload) {
 
 bool readPayload(BinaryReader& reader, EntityDestroy& payload) {
   return reader.read(payload.entityId) &&
-         reader.readEnum(payload.reason, DestroyReason::Collected);
+         reader.readEnum(payload.reason, common::DeathReason::Collected);
 }
 
 bool readPayload(BinaryReader& reader, WorldSnapshot& payload) {

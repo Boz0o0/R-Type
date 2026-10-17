@@ -29,6 +29,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Gameplay: gameplay.md
   - Network Protocol:
       - Protocol: protocol/specification.md
       - Code: protocol/implementation.md
