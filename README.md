@@ -28,7 +28,7 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-The executables are placed in `build/bin/`: `rtype_client` and `rtype_server`.
+The executables are placed in `build/bin/`: `r-type_client` and `r-type_server`.
 
 To build only one of them, turn the other off with `-DRTYPE_CLIENT=OFF` or `-DRTYPE_SERVER=OFF`.
 
