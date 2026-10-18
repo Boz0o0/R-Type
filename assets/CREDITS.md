@@ -7,6 +7,7 @@
 | `sprites/player-shots.png` | `r-typesheet1.gif` from the Epitech | placeholder, to be replaced |
 | `sprites/enemy-shots.png` | `r-typesheet43.gif` from the Epitech | placeholder, to be replaced |
 | `sprites/explosions.png` | `r-typesheet44.gif` from the Epitech | placeholder, to be replaced |
+| `sprites/starfield-back.png`, `sprites/starfield-front.png` | made by the team (generated pixel stars and planets) | ours |
 | `fonts/tuffy.ttf` | Tuffy by Thatcher Ulrich, shipped with the SFML examples | public domain |
 | `sounds/shoot.wav` | made by the team with ffmpeg (square wave sweep) | ours |
 | `sounds/explosion.wav` | made by the team with ffmpeg (filtered brown noise) | ours |

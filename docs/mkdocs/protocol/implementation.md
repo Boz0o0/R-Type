@@ -198,4 +198,4 @@ Still to do in the client/server:
 - [x] `PLAYER_JOINED` / `PLAYER_LEFT` / `ENTITY_SPAWN` when a player joins or leaves
 - [x] Entities in `WORLD_SNAPSHOT`
 - [x] Limit the number of packets per sender
-- [ ] Client: use `PLAYER_STATE` / `GAME_OVER` (HUD with lives and score)
+- [x] Client: use `PLAYER_STATE` / `GAME_OVER` (HUD with lives and score)

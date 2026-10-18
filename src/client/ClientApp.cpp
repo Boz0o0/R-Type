@@ -10,6 +10,7 @@
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Controls.hpp>
 #include <rtype/client/Hud.hpp>
+#include <rtype/client/Starfield.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
@@ -49,6 +50,7 @@ void ClientApp::run() {
       audio::AudioListener{.engine = this->_audioEngine});
   const Assets assets = AssetLoader::load(this->_backend, this->_audioEngine,
                                           this->_config.assetsDirectory());
+  Starfield::spawn(this->_world, assets.starfield);
   WorldMirror worldMirror(this->_world, assets.looks);
   Hud hud(this->_world, assets.font);
 
@@ -75,6 +77,7 @@ void ClientApp::run() {
     }
     this->_connection.sendInput(Controls::inputMask(keys.keysDown));
     this->_movementSystem.update(this->_world);
+    this->_scrollingSystem.update(this->_world);
     this->_animationSystem.update(this->_world);
     this->_explosionSystem.update(this->_world);
     this->_audioSystem.update(this->_world);

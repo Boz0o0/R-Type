@@ -48,6 +48,10 @@ Assets AssetLoader::load(render::IRenderer& renderer,
   assets.looks.explosion = animated(explosions, EXPLOSION_FRAMES,
                                     EXPLOSION_FRAME_TIME, EXPLOSION_SCALE);
   assets.looks.explosion.animation.loop = false;
+  assets.starfield = {
+      texture(renderer, sprites / "starfield-back.png"),
+      texture(renderer, sprites / "starfield-front.png"),
+  };
 
   assets.looks.shootSound = sound(audio, directory / "sounds" / "shoot.wav");
   assets.looks.explosionSound =
