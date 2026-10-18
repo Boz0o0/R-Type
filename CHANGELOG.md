@@ -28,7 +28,7 @@ First playable version (Part 1).
 
 ### Added
 
-- **Gameplay**: ships, ennemies and missiles as ECS components and systems in `src/common/`.
+- **Gameplay**: ships, enemies and missiles as ECS components and systems in `src/common/`.
 - **Server**: up to 4 players, 10 waves, 3 lives per player, score, victory or defeat, new game 5 s after the end. Network on its own thread, game at 60 ticks per second.
 - **Protocol**: binary UDP protocol (see the specification), reliable packets with acks and resends, timeout of silent players, packet limit per sender.
 - **Client**: animated sprites, one colour per player, explosions, sounds, HUD (connection, health, lives, score, events), scrolling background.
