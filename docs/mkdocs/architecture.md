@@ -21,7 +21,7 @@ An arrow means "uses".
 | Gameplay | `src/common/`          | components, resources and systems of the game rules ([Gameplay](gameplay.md)) |
 | Protocol | `src/common/protocol/` | the packets, and how they are turned into bytes and back ([Protocol](protocol/specification.md)) |
 | Server   | `src/server/`          | accepts the players and runs the game loop                               |
-| Client   | `src/client/`          | opens the window, reads the keyboard, talks to the server                |
+| Client   | `src/client/`          | opens the window, reads the keyboard, talks to the server, shows and plays what the server says |
 
 The headers are in `include/rtype/`, in the same folders.
 
@@ -49,11 +49,32 @@ The two threads only share the socket (behind a mutex) and a bounded
 
 ## Client
 
+Before the loop, `AssetLoader` loads the sprite sheets, the font and the
+sounds from the `assets/` folder next to the binary (CMake copies it there,
+the sources are in `assets/CREDITS.md`). The client stops if a file is
+missing.
+
 One loop, once per frame:
 
-1. `InputSystem` (engine): reads the keyboard and the mouse.
-2. `ServerConnection`: connects to the server, then sends a `PING` every second. The client stops if the server refuses it, does not answer, or goes silent for 5 seconds.
-3. `WorldMirror`: applies the packets of the server to the local `World`
-4. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
-5. `MovementSystem` (engine): moves the entities with their speed between two snapshots.
-6. `RenderSystem` (engine): draws the `World`. The game area is 1920x1080, scaled to fit the window.
+1. `InputSystem` (engine): reads the keyboard and the mouse. Escape quits.
+2. `ServerConnection`: connects to the server, sends a `PING` every second,
+   acknowledges the reliable packets and drops their copies, then hands out
+   the game packets it received.
+3. `Hud`: shows the connection state, our health, lives and score, who
+   joined or left, and the result of the game.
+4. `WorldMirror`: applies the game packets to the local `World`. It keeps one
+   entity per server entity, with the sprite, animation and size of its kind
+   (each ship has the colour of its player), plays the sound of our shots,
+   and leaves an explosion where a ship or an enemy is killed.
+5. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
+6. `MovementSystem` (engine): moves the entities with their speed between two
+   snapshots.
+7. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+   remove an explosion once its animation and its sound are over.
+8. `AudioSystem` (engine): plays the sounds.
+9. `RenderSystem` (engine): draws the `World`. The game area is 1920x1080,
+   scaled to fit the window.
+
+If the server refuses the client, does not answer, or goes silent for 5
+seconds, the HUD shows why and waits: the next key pressed stops the client,
+with exit code 84.

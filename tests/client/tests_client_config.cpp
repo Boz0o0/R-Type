@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
 #include <string>
@@ -25,6 +26,15 @@ static std::optional<HostAndPort> parse(std::vector<std::string> words) {
     return std::nullopt;
   }
   return HostAndPort{config->host(), config->port()};
+}
+
+static std::optional<std::filesystem::path> assetsOf(
+    std::vector<std::string> words) {
+  const auto config = configOf(std::move(words));
+  if (!config) {
+    return std::nullopt;
+  }
+  return config->assetsDirectory();
 }
 
 static std::optional<std::string> nameOf(std::vector<std::string> words) {
@@ -81,4 +91,10 @@ TEST(ClientConfig, RejectsEmptyOrTooLongNames) {
         nameOf({"r-type_client", "localhost", "4242", name}).has_value())
         << "name: \"" << name << '"';
   }
+}
+
+TEST(ClientConfig, FindsTheAssetsNextToTheBinary) {
+  EXPECT_EQ(assetsOf({"build/bin/r-type_client"}),
+            std::filesystem::path("build/bin/assets"));
+  EXPECT_EQ(assetsOf({"r-type_client"}), std::filesystem::path("assets"));
 }

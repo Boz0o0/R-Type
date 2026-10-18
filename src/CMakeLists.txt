@@ -41,6 +41,7 @@ if(RTYPE_CLIENT)
             ampersand_net
             ampersand_physics
             ampersand_render
+            ampersand_audio
     )
     
     add_executable(r-type_client
@@ -57,6 +58,14 @@ if(RTYPE_CLIENT)
             ampersand_render
             ampersand_audio
     )
+
+    # The client loads its assets from the folder next to its binary.
+    add_custom_target(client_assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:r-type_client>/assets"
+    )
+    add_dependencies(client client_assets)
 endif()
 
 if(RTYPE_SERVER)

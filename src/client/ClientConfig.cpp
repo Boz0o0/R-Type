@@ -1,4 +1,5 @@
 #include <charconv>
+#include <filesystem>
 #include <rtype/client/ClientConfig.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <system_error>
@@ -10,6 +11,10 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
   ClientConfig config;
   if (args.size() > 4) {
     return std::nullopt;
+  }
+  if (!args.empty()) {
+    config._assetsDirectory =
+        std::filesystem::path(args[0]).parent_path() / "assets";
   }
   if (args.size() > 1) {
     config._host = args[1];
@@ -37,6 +42,9 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
 const std::string& ClientConfig::host() const { return this->_host; }
 std::uint16_t ClientConfig::port() const { return this->_port; }
 const std::string& ClientConfig::name() const { return this->_name; }
+const std::filesystem::path& ClientConfig::assetsDirectory() const {
+  return this->_assetsDirectory;
+}
 
 std::optional<std::uint16_t> ClientConfig::parsePort(const std::string& text) {
   std::uint16_t port = 0;
