@@ -10,12 +10,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <rtype/client/EntityLooks.hpp>
+#include <rtype/client/Starfield.hpp>
 #include <span>
 
 namespace rtype::client {
 
 struct Assets {
   EntityLooks looks;
+  Starfield::Textures starfield{};
   ampersand::render::FontId font{};
 };
 

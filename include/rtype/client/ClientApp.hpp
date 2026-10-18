@@ -18,6 +18,7 @@
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/ExplosionSystem.hpp>
+#include <rtype/client/systems/ScrollingSystem.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 
 namespace rtype::client {
@@ -55,6 +56,7 @@ class ClientApp {
   ampersand::core::ecs::World _world;
   ampersand::input::InputSystem _inputSystem;
   ampersand::physics::MovementSystem _movementSystem;
+  ScrollingSystem _scrollingSystem;
   ampersand::render::AnimationSystem _animationSystem;
   ExplosionSystem _explosionSystem;
   ampersand::audio::AudioSystem _audioSystem;
