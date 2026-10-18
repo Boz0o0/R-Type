@@ -105,7 +105,9 @@ TEST(protocol, round_trip_game_packets) {
   EXPECT_FLOAT_EQ(spawn.velocityX, -200.0F);
 
   const auto destroy = roundTrip(EntityDestroy{
-      .entityId = 5, .reason = rtype::common::DeathReason::OutOfScreen});
+      .entityId = 5,
+      .reason = rtype::common::DeathReason::OutOfScreen,
+  });
   EXPECT_EQ(destroy.reason, rtype::common::DeathReason::OutOfScreen);
 
   const auto state = roundTrip(

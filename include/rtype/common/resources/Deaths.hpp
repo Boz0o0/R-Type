@@ -2,6 +2,7 @@
 
 #include <ampersand/core/ecs/Entity.hpp>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace rtype::common {
@@ -24,6 +25,12 @@ struct Death {
   ampersand::core::ecs::Entity entity;
   /** @brief Why it died. */
   DeathReason reason{};
+  /**
+   * @brief Entity whose Damage removed its last hit points, when it was
+   *        Killed by one (a missile, an enemy...). Still alive until the
+   *        CleanupSystem, so the server can credit its Owner.
+   */
+  std::optional<ampersand::core::ecs::Entity> killer;
 };
 
 /**

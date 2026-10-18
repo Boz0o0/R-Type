@@ -27,9 +27,11 @@ Entity gunner(World& world, bool firing) {
   world.add(entity,
             ampersand::core::Transform{.position = {100.0F, 200.0F, 0.0F}});
   world.add(entity, Team{.side = Side::Players});
-  world.add(entity, Weapon{.cooldown = 0.25F,
-                           .firing = firing,
-                           .missile = EntityKind::PlayerMissile});
+  world.add(entity, Weapon{
+                        .cooldown = 0.25F,
+                        .firing = firing,
+                        .missile = EntityKind::PlayerMissile,
+                    });
   return entity;
 }
 
