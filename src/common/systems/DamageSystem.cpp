@@ -32,8 +32,11 @@ void DamageSystem::hit(World& world, Deaths& deaths, Entity attacker,
   if (health.current > 0) {
     health.current -= world.get<Damage>(attacker).amount;
     if (health.current <= 0) {
-      deaths.entities.push_back(
-          {.entity = target, .reason = DeathReason::Killed});
+      deaths.entities.push_back({
+          .entity = target,
+          .reason = DeathReason::Killed,
+          .killer = attacker,
+      });
     }
   }
   if (world.has<Projectile>(attacker)) {

@@ -11,6 +11,7 @@
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
+#include <rtype/common/components/Owner.hpp>
 #include <rtype/common/components/Projectile.hpp>
 #include <rtype/common/components/Team.hpp>
 #include <rtype/common/components/Weapon.hpp>
@@ -33,7 +34,8 @@ std::optional<Entity> createShip(World& world,
     return std::nullopt;
   }
   world.add(ship, ampersand::core::Transform{
-                      .position = {position.x, position.y, 0.0F}});
+                      .position = {position.x, position.y, 0.0F},
+                  });
   world.add(ship, Kind{.kind = EntityKind::Ship});
   world.add(ship, Velocity{});
   world.add(ship, BoxCollider{.bounds = {0.0F, 0.0F, 64.0F, 32.0F}});
@@ -54,17 +56,20 @@ std::optional<Entity> createEnemy(
     return std::nullopt;
   }
   world.add(enemy, ampersand::core::Transform{
-                       .position = {position.x, position.y, 0.0F}});
+                       .position = {position.x, position.y, 0.0F},
+                   });
   world.add(enemy, Kind{.kind = EntityKind::Enemy});
   world.add(enemy, Velocity{.value = {-200.0F, 0.0F}});
   world.add(enemy, BoxCollider{.bounds = {0.0F, 0.0F, 64.0F, 64.0F}});
   world.add(enemy, Health{.current = 2, .max = 2});
   world.add(enemy, Damage{.amount = 1});
   world.add(enemy, Team{.side = Side::Enemies});
-  world.add(enemy, Weapon{.cooldown = 1.5F,
-                          .remaining = 1.5F,
-                          .firing = true,
-                          .missile = EntityKind::EnemyMissile});
+  world.add(enemy, Weapon{
+                       .cooldown = 1.5F,
+                       .remaining = 1.5F,
+                       .firing = true,
+                       .missile = EntityKind::EnemyMissile,
+                   });
   world.getResource<Spawns>().entities.push_back(enemy);
   return enemy;
 }
@@ -87,6 +92,9 @@ std::optional<Entity> createMissile(World& world, EntityKind kind,
   world.add(missile, Projectile{});
   if (world.has<Team>(shooter)) {
     world.add(missile, world.get<Team>(shooter));
+  }
+  if (world.has<Owner>(shooter)) {
+    world.add(missile, world.get<Owner>(shooter));
   }
   if (kind == EntityKind::PlayerMissile) {
     world.add(missile, Velocity{.value = {800.0F, 0.0F}});

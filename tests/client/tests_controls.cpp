@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <ampersand/input/Event.hpp>
+#include <cstdint>
 #include <rtype/client/Controls.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 
@@ -22,8 +23,12 @@ TEST(Controls, SpaceShoots) {
 }
 
 TEST(Controls, CombinesKeysHeldTogether) {
-  EXPECT_EQ(Controls::inputMask({Key::Up, Key::Right, Key::Space}),
-            InputFlag::MOVE_UP | InputFlag::MOVE_RIGHT | InputFlag::SHOOT);
+  // Unsigned operands: a | of two std::uint8_t would give a signed int.
+  constexpr auto expected =
+      static_cast<std::uint8_t>(static_cast<unsigned>(InputFlag::MOVE_UP) |
+                                static_cast<unsigned>(InputFlag::MOVE_RIGHT) |
+                                static_cast<unsigned>(InputFlag::SHOOT));
+  EXPECT_EQ(Controls::inputMask({Key::Up, Key::Right, Key::Space}), expected);
 }
 
 TEST(Controls, AllBoundKeysGiveEveryFlag) {

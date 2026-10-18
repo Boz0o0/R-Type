@@ -19,16 +19,28 @@ class Controls {
     std::uint8_t flag;
   };
 
-  static constexpr std::array<Binding, 5> BINDINGS{{
-      {.key = ampersand::input::Key::Up, .flag = protocol::InputFlag::MOVE_UP},
-      {.key = ampersand::input::Key::Down,
-       .flag = protocol::InputFlag::MOVE_DOWN},
-      {.key = ampersand::input::Key::Left,
-       .flag = protocol::InputFlag::MOVE_LEFT},
-      {.key = ampersand::input::Key::Right,
-       .flag = protocol::InputFlag::MOVE_RIGHT},
-      {.key = ampersand::input::Key::Space, .flag = protocol::InputFlag::SHOOT},
-  }};
+  static constexpr std::array BINDINGS{
+      Binding{
+          .key = ampersand::input::Key::Up,
+          .flag = protocol::InputFlag::MOVE_UP,
+      },
+      Binding{
+          .key = ampersand::input::Key::Down,
+          .flag = protocol::InputFlag::MOVE_DOWN,
+      },
+      Binding{
+          .key = ampersand::input::Key::Left,
+          .flag = protocol::InputFlag::MOVE_LEFT,
+      },
+      Binding{
+          .key = ampersand::input::Key::Right,
+          .flag = protocol::InputFlag::MOVE_RIGHT,
+      },
+      Binding{
+          .key = ampersand::input::Key::Space,
+          .flag = protocol::InputFlag::SHOOT,
+      },
+  };
 };
 
 }  // namespace rtype::client

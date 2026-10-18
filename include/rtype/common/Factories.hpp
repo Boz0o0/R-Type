@@ -42,8 +42,8 @@ std::optional<ampersand::core::ecs::Entity> createEnemy(
 /**
  * @brief Creates a missile fired by an entity.
  *
- * The missile starts at the position of the shooter, with its Team (if any).
- * Its kind gives the rest (speed, damage, sprite, etc.).
+ * The missile starts at the position of the shooter, with its Team and its
+ * Owner (if any). Its kind gives the rest (speed, damage, sprite, etc.).
  *
  * @param world World holding the shooter.
  * @param kind Kind of the missile.
