@@ -63,7 +63,7 @@ if(RTYPE_CLIENT)
     add_custom_target(client_assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${PROJECT_SOURCE_DIR}/assets"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets"
+            "$<TARGET_FILE_DIR:r-type_client>/assets"
     )
     add_dependencies(client client_assets)
 endif()
