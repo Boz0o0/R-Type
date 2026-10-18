@@ -8,6 +8,8 @@
 
 The CI builds, lints and tests the project on Linux and Windows for every pull request.
 
+Each pull request adds a short line under `[Unreleased]` in `CHANGELOG.md` (how to release a version is at the top of that file).
+
 ## Commits
 
 We follow [Conventional Commits](https://www.conventionalcommits.org/), for example `feat(client): turn held keys into the input mask`.
