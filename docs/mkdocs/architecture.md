@@ -49,10 +49,21 @@ The two threads only share the socket (behind a mutex) and a bounded
 
 ## Client
 
-Before the loop, `AssetLoader` loads the sprite sheets, the font and the
-sounds from the `assets/` folder next to the binary (CMake copies it there,
-the sources are in `assets/CREDITS.md`). The client stops if a file is
-missing.
+Before the loop, `AssetLoader` loads the sprite sheets, the star-field images,
+the font and the sounds from the `assets/` folder next to the binary (CMake
+copies it there, the sources are in `assets/CREDITS.md`). The client stops if
+a file is missing.
+
+`Starfield` then creates the background: two layers of stars (the back one
+with a planet and a moon), each drawn twice side by side, behind everything
+else. The back layer scrolls left at 30 px/s and the front one at 90 px/s, so
+the front stars look closer.
+
+Each frame starts by measuring the real time since the previous one
+(`std::chrono::steady_clock`, at most 0.1 s so a frozen window does not make
+everything jump) into the engine `Clock`. Every move, scroll and animation
+uses it, so the game runs at the same speed on any computer, whatever its
+frame rate.
 
 One loop, once per frame:
 
@@ -68,12 +79,14 @@ One loop, once per frame:
    and leaves an explosion where a ship or an enemy is killed.
 5. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
 6. `MovementSystem` (engine): moves the entities with their speed between two
-   snapshots.
-7. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+   snapshots, and the star-field layers.
+7. `ScrollingSystem`: once a star-field copy has fully left the screen on the
+   left, puts it back behind the other copy, so the background never ends.
+8. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
    remove an explosion once its animation and its sound are over.
-8. `AudioSystem` (engine): plays the sounds.
-9. `RenderSystem` (engine): draws the `World`. The game area is 1920x1080,
-   scaled to fit the window.
+9. `AudioSystem` (engine): plays the sounds.
+10. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+    the HUD on top. The game area is 1920x1080, scaled to fit the window.
 
 If the server refuses the client, does not answer, or goes silent for 5
 seconds, the HUD shows why and waits: the next key pressed stops the client,
