@@ -17,7 +17,7 @@
 #include <rtype/common/systems/OutOfScreenSystem.hpp>
 #include <rtype/common/systems/ShootingSystem.hpp>
 #include <rtype/server/GameEvents.hpp>
-#include <rtype/server/WaveSpawner.hpp>
+#include <rtype/server/systems/WaveSystem.hpp>
 #include <vector>
 
 namespace rtype::server {
@@ -171,7 +171,7 @@ class Game {
   common::OutOfScreenSystem _outOfScreenSystem{
       {0.0F, 0.0F, SCREEN_WIDTH, SCREEN_HEIGHT}};
   common::CleanupSystem _cleanupSystem;
-  WaveSpawner _waves;
+  WaveSystem _waveSystem;
   /** @brief Indexed by player id. */
   std::array<std::optional<Player>, protocol::MAX_PLAYERS> _players;
   Phase _phase{Phase::Waiting};

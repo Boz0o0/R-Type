@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ampersand/core/ecs/ISystem.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <cstdint>
@@ -14,7 +15,7 @@ namespace rtype::server {
  * the screen at random heights, flying left. The level ends after WAVE_COUNT
  * waves.
  */
-class WaveSpawner {
+class WaveSystem final : public ampersand::core::ecs::ISystem {
  public:
   /** @brief Waves in a level. */
   static constexpr std::uint32_t WAVE_COUNT = 10;
@@ -38,7 +39,7 @@ class WaveSpawner {
    *        edge, between its top and bottom.
    * @param seed Seed of the random heights.
    */
-  WaveSpawner(ampersand::core::math::Vec2f screen, std::uint32_t seed);
+  WaveSystem(ampersand::core::math::Vec2f screen, std::uint32_t seed);
 
   /** @brief Goes back to the start of the level. */
   void reset();
@@ -46,11 +47,12 @@ class WaveSpawner {
   /**
    * @brief Spawns the next wave when it is time to.
    *
-   * @param world World to create the enemies in.
-   * @param deltaTime Seconds since the previous call.
-   * @throws ResourceNotFound if the World has no Spawns.
+   * @param world World holding the Clock resource, to create the enemies
+   *        in.
+   * @throws ResourceNotFound if the World has no Clock, or no Spawns when a
+   *         wave is sent.
    */
-  void update(ampersand::core::ecs::World& world, float deltaTime);
+  void update(ampersand::core::ecs::World& world) override;
 
   /** @brief Whether every wave of the level was sent. */
   [[nodiscard]] bool finished() const noexcept;

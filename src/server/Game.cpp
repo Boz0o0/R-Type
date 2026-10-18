@@ -34,7 +34,8 @@ using common::EntityKind;
 using common::Kind;
 namespace InputFlag = protocol::InputFlag;
 
-Game::Game(std::uint32_t seed) : _waves({SCREEN_WIDTH, SCREEN_HEIGHT}, seed) {
+Game::Game(std::uint32_t seed)
+    : _waveSystem({SCREEN_WIDTH, SCREEN_HEIGHT}, seed) {
   this->_world.addResource<ampersand::core::Clock>();
   this->_world.addResource<ampersand::physics::Collisions>();
   this->_world.addResource<common::Deaths>();
@@ -71,7 +72,7 @@ std::vector<GameEvent> Game::update(float deltaTime) {
 
   this->updatePhase(deltaTime, events);
   if (this->_phase == Phase::Playing) {
-    this->_waves.update(this->_world, deltaTime);
+    this->_waveSystem.update(this->_world);
     this->updatePlayers(deltaTime);
   }
   this->_shootingSystem.update(this->_world);
@@ -158,7 +159,7 @@ void Game::start(std::vector<GameEvent>& events) {
       player->respawnIn = 0.0F;
     }
   }
-  this->_waves.reset();
+  this->_waveSystem.reset();
   this->_phase = Phase::Playing;
   events.emplace_back(GameStarted{});
 }
@@ -286,7 +287,7 @@ void Game::checkEnd(std::vector<GameEvent>& events) {
     this->end(false, events);
     return;
   }
-  if (!this->_waves.finished()) {
+  if (!this->_waveSystem.finished()) {
     return;
   }
   for (const Entity entity : this->_world.owners<Kind>()) {

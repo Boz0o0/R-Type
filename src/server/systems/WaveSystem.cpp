@@ -1,39 +1,37 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
+#include <ampersand/core/resources/Clock.hpp>
 #include <cstdint>
 #include <random>
 #include <rtype/common/Factories.hpp>
-#include <rtype/server/WaveSpawner.hpp>
+#include <rtype/server/systems/WaveSystem.hpp>
 
 namespace rtype::server {
 
-WaveSpawner::WaveSpawner(ampersand::core::math::Vec2f screen,
-                         std::uint32_t seed)
+WaveSystem::WaveSystem(ampersand::core::math::Vec2f screen, std::uint32_t seed)
     : _screen(screen), _random(seed) {}
 
-void WaveSpawner::reset() {
+void WaveSystem::reset() {
   this->_nextWaveIn = FIRST_WAVE_DELAY;
   this->_wave = 0;
 }
 
-void WaveSpawner::update(ampersand::core::ecs::World& world, float deltaTime) {
+void WaveSystem::update(ampersand::core::ecs::World& world) {
   if (this->finished()) {
     return;
   }
-  this->_nextWaveIn -= deltaTime;
+  this->_nextWaveIn -= world.getResource<ampersand::core::Clock>().dt;
   if (this->_nextWaveIn <= 0.0F) {
     this->spawnWave(world);
     this->_nextWaveIn += WAVE_INTERVAL;
   }
 }
 
-bool WaveSpawner::finished() const noexcept {
-  return this->_wave >= WAVE_COUNT;
-}
+bool WaveSystem::finished() const noexcept { return this->_wave >= WAVE_COUNT; }
 
-std::uint32_t WaveSpawner::wave() const noexcept { return this->_wave; }
+std::uint32_t WaveSystem::wave() const noexcept { return this->_wave; }
 
-void WaveSpawner::spawnWave(ampersand::core::ecs::World& world) {
+void WaveSystem::spawnWave(ampersand::core::ecs::World& world) {
   std::uniform_real_distribution<float> height(
       VERTICAL_MARGIN, this->_screen.y - VERTICAL_MARGIN - ENEMY_HEIGHT);
   const std::uint32_t size = FIRST_WAVE_SIZE + this->_wave;
