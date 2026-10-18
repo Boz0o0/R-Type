@@ -46,7 +46,7 @@ All modules are on by default. Turn one off with `AMPERSAND_MODULE_<NAME>=OFF`
 include(FetchContent)
 FetchContent_Declare(ampersand
     GIT_REPOSITORY https://github.com/Boz0o0/Ampersand-Engine.git
-    GIT_TAG v0.1.0
+    GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(ampersand)
 
