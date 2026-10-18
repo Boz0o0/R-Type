@@ -12,6 +12,7 @@ using State = rtype::client::ServerConnection::State;
 using rtype::protocol::DisconnectReason;
 using rtype::protocol::GameOver;
 using rtype::protocol::GameResult;
+using rtype::protocol::GameStart;
 using rtype::protocol::PlayerJoined;
 using rtype::protocol::PlayerLeft;
 using rtype::protocol::PlayerState;
@@ -36,6 +37,7 @@ TEST(Hud, ShowsWhyTheServerRefusedUs) {
   hud.showConnection(State::Rejected, std::nullopt, RejectReason::ServerFull);
 
   EXPECT_EQ(hud.banner(), "Server full");
+  EXPECT_EQ(hud.event(), "Press any key to quit");
 }
 
 TEST(Hud, ShowsOnlyOurOwnStats) {
@@ -73,4 +75,17 @@ TEST(Hud, GameOverStaysWhenTheConnectionCloses) {
   hud.showConnection(State::Disconnected, std::nullopt, std::nullopt);
 
   EXPECT_EQ(hud.banner(), "VICTORY   Score 900");
+}
+
+// The server starts a new game 5 s after the end: the old result goes away.
+TEST(Hud, NewGameClearsTheResult) {
+  World world;
+  Hud hud(world, 0);
+  hud.apply(GameOver{.result = GameResult::Defeat, .finalScore = 300});
+
+  hud.apply(GameStart{.serverTick = 42});
+  EXPECT_TRUE(hud.banner().empty());
+
+  hud.apply(GameOver{.result = GameResult::Victory, .finalScore = 500});
+  EXPECT_EQ(hud.banner(), "VICTORY   Score 500");
 }

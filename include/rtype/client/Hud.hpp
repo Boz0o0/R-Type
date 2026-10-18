@@ -50,6 +50,7 @@ class Hud {
   static constexpr ampersand::render::Color BANNER_COLOR{
       .r = 255, .g = 220, .b = 80};
   static constexpr float LETTER_WIDTH = 0.55F;
+  static constexpr const char* QUIT_HINT = "Press any key to quit";
 
   [[nodiscard]] static std::string playerLabel(std::uint8_t playerId);
   [[nodiscard]] static std::string rejectText(

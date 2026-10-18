@@ -47,12 +47,15 @@ void Hud::showConnection(State state, std::optional<std::uint8_t> playerId,
     }
     case State::Rejected:
       this->setBanner(rejectText(rejectReason));
+      this->setText(this->_event, QUIT_HINT);
       break;
     case State::Unreachable:
       this->setBanner("Server unreachable");
+      this->setText(this->_event, QUIT_HINT);
       break;
     case State::Disconnected:
       this->setBanner("Disconnected");
+      this->setText(this->_event, QUIT_HINT);
       break;
   }
 }
@@ -76,6 +79,9 @@ void Hud::apply(const protocol::Payload& packet) {
         over->result == protocol::GameResult::Victory ? "VICTORY" : "GAME OVER";
     this->setBanner(result + "   Score " + std::to_string(over->finalScore));
     this->_gameOver = true;
+  } else if (std::holds_alternative<protocol::GameStart>(packet)) {
+    this->_gameOver = false;
+    this->setBanner("");
   }
 }
 

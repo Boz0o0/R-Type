@@ -53,7 +53,7 @@ void ClientApp::run() {
   Hud hud(this->_world, assets.font);
 
   auto previous = std::chrono::steady_clock::now();
-  std::optional<std::chrono::steady_clock::time_point> endedAt;
+  bool ended = false;
   while (window.isOpen) {
     const auto now = std::chrono::steady_clock::now();
     clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
@@ -62,19 +62,14 @@ void ClientApp::run() {
     previous = now;
 
     this->_inputSystem.update(this->_world);
-    if (keys.keysDown.contains(input::Key::Escape)) {
+    if (keys.keysDown.contains(input::Key::Escape) ||
+        (ended && pressedAKey(keys))) {
       window.isOpen = false;
     }
     this->_connection.update(now);
     hud.showConnection(this->_connection.state(), this->_connection.playerId(),
                        this->_connection.rejectReason());
-    if (this->_connection.hasEnded()) {
-      // The HUD shows why for a moment; ServerConnection printed it too.
-      endedAt = endedAt.value_or(now);
-      if (now - *endedAt > END_SCREEN_TIME) {
-        throw std::runtime_error("the connection to the server ended");
-      }
-    }
+    ended = this->_connection.hasEnded();
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, hud, packet);
     }
@@ -85,7 +80,17 @@ void ClientApp::run() {
     this->_audioSystem.update(this->_world);
     this->_renderSystem.update(this->_world);
   }
+  if (this->_connection.hasEnded()) {
+    // The HUD showed why, and ServerConnection printed it.
+    throw std::runtime_error("the connection to the server ended");
+  }
   this->_connection.disconnect();
+}
+
+bool ClientApp::pressedAKey(const input::InputManager& keys) {
+  return std::ranges::any_of(keys.events, [](const input::Event& event) {
+    return std::holds_alternative<input::KeyPressed>(event);
+  });
 }
 
 void ClientApp::applyPacket(WorldMirror& worldMirror, Hud& hud,

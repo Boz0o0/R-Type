@@ -11,7 +11,6 @@
 #include <ampersand/render/SfmlRenderer.hpp>
 #include <ampersand/render/systems/AnimationSystem.hpp>
 #include <ampersand/render/systems/RenderSystem.hpp>
-#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
@@ -41,8 +40,9 @@ class ClientApp {
   };
 
   static constexpr float MAX_FRAME_TIME = 0.1F;
-  static constexpr std::chrono::seconds END_SCREEN_TIME{3};
 
+  [[nodiscard]] static bool pressedAKey(
+      const ampersand::input::InputManager& keys);
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);
   static void applyPacket(WorldMirror& worldMirror, Hud& hud,
