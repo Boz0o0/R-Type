@@ -26,6 +26,8 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      check_paths: true
 
 nav:
   - Home: index.md
@@ -33,6 +35,7 @@ nav:
   - Gameplay: gameplay.md
   - Design decisions: decisions.md
   - Contributing: contributing.md
+  - Changelog: changelog.md
   - Network Protocol:
       - Protocol: protocol/specification.md
       - Code: protocol/implementation.md
