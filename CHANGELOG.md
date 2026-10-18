@@ -24,6 +24,10 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-18
+
+Binary serialization for the network module.
+
 ### Added
 
 - **Net**: `BinaryWriter` and `BinaryReader` for big-endian serialization of integers, finite floats, enums and length-prefixed strings, with bounds and input validation.
@@ -48,5 +52,6 @@ First release, with the very base of the engine.
 - One CMake option and one static library per module.
 - Documentation website.
 
-[Unreleased]: https://github.com/Boz0o0/Ampersand-Engine/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Boz0o0/Ampersand-Engine/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Boz0o0/Ampersand-Engine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Boz0o0/Ampersand-Engine/releases/tag/v0.1.0

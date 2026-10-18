@@ -56,7 +56,7 @@ set(AMPERSAND_MODULE_NET OFF)  # optional: turn off what the game does not use
 
 FetchContent_Declare(ampersand
     GIT_REPOSITORY https://github.com/Boz0o0/Ampersand-Engine.git
-    GIT_TAG v0.1.0
+    GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(ampersand)
 
