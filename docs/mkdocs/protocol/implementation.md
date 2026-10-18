@@ -148,7 +148,7 @@ flowchart LR
 | `GameServer` | the clients (IP + port -> player), PING/PONG, timeouts, joins and leaves, turns `GameEvents` into packets |
 | `ReliableOutbox` | the reliable packets of one client waiting for their ACK |
 | `Game` | the game logic: `World`, systems, ships, lives, score, game phases |
-| `WaveSpawner` | the waves of Bydos of a level |
+| `WaveSystem` | the waves of Bydos of a level |
 | `GameEvents.hpp` | what `Game::update()` returns: spawns, deaths, player changes, start/end |
 
 ### Game logic and network are apart
@@ -164,7 +164,7 @@ without the network (`tests/server/tests_game.cpp`).
 One tick of `Game::update()`:
 
 1. Phase: start a game when a player is there, restart one 5 s after it ended.
-2. Waves (`WaveSpawner`), ships that come back, inputs -> speed and trigger.
+2. Waves (`WaveSystem`), ships that come back, inputs -> speed and trigger.
 3. `ShootingSystem`, `MovementSystem`, ships kept on the screen,
    `CollisionSystem`, `DamageSystem`, `OutOfScreenSystem`.
 4. Rules: lost ships take a life, enemies shot down give score to the owner

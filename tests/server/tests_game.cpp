@@ -14,7 +14,7 @@
 #include <rtype/common/resources/Deaths.hpp>
 #include <rtype/server/Game.hpp>
 #include <rtype/server/GameEvents.hpp>
-#include <rtype/server/WaveSpawner.hpp>
+#include <rtype/server/systems/WaveSystem.hpp>
 #include <set>
 #include <stdexcept>
 #include <variant>
@@ -192,10 +192,10 @@ TEST(Game, SendsWavesOfEnemies) {
   Game game(SEED);
   game.addPlayer(0);
 
-  const auto events = runFor(game, WaveSpawner::FIRST_WAVE_DELAY + TICK);
+  const auto events = runFor(game, WaveSystem::FIRST_WAVE_DELAY + TICK);
 
   EXPECT_EQ(spawnedCount(events, EntityKind::Enemy),
-            WaveSpawner::FIRST_WAVE_SIZE);
+            WaveSystem::FIRST_WAVE_SIZE);
 }
 
 TEST(Game, DestroysTheShipOfAPlayerWhoLeaves) {
@@ -282,8 +282,8 @@ TEST(Game, WinsOnceEveryWaveIsBeaten) {
   game.addPlayer(0);
   std::vector<GameEnded> ended;
   const float levelLength =
-      WaveSpawner::FIRST_WAVE_DELAY +
-      (WaveSpawner::WAVE_INTERVAL * WaveSpawner::WAVE_COUNT);
+      WaveSystem::FIRST_WAVE_DELAY +
+      (WaveSystem::WAVE_INTERVAL * WaveSystem::WAVE_COUNT);
 
   const auto ticks = static_cast<int>(levelLength / TICK);
   for (int tick = 0; tick < ticks && ended.empty(); ++tick) {
