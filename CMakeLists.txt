@@ -31,7 +31,13 @@ endif()
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
-add_subdirectory(ampersand-engine)
+set(AMPERSAND_ENGINE_VERSION 0.2.0)
+CPMAddPackage(
+    NAME AmpersandEngine
+    GITHUB_REPOSITORY Boz0o0/Ampersand-Engine
+    GIT_TAG v${AMPERSAND_ENGINE_VERSION}
+)
+
 add_subdirectory(src)
 
 if (BUILD_TESTING)

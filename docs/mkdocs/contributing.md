@@ -22,6 +22,8 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/), for exam
 git subtree pull --prefix=ampersand-engine git@github.com:Boz0o0/Ampersand-Engine.git main --squash
 ```
 
+The engine version the game is built against is `AMPERSAND_ENGINE_VERSION` in the root `CMakeLists.txt`. When configuring, CMake pulls the release tagged `v<AMPERSAND_ENGINE_VERSION>` with CPM.
+
 ## Code style
 
 - **Format**: clang-format, Google style (`.clang-format`).
