@@ -29,7 +29,7 @@ flowchart LR
 | `PacketCodec.hpp/.cpp` | `encode()` and `decode()` |
 | `tests/common/tests_protocol.cpp` | unit tests |
 
-The byte tools live in the engine (`ampersand-engine/include/ampersand/net/`):
+The byte tools live in the [engine](https://github.com/Boz0o0/Ampersand-Engine) (`include/ampersand/net/`):
 
 | File | What's inside |
 | --- | --- |

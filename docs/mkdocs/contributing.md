@@ -16,11 +16,9 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/), for exam
 
 ## The engine
 
-`ampersand-engine/` is a git subtree of the [engine repository](https://github.com/Boz0o0/Ampersand-Engine). Change the engine in its own repository, then pull it here:
+The engine is not in this repository. Change it in the [engine repository](https://github.com/Boz0o0/Ampersand-Engine) and release a new version there.
 
-```sh
-git subtree pull --prefix=ampersand-engine git@github.com:Boz0o0/Ampersand-Engine.git main --squash
-```
+The engine version the game is built against is `AMPERSAND_ENGINE_VERSION` in the root `CMakeLists.txt`. When configuring, CMake pulls the release tagged `v<AMPERSAND_ENGINE_VERSION>` with CPM. To use a new engine release, bump this version in a pull request.
 
 ## Code style
 

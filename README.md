@@ -54,9 +54,8 @@ Stop the server with `Ctrl+C`: it tells every client before closing.
 
 ```
 .
-├── ampersand-engine/   # Ampersand Engine, included as a git subtree
 ├── assets/             # Client sprites, star-field, font and sounds (sources in CREDITS.md)
-├── cmake/              # CMake helpers (CPM)
+├── cmake/              # CMake helpers (CPM, also used to fetch Ampersand Engine)
 ├── docs/
 │   ├── doxygen/        # Doxygen output (generated, not committed)
 │   └── mkdocs/         # MkDocs documentation
