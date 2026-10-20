@@ -22,6 +22,14 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+### Changed
+
+- **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`, currently `0.2.0`) instead of being included as a git subtree.
+
+### Removed
+
+- The `ampersand-engine/` git subtree.
+
 ## [1.0.0] - 2026-10-18
 
 First playable version (Part 1).

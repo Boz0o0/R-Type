@@ -17,7 +17,7 @@ An arrow means "uses".
 
 | Layer    | Folder                 | Role                                                                     |
 | -------- | ---------------------- | ------------------------------------------------------------------------ |
-| Engine   | `ampersand-engine/`    | ECS, physics, rendering, input, audio, UDP socket: knows nothing about R-Type ([docs](https://boz0o0.github.io/Ampersand-Engine/)) |
+| Engine   | fetched with CPM       | ECS, physics, rendering, input, audio, UDP socket: knows nothing about R-Type ([docs](https://boz0o0.github.io/Ampersand-Engine/)) |
 | Gameplay | `src/common/`          | components, resources and systems of the game rules ([Gameplay](gameplay.md)) |
 | Protocol | `src/common/protocol/` | the packets, and how they are turned into bytes and back ([Protocol](protocol/specification.md)) |
 | Server   | `src/server/`          | accepts the players and runs the game loop                               |
