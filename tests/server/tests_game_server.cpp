@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <ampersand/physics/components/Velocity.hpp>
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -13,6 +12,7 @@
 #include <rtype/server/GameServer.hpp>
 #include <rtype/server/ReliableOutbox.hpp>
 #include <rtype/server/ServerNetwork.hpp>
+#include <stop_token>
 #include <string>
 #include <thread>
 #include <variant>
@@ -27,6 +27,7 @@ using rtype::server::test::collect;
 using rtype::server::test::payloadsOf;
 using rtype::server::test::stepUntil;
 using rtype::server::test::TestClient;
+using rtype::server::test::TestServer;
 
 namespace {
 
@@ -34,7 +35,7 @@ constexpr std::chrono::milliseconds NO_ANSWER_WAIT{200};
 
 const GameServer::Clock::time_point START = GameServer::Clock::now();
 
-std::optional<ConnectAccept> join(GameServer& game, TestClient& client,
+std::optional<ConnectAccept> join(TestServer& game, TestClient& client,
                                   const std::string& name = "Player") {
   client.send(ConnectRequest{.playerName = name});
   return stepUntil<ConnectAccept>(game, client, START);
@@ -88,7 +89,7 @@ void acknowledge(TestClient& client, const std::vector<Packet>& packets) {
 
 TEST(GameServer, AcceptsAClientAndGivesItAnId) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
 
   const auto accept = join(game, client, "Alice");
@@ -101,7 +102,7 @@ TEST(GameServer, AcceptsAClientAndGivesItAnId) {
 
 TEST(GameServer, GivesEachClientItsOwnId) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient first(network);
   TestClient second(network);
 
@@ -116,7 +117,7 @@ TEST(GameServer, GivesEachClientItsOwnId) {
 
 TEST(GameServer, SameAddressGetsTheSameIdAgain) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
 
   const auto first = join(game, client);
@@ -129,7 +130,7 @@ TEST(GameServer, SameAddressGetsTheSameIdAgain) {
 
 TEST(GameServer, RejectsClientsWhenFull) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   std::vector<std::unique_ptr<TestClient>> players;
   for (std::uint8_t index = 0; index < MAX_PLAYERS; ++index) {
     players.push_back(std::make_unique<TestClient>(network));
@@ -147,7 +148,7 @@ TEST(GameServer, RejectsClientsWhenFull) {
 
 TEST(GameServer, FreedIdIsGivenToTheNextClient) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient first(network);
   TestClient second(network);
   ASSERT_TRUE(join(game, first).has_value());
@@ -167,7 +168,7 @@ TEST(GameServer, FreedIdIsGivenToTheNextClient) {
 
 TEST(GameServer, AnswersPingWithPong) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
@@ -180,7 +181,7 @@ TEST(GameServer, AnswersPingWithPong) {
 
 TEST(GameServer, IgnoresPacketsFromUnknownAddresses) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient stranger(network);
 
   stranger.send(Ping{.timestampMs = 1});
@@ -193,7 +194,7 @@ TEST(GameServer, IgnoresPacketsFromUnknownAddresses) {
 
 TEST(GameServer, SendsSnapshotsToClients) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
@@ -207,7 +208,7 @@ TEST(GameServer, SendsSnapshotsToClients) {
 
 TEST(GameServer, RemovesSilentClientsAfterTheTimeout) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
@@ -220,12 +221,11 @@ TEST(GameServer, RemovesSilentClientsAfterTheTimeout) {
 
 TEST(GameServer, KeepsTickingWithoutAnyClient) {
   ServerNetwork network(0);
-  GameServer game(network);
-  std::atomic<bool> stopRequested{false};
-
-  std::jthread gameThread([&game, &stopRequested] { game.run(stopRequested); });
+  TestServer game(network);
+  std::jthread gameThread(
+      [&game](const std::stop_token& token) { game.run(token); });
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  stopRequested = true;
+  gameThread.request_stop();
   gameThread.join();
 
   // 30 ticks in 500 ms at 60 Hz; leave room for a slow CI machine.
@@ -235,12 +235,13 @@ TEST(GameServer, KeepsTickingWithoutAnyClient) {
 
 TEST(GameServer, TellsClientsWhenItShutsDown) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
-  const std::atomic<bool> stopRequested{true};
-  game.run(stopRequested);
+  std::stop_source stopSource;
+  stopSource.request_stop();
+  game.run(stopSource.get_token());
 
   EXPECT_EQ(game.playerCount(), 0U);
   const auto disconnect =
@@ -251,7 +252,7 @@ TEST(GameServer, TellsClientsWhenItShutsDown) {
 
 TEST(GameServer, RejectsNamesThatAreNotUtf8) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
 
   client.send(ConnectRequest{.playerName = "Bad\xFF\xFEName"});
@@ -264,7 +265,7 @@ TEST(GameServer, RejectsNamesThatAreNotUtf8) {
 
 TEST(GameServer, WelcomesANewPlayerWithTheGame) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client, "Alice").has_value());
 
@@ -286,7 +287,7 @@ TEST(GameServer, WelcomesANewPlayerWithTheGame) {
 
 TEST(GameServer, ShowsTheOthersToALatePlayer) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient first(network);
   TestClient second(network);
   ASSERT_TRUE(join(game, first, "Alice").has_value());
@@ -306,7 +307,7 @@ TEST(GameServer, ShowsTheOthersToALatePlayer) {
 
 TEST(GameServer, TellsTheOthersWhenAPlayerQuits) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient first(network);
   TestClient second(network);
   ASSERT_TRUE(join(game, first).has_value());
@@ -327,7 +328,7 @@ TEST(GameServer, TellsTheOthersWhenAPlayerQuits) {
 
 TEST(GameServer, TellsTheOthersWhenAPlayerCrashes) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient crashed(network);
   TestClient alive(network);
   ASSERT_TRUE(join(game, crashed).has_value());
@@ -349,7 +350,7 @@ TEST(GameServer, TellsTheOthersWhenAPlayerCrashes) {
 
 TEST(GameServer, SnapshotsCarryTheEntities) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
@@ -365,7 +366,7 @@ TEST(GameServer, SnapshotsCarryTheEntities) {
 
 TEST(GameServer, ResendsReliablePacketsUntilAcknowledged) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   client.send(ConnectRequest{.playerName = "Alice"});
   const auto sent = sequencesOf<ConnectAccept>(collect(game, client, START));
@@ -390,7 +391,7 @@ TEST(GameServer, ResendsReliablePacketsUntilAcknowledged) {
 
 TEST(GameServer, DropsAClientThatNeverAcknowledges) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
 
@@ -405,7 +406,7 @@ TEST(GameServer, DropsAClientThatNeverAcknowledges) {
 
 TEST(GameServer, MovesTheShipWithTheInputs) {
   ServerNetwork network(0);
-  GameServer game(network);
+  TestServer game(network);
   TestClient client(network);
   ASSERT_TRUE(join(game, client).has_value());
   game.step(START);
@@ -421,4 +422,45 @@ TEST(GameServer, MovesTheShipWithTheInputs) {
   game.step(START);
 
   EXPECT_GT(world.get<ampersand::physics::Velocity>(*ship).value.x, 0.0F);
+}
+
+TEST(GameServer, TellsTheListenerWhoJoinsAndLeaves) {
+  ServerNetwork network(0);
+  std::vector<rtype::server::SessionChange> changes;
+  TestServer game(network,
+                  [&changes](const ampersand::net::Endpoint& /*endpoint*/,
+                             rtype::server::SessionChange change) {
+                    changes.push_back(change);
+                  });
+  TestClient client(network);
+  ASSERT_TRUE(join(game, client).has_value());
+
+  client.send(Disconnect{.reason = DisconnectReason::Quit});
+  // Ticks run until the DISCONNECT is handled.
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(1);
+  while (game.playerCount() != 0 &&
+         std::chrono::steady_clock::now() < deadline) {
+    game.step(START);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  EXPECT_EQ(changes, (std::vector{rtype::server::SessionChange::Joined,
+                                  rtype::server::SessionChange::Left}));
+}
+
+TEST(GameServer, TellsTheListenerAboutRefusedNames) {
+  ServerNetwork network(0);
+  std::vector<rtype::server::SessionChange> changes;
+  TestServer game(network,
+                  [&changes](const ampersand::net::Endpoint& /*endpoint*/,
+                             rtype::server::SessionChange change) {
+                    changes.push_back(change);
+                  });
+  TestClient client(network);
+
+  client.send(ConnectRequest{.playerName = "Bad\x01Name"});
+  ASSERT_TRUE(stepUntil<ConnectReject>(game, client, START).has_value());
+
+  EXPECT_EQ(changes, std::vector{rtype::server::SessionChange::Left});
 }

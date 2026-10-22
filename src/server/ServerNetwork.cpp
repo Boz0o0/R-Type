@@ -7,6 +7,7 @@
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/server/Log.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <span>
 #include <stop_token>
@@ -49,7 +50,7 @@ void ServerNetwork::sendDatagram(std::span<const std::byte> datagram,
     const std::scoped_lock lock(this->_socketMutex);
     this->_socket.send(datagram, target);
   } catch (const NetError& error) {
-    std::cerr << "[server] " << error.what() << '\n';
+    logLine(std::cerr, "[server] ", error.what());
   }
 }
 
@@ -70,7 +71,7 @@ bool ServerNetwork::receiveOne(std::span<std::byte> buffer) {
     const std::scoped_lock lock(this->_socketMutex);
     length = this->_socket.receive(buffer, from);
   } catch (const NetError& error) {
-    std::cerr << "[server] " << error.what() << '\n';
+    logLine(std::cerr, "[server] ", error.what());
     return false;
   }
   if (!length) {
@@ -85,8 +86,8 @@ bool ServerNetwork::receiveOne(std::span<std::byte> buffer) {
       protocol::decode(buffer.first(*length), packet);
   if (error == protocol::DecodeError::None) {
     if (!this->_queue.push({.from = from, .packet = std::move(packet)})) {
-      std::cerr << "[server] queue full, dropped a packet from "
-                << from.toString() << '\n';
+      logLine(std::cerr, "[server] queue full, dropped a packet from ",
+              from.toString());
     }
     return true;
   }
@@ -98,8 +99,8 @@ bool ServerNetwork::receiveOne(std::span<std::byte> buffer) {
         },
         from);
   }
-  std::cerr << "[server] dropped a packet from " << from.toString() << ": "
-            << protocol::toString(error) << '\n';
+  logLine(std::cerr, "[server] dropped a packet from ", from.toString(), ": ",
+          protocol::toString(error));
   return true;
 }
 

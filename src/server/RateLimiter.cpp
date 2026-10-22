@@ -1,5 +1,6 @@
 #include <ampersand/net/UdpSocket.hpp>
 #include <iostream>
+#include <rtype/server/Log.hpp>
 #include <rtype/server/RateLimiter.hpp>
 
 namespace rtype::server {
@@ -22,8 +23,8 @@ bool RateLimiter::allow(const ampersand::net::Endpoint& sender,
   }
   ++found->second;
   if (found->second == this->_limits.packetsPerSecond + 1) {
-    std::cerr << "[server] " << key << " sends too much, dropping its packets"
-              << '\n';
+    logLine(std::cerr, "[server] ", key,
+            " sends too much, dropping its packets");
   }
   return found->second <= this->_limits.packetsPerSecond;
 }

@@ -2,18 +2,20 @@
 
 #include <ampersand/net/UdpSocket.hpp>
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <random>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/server/Game.hpp>
 #include <rtype/server/GameEvents.hpp>
+#include <rtype/server/MessageQueue.hpp>
 #include <rtype/server/ReliableOutbox.hpp>
 #include <rtype/server/ServerNetwork.hpp>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,13 +35,38 @@ struct ClientSession {
   ReliableOutbox outbox;
 };
 
+/** @brief What a SessionListener is told about an address. */
+enum class SessionChange : std::uint8_t {
+  /** @brief The address is now a client of the game. */
+  Joined,
+  /** @brief The address is not a client anymore: it left, was dropped, or
+   *         was refused. */
+  Left,
+};
+
 /**
- * @brief The game thread of the server: the link between the clients and
- *        the Game.
+ * @brief Called by a GameServer, from its own thread, each time a client
+ *        joins or leaves it.
+ */
+using SessionListener =
+    std::function<void(const ampersand::net::Endpoint&, SessionChange)>;
+
+/** @brief How the Lobby knows a GameServer. */
+struct PartyLink {
+  /** @brief Number of the party, shown in the logs. */
+  std::uint32_t id{};
+  /** @brief Told about every client that joins or leaves, if set. */
+  SessionListener listener;
+};
+
+/**
+ * @brief One party of the server: the link between its clients and its Game.
  *
- * run() calls step() SERVER_TICK_RATE times per second, whether clients send
- * something or not. Each step handles the packets queued by the network
- * thread (joins, inputs, ACKs...), runs one tick of the Game, sends its
+ * The Lobby gives it the packets of its clients with push(); each party runs
+ * in its own thread. run() calls step() SERVER_TICK_RATE times per second,
+ * whether clients send something or not. Each step handles the packets
+ * pushed since the last one (joins, inputs, ACKs...), runs one tick of the
+ * Game, sends its
  * events to every client, and sends a WORLD_SNAPSHOT SNAPSHOT_RATE times per
  * second. Reliable packets without ACK are sent again; a client that stays
  * silent, or never acknowledges them, is removed and the others are told.
@@ -64,17 +91,27 @@ class GameServer {
   /**
    * @brief Creates an empty game.
    *
-   * @param network Where packets come from and go to; must outlive the game.
+   * @param network Where packets are sent; must outlive the game.
    * @param seed Seed of the random parts of the Game.
+   * @param link Number of the party and who to tell about its clients.
    */
   explicit GameServer(ServerNetwork& network,
-                      std::uint32_t seed = std::random_device{}());
+                      std::uint32_t seed = std::random_device{}(),
+                      PartyLink link = {});
 
   /**
-   * @brief Runs a tick every TICK_DURATION until stopRequested becomes true,
-   *        then tells every client that the server is shutting down.
+   * @brief Queues a packet for the next step(). Can be called from any
+   *        thread.
+   *
+   * @return false if the queue is full and the packet was dropped.
    */
-  void run(const std::atomic<bool>& stopRequested);
+  bool push(IncomingMessage message);
+
+  /**
+   * @brief Runs a tick every TICK_DURATION until a stop is requested, then
+   *        tells every client that the server is shutting down.
+   */
+  void run(const std::stop_token& stopToken);
 
   /**
    * @brief Runs one tick.
@@ -91,6 +128,9 @@ class GameServer {
 
   /** @brief The game logic, to inspect it (tests). */
   [[nodiscard]] Game& game() noexcept;
+
+  /** @brief Whether a name is valid UTF-8 without control characters. */
+  [[nodiscard]] static bool isValidName(std::string_view name);
 
  private:
   /**
@@ -131,8 +171,9 @@ class GameServer {
   [[nodiscard]] ClientSession* findSession(
       const ampersand::net::Endpoint& endpoint);
 
-  /** @brief Whether a name is valid UTF-8 without control characters. */
-  [[nodiscard]] static bool isValidName(std::string_view name);
+  /** @brief Tells the listener, if any. */
+  void notify(const ampersand::net::Endpoint& endpoint, SessionChange change);
+
   /**
    * @brief Bytes of the UTF-8 character that starts a non-empty text, or 0 if
    *        it is invalid or a control character.
@@ -143,6 +184,10 @@ class GameServer {
       protocol::DisconnectReason reason);
 
   ServerNetwork& _network;
+  MessageQueue<IncomingMessage> _inbox{ServerNetwork::MAX_QUEUED_MESSAGES};
+  /** @brief "[party N]", at the start of every log line. */
+  std::string _logPrefix;
+  SessionListener _listener;
   Game _game;
   /** @brief Indexed by player id; empty slots are free ids. */
   std::array<std::optional<ClientSession>, protocol::MAX_PLAYERS> _sessions;

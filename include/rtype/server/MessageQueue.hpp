@@ -8,10 +8,10 @@
 namespace rtype::server {
 
 /**
- * @brief A bounded queue shared by one thread that pushes and one that drains.
+ * @brief A bounded queue shared by threads that push and one that drains.
  *
  * Every access locks a std::mutex, held only for the time of a push_back or a
- * swap, so the network thread is never blocked long by the game thread.
+ * swap, so a thread that pushes is never blocked long by the one that drains.
  * When the queue is full, new messages are dropped, so a client flooding the
  * server cannot make it use all its memory.
  */

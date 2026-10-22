@@ -39,8 +39,9 @@ struct OutgoingDatagram {
  * dropped: they never reach the game and never crash the server. So are the
  * datagrams of a sender past MAX_PACKETS_PER_SECOND.
  *
- * The game thread takes the messages with receive() and answers with send().
- * Both threads share the socket, so every use of it locks a mutex.
+ * The Lobby takes the messages with receive() and hands them to the parties,
+ * which answer with send() from their own threads. They all share the
+ * socket, so every use of it locks a mutex.
  */
 class ServerNetwork {
  public:
