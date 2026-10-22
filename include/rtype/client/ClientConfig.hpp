@@ -16,6 +16,8 @@ class ClientConfig {
   [[nodiscard]] const std::string& host() const;
   [[nodiscard]] std::uint16_t port() const;
   [[nodiscard]] const std::string& name() const;
+  // Code of the private party to join; empty for any public party.
+  [[nodiscard]] const std::string& partyCode() const;
   // assets/ next to the binary, found from the first argument.
   [[nodiscard]] const std::filesystem::path& assetsDirectory() const;
 
@@ -26,6 +28,7 @@ class ClientConfig {
   std::string _host{"127.0.0.1"};
   std::uint16_t _port{4242};
   std::string _name{"Player"};
+  std::string _partyCode;
   std::filesystem::path _assetsDirectory{"assets"};
 };
 

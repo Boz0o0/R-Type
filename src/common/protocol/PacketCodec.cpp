@@ -31,6 +31,12 @@ void checkPlayerName(const std::string& name) {
   }
 }
 
+void checkPartyCode(const std::string& code) {
+  if (code.size() > MAX_PARTY_CODE_LENGTH) {
+    throw ProtocolError("party code must be 0 to 8 bytes");
+  }
+}
+
 void checkPlayerId(std::uint8_t playerId) {
   if (!isPlayerId(playerId)) {
     throw ProtocolError("player id out of range");
@@ -41,7 +47,9 @@ void checkPlayerId(std::uint8_t playerId) {
 
 void writePayload(BinaryWriter& writer, const ConnectRequest& payload) {
   checkPlayerName(payload.playerName);
+  checkPartyCode(payload.partyCode);
   writer.writeString(payload.playerName);
+  writer.writeString(payload.partyCode);
 }
 
 void writePayload(BinaryWriter& writer, const ConnectAccept& payload) {
@@ -152,7 +160,8 @@ bool readPlayerName(BinaryReader& reader, std::string& name) {
 }
 
 bool readPayload(BinaryReader& reader, ConnectRequest& payload) {
-  return readPlayerName(reader, payload.playerName);
+  return readPlayerName(reader, payload.playerName) &&
+         reader.readString(payload.partyCode, MAX_PARTY_CODE_LENGTH);
 }
 
 bool readPayload(BinaryReader& reader, ConnectAccept& payload) {
@@ -161,7 +170,7 @@ bool readPayload(BinaryReader& reader, ConnectAccept& payload) {
 }
 
 bool readPayload(BinaryReader& reader, ConnectReject& payload) {
-  return reader.readEnum(payload.reason, RejectReason::InvalidName);
+  return reader.readEnum(payload.reason, RejectReason::InvalidPartyCode);
 }
 
 bool readPayload(BinaryReader& reader, Disconnect& payload) {

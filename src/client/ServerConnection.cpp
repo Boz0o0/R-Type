@@ -24,9 +24,11 @@ using ampersand::net::NetError;
 using ampersand::net::UdpSocket;
 
 ServerConnection::ServerConnection(const std::string& host, std::uint16_t port,
-                                   std::string playerName)
+                                   std::string playerName,
+                                   std::string partyCode)
     : _server(UdpSocket::resolve(host, port)),
-      _playerName(std::move(playerName)) {}
+      _playerName(std::move(playerName)),
+      _partyCode(std::move(partyCode)) {}
 
 void ServerConnection::update(Clock::time_point now) {
   this->receivePackets(now);
@@ -53,7 +55,10 @@ void ServerConnection::update(Clock::time_point now) {
     }
     ++this->_connectAttempts;
     this->_lastSend = now;
-    this->send(protocol::ConnectRequest{.playerName = this->_playerName});
+    this->send(protocol::ConnectRequest{
+        .playerName = this->_playerName,
+        .partyCode = this->_partyCode,
+    });
   } else if (this->_state == State::Connected &&
              (!this->_lastSend || now - *this->_lastSend >= PING_INTERVAL)) {
     this->_lastSend = now;

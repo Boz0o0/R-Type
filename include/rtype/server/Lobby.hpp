@@ -8,12 +8,14 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/server/GameServer.hpp>
 #include <rtype/server/MessageQueue.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <variant>
 
 namespace rtype::server {
 
@@ -22,10 +24,13 @@ namespace rtype::server {
  *
  * Every party is a GameServer with its own thread and its own tick loop. The
  * Lobby takes the packets of the network thread and gives each one to the
- * party of its sender. A CONNECT_REQUEST from a new address goes to the
- * first party with a free place; when every party is full, a new one is
- * opened, up to the limit given to the Lobby. A party is closed as soon as
- * its last client is gone.
+ * party of its sender. A CONNECT_REQUEST from a new address without party
+ * code goes to the first public party with a free place; when every public
+ * party is full, a new one is opened. With a party code, it goes to the
+ * private party of that code (letter case ignored), opened if there is none
+ * yet: only the clients who know the code play in it. The Lobby never runs
+ * more parties than the limit it was given. A party is closed as soon as its
+ * last client is gone, and its code can then be used again.
  *
  * The Lobby is the only one to touch its tables. The parties tell it who
  * joined or left through a MessageQueue, and it reads that queue before
@@ -81,9 +86,17 @@ class Lobby {
   [[nodiscard]] std::optional<PartyId> partyOf(
       const ampersand::net::Endpoint& endpoint) const;
 
+  /** @brief The private party of a code, if one is running. */
+  [[nodiscard]] std::optional<PartyId> partyWithCode(std::string code) const;
+
+  /** @brief A party code in upper case, the form used by the Lobby. */
+  [[nodiscard]] static std::string normalizeCode(std::string code);
+
  private:
   struct Party {
     std::unique_ptr<GameServer> server;
+    /** @brief Code to join it, in upper case; empty for a public party. */
+    std::string code;
     /** @brief Clients routed to it, joined or about to. */
     std::size_t players{};
     // Last member: stopped (then joined) before the server is destroyed.
@@ -101,9 +114,14 @@ class Lobby {
   void route(IncomingMessage message);
   /** @brief Gives a CONNECT_REQUEST from an address in no party to one. */
   void connect(IncomingMessage message);
-  /** @brief A party with a free place, opened if needed; none at the limit. */
-  [[nodiscard]] std::optional<PartyId> place();
-  [[nodiscard]] PartyId open();
+  /**
+   * @brief The party for a code (empty: any public party), opened if needed.
+   *
+   * @return The party, or why the client cannot join any.
+   */
+  [[nodiscard]] std::variant<PartyId, protocol::RejectReason> place(
+      const std::string& code);
+  [[nodiscard]] PartyId open(const std::string& code);
   void closeEmptyParties();
 
   void bind(const ampersand::net::Endpoint& endpoint, PartyId party);
@@ -114,6 +132,8 @@ class Lobby {
   MessageQueue<Change> _changes{MAX_QUEUED_CHANGES};
   /** @brief Party of each client, keyed by Endpoint::toString(). */
   std::unordered_map<std::string, PartyId> _routes;
+  /** @brief Private party of each code, in upper case. */
+  std::unordered_map<std::string, PartyId> _codes;
   // After _changes: the parties, which push into it, are destroyed first.
   std::map<PartyId, Party> _parties;
   PartyId _nextPartyId{1};

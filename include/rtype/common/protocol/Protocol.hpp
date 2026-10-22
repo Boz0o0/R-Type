@@ -1,13 +1,15 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 /**
  * @file Protocol.hpp
- * @brief Constants and enumerations of the R-Type binary protocol (RTP/1).
+ * @brief Constants and enumerations of the R-Type binary protocol (RTP/2).
  *
  * Every value here is part of the wire format described in
  * docs/mkdocs/protocol/specification.md: changing one of them breaks
@@ -19,7 +21,7 @@ namespace rtype::protocol {
 /** @brief First two bytes of every datagram ("RT" in ASCII). */
 inline constexpr std::uint16_t MAGIC = 0x5254;
 /** @brief Version of the protocol implemented by this code. */
-inline constexpr std::uint8_t VERSION = 1;
+inline constexpr std::uint8_t VERSION = 2;
 /** @brief UDP port the server listens on when none is given. */
 inline constexpr std::uint16_t DEFAULT_PORT = 4242;
 
@@ -34,6 +36,8 @@ inline constexpr std::size_t MAX_PAYLOAD_SIZE = MAX_DATAGRAM_SIZE - HEADER_SIZE;
 inline constexpr std::uint8_t MAX_PLAYERS = 4;
 /** @brief Longest player name, in bytes of UTF-8. */
 inline constexpr std::size_t MAX_PLAYER_NAME_LENGTH = 16;
+/** @brief Longest party code, in ASCII letters and digits. */
+inline constexpr std::size_t MAX_PARTY_CODE_LENGTH = 8;
 /** @brief ownerId value of an entity that belongs to no player. */
 inline constexpr std::uint8_t NO_OWNER = 0xFF;
 
@@ -116,6 +120,10 @@ enum class RejectReason : std::uint8_t {
   GameInProgress = 1,
   VersionMismatch = 2,
   InvalidName = 3,
+  /** @brief The party of the code asked already has MAX_PLAYERS players. */
+  PartyFull = 4,
+  /** @brief The party code is not 1 to 8 ASCII letters and digits. */
+  InvalidPartyCode = 5,
 };
 
 /** @brief Outcome of a game. */
@@ -144,6 +152,23 @@ enum class GameResult : std::uint8_t {
     default:
       return false;
   }
+}
+
+/**
+ * @brief Whether a text can be used as a party code: 1 to
+ *        MAX_PARTY_CODE_LENGTH ASCII letters and digits.
+ *
+ * @param code Code typed by the player.
+ */
+[[nodiscard]] constexpr bool isValidPartyCode(std::string_view code) noexcept {
+  if (code.empty() || code.size() > MAX_PARTY_CODE_LENGTH) {
+    return false;
+  }
+  return std::ranges::all_of(code, [](char character) {
+    return (character >= 'A' && character <= 'Z') ||
+           (character >= 'a' && character <= 'z') ||
+           (character >= '0' && character <= '9');
+  });
 }
 
 /** @brief Thrown when asked to encode a packet that breaks the protocol. */

@@ -13,6 +13,7 @@
 #include <rtype/server/Log.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <stop_token>
+#include <string>
 #include <thread>
 #include <utility>
 #include <variant>
@@ -34,6 +35,7 @@ void Lobby::run(const std::atomic<bool>& stopRequested) {
   }
   this->_parties.clear();
   this->_routes.clear();
+  this->_codes.clear();
 }
 
 void Lobby::step() {
@@ -54,6 +56,23 @@ std::optional<Lobby::PartyId> Lobby::partyOf(const Endpoint& endpoint) const {
     return std::nullopt;
   }
   return found->second;
+}
+
+std::optional<Lobby::PartyId> Lobby::partyWithCode(std::string code) const {
+  const auto found = this->_codes.find(normalizeCode(std::move(code)));
+  if (found == this->_codes.end()) {
+    return std::nullopt;
+  }
+  return found->second;
+}
+
+std::string Lobby::normalizeCode(std::string code) {
+  for (char& character : code) {
+    if (character >= 'a' && character <= 'z') {
+      character = static_cast<char>(character - 'a' + 'A');
+    }
+  }
+  return code;
 }
 
 void Lobby::applyChanges() {
@@ -108,33 +127,51 @@ void Lobby::connect(IncomingMessage message) {
         message.from);
     return;
   }
-  const std::optional<PartyId> party = this->place();
-  if (!party) {
+  if (!request->partyCode.empty() &&
+      !protocol::isValidPartyCode(request->partyCode)) {
     this->_network.send(
-        protocol::ConnectReject{.reason = protocol::RejectReason::ServerFull},
+        protocol::ConnectReject{
+            .reason = protocol::RejectReason::InvalidPartyCode,
+        },
         message.from);
     return;
   }
+  const auto placed = this->place(normalizeCode(request->partyCode));
+  if (const auto* reason = std::get_if<protocol::RejectReason>(&placed)) {
+    this->_network.send(protocol::ConnectReject{.reason = *reason},
+                        message.from);
+    return;
+  }
+  const PartyId party = std::get<PartyId>(placed);
   const Endpoint from = message.from;
-  this->bind(from, *party);
-  if (!this->_parties.at(*party).server->push(std::move(message))) {
-    this->unbind(from, *party);
+  this->bind(from, party);
+  if (!this->_parties.at(party).server->push(std::move(message))) {
+    this->unbind(from, party);
   }
 }
 
-std::optional<Lobby::PartyId> Lobby::place() {
-  for (const auto& [partyId, party] : this->_parties) {
-    if (party.players < protocol::MAX_PLAYERS) {
-      return partyId;
+std::variant<Lobby::PartyId, protocol::RejectReason> Lobby::place(
+    const std::string& code) {
+  if (code.empty()) {
+    for (const auto& [partyId, party] : this->_parties) {
+      if (party.code.empty() && party.players < protocol::MAX_PLAYERS) {
+        return partyId;
+      }
     }
+  } else if (const auto found = this->_codes.find(code);
+             found != this->_codes.end()) {
+    if (this->_parties.at(found->second).players >= protocol::MAX_PLAYERS) {
+      return protocol::RejectReason::PartyFull;
+    }
+    return found->second;
   }
   if (this->_parties.size() >= this->_maxParties) {
-    return std::nullopt;
+    return protocol::RejectReason::ServerFull;
   }
-  return this->open();
+  return this->open(code);
 }
 
-Lobby::PartyId Lobby::open() {
+Lobby::PartyId Lobby::open(const std::string& code) {
   const PartyId partyId = this->_nextPartyId++;
   auto server = std::make_unique<GameServer>(
       this->_network, std::random_device{}(),
@@ -158,11 +195,17 @@ Lobby::PartyId Lobby::open() {
       partyId,
       Party{
           .server = std::move(server),
+          .code = code,
           .players = 0,
           .thread = std::jthread(
               [&game](const std::stop_token& token) { game.run(token); }),
       });
-  logLine(std::cout, "[server] party ", partyId, " opened");
+  if (code.empty()) {
+    logLine(std::cout, "[server] party ", partyId, " opened");
+  } else {
+    this->_codes.emplace(code, partyId);
+    logLine(std::cout, "[server] party ", partyId, " opened, code ", code);
+  }
   return partyId;
 }
 
@@ -173,6 +216,9 @@ void Lobby::closeEmptyParties() {
       continue;
     }
     logLine(std::cout, "[server] party ", party->first, " closed");
+    if (!party->second.code.empty()) {
+      this->_codes.erase(party->second.code);
+    }
     party = this->_parties.erase(party);
   }
 }

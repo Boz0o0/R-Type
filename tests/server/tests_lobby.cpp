@@ -76,18 +76,19 @@ std::vector<Packet> collect(Lobby& lobby, TestClient& client) {
 }
 
 std::optional<ConnectAccept> join(Lobby& lobby, TestClient& client,
-                                  const std::string& name = "Player") {
-  client.send(ConnectRequest{.playerName = name});
+                                  const std::string& name = "Player",
+                                  const std::string& code = "") {
+  client.send(ConnectRequest{.playerName = name, .partyCode = code});
   return stepUntil<ConnectAccept>(lobby, client);
 }
 
 /** @brief Fills a party with MAX_PLAYERS clients. */
-std::vector<std::unique_ptr<TestClient>> fillParty(Lobby& lobby,
-                                                   ServerNetwork& network) {
+std::vector<std::unique_ptr<TestClient>> fillParty(
+    Lobby& lobby, ServerNetwork& network, const std::string& code = "") {
   std::vector<std::unique_ptr<TestClient>> players;
   for (std::uint8_t index = 0; index < MAX_PLAYERS; ++index) {
     players.push_back(std::make_unique<TestClient>(network));
-    EXPECT_TRUE(join(lobby, *players.back()).has_value());
+    EXPECT_TRUE(join(lobby, *players.back(), "Player", code).has_value());
   }
   return players;
 }
@@ -277,4 +278,105 @@ TEST(Lobby, StopsEveryPartyWhenItShutsDown) {
     ASSERT_TRUE(disconnect.has_value());
     EXPECT_EQ(disconnect->reason, DisconnectReason::ServerShutdown);
   }
+}
+
+TEST(Lobby, PutsPlayersWithTheSameCodeInTheSameParty) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient alice(network);
+  TestClient bob(network);
+
+  ASSERT_TRUE(join(lobby, alice, "Alice", "friends").has_value());
+  const auto accept = join(lobby, bob, "Bob", "FRIENDS");  // case ignored
+
+  ASSERT_TRUE(accept.has_value());
+  EXPECT_EQ(accept->playerId, 1);
+  EXPECT_EQ(lobby.partyCount(), 1U);
+  EXPECT_EQ(lobby.partyWithCode("Friends"), lobby.partyOf(alice.endpoint()));
+  EXPECT_EQ(lobby.partyOf(alice.endpoint()), lobby.partyOf(bob.endpoint()));
+}
+
+TEST(Lobby, GivesEachCodeItsOwnParty) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient alice(network);
+  TestClient bob(network);
+
+  ASSERT_TRUE(join(lobby, alice, "Alice", "ONE").has_value());
+  const auto accept = join(lobby, bob, "Bob", "TWO");
+
+  ASSERT_TRUE(accept.has_value());
+  EXPECT_EQ(accept->playerId, 0);
+  EXPECT_EQ(lobby.partyCount(), 2U);
+}
+
+TEST(Lobby, NeverPutsPlayersWithoutCodeInAPrivateParty) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient friendly(network);
+  TestClient stranger(network);
+  ASSERT_TRUE(join(lobby, friendly, "Friend", "SECRET").has_value());
+
+  const auto accept = join(lobby, stranger, "Stranger");
+
+  ASSERT_TRUE(accept.has_value());
+  EXPECT_EQ(accept->playerId, 0);
+  EXPECT_EQ(lobby.partyCount(), 2U);
+  EXPECT_NE(lobby.partyOf(friendly.endpoint()),
+            lobby.partyOf(stranger.endpoint()));
+}
+
+TEST(Lobby, RejectsPlayersWhenTheirPrivatePartyIsFull) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  const auto players = fillParty(lobby, network, "FULL");
+
+  TestClient late(network);
+  late.send(ConnectRequest{.playerName = "Late", .partyCode = "full"});
+  const auto reject = stepUntil<ConnectReject>(lobby, late);
+
+  ASSERT_TRUE(reject.has_value());
+  EXPECT_EQ(reject->reason, RejectReason::PartyFull);
+  EXPECT_EQ(lobby.partyCount(), 1U);
+}
+
+TEST(Lobby, RejectsInvalidPartyCodesWithoutOpeningAParty) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+
+  client.send(ConnectRequest{.playerName = "Bob", .partyCode = "ab-c"});
+  const auto reject = stepUntil<ConnectReject>(lobby, client);
+
+  ASSERT_TRUE(reject.has_value());
+  EXPECT_EQ(reject->reason, RejectReason::InvalidPartyCode);
+  EXPECT_EQ(lobby.partyCount(), 0U);
+}
+
+TEST(Lobby, RejectsNewCodesWhenItRunsTooManyParties) {
+  ServerNetwork network(0);
+  Lobby lobby(network, 1);
+  TestClient first(network);
+  ASSERT_TRUE(join(lobby, first).has_value());
+
+  TestClient other(network);
+  other.send(ConnectRequest{.playerName = "Other", .partyCode = "NEW"});
+  const auto reject = stepUntil<ConnectReject>(lobby, other);
+
+  ASSERT_TRUE(reject.has_value());
+  EXPECT_EQ(reject->reason, RejectReason::ServerFull);
+  EXPECT_EQ(lobby.partyCount(), 1U);
+}
+
+TEST(Lobby, FreesTheCodeOnceItsPartyIsClosed) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+  ASSERT_TRUE(join(lobby, client, "Bob", "ONCE").has_value());
+  ASSERT_TRUE(lobby.partyWithCode("ONCE").has_value());
+
+  client.send(Disconnect{.reason = DisconnectReason::Quit});
+
+  EXPECT_TRUE(stepUntil(lobby, [&lobby] { return lobby.partyCount() == 0; }));
+  EXPECT_FALSE(lobby.partyWithCode("ONCE").has_value());
 }
