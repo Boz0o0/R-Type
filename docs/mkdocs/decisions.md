@@ -18,8 +18,10 @@ The subject imposes UDP for the game. For the sockets, Asio was recommended to u
 ## Protocol: binary, field by field
 The protocol is binary: packets are small and fast to check. A text format (JSON) would be bigger and slower to read. Every value is written one by one, in big-endian, never with a `memcpy` of a struct, so the bytes are the same on every compiler and machine. Details: [Protocol](protocol/specification.md).
 
-## Server: two threads
-The subject asks for a multithreaded server. We use two threads: the network thread and the game thread. They only share the socket (behind a mutex) and a bounded queue of packets. Details: [Architecture](architecture.md#server).
+## Server: one thread per party
+The subject asks for a multithreaded server. We use a network thread, a lobby thread, and one thread per party. They only share the socket (behind a mutex) and bounded queues of packets: the lobby sends each packet to the queue of its party, and the parties tell the lobby who joined or left through another queue. Details: [Architecture](architecture.md#server).
+
+A thread per party keeps each party exactly like the single game we had before: its own tick loop, its own `World`, nothing shared. A pool of threads running every party in turn would only pay off with hundreds of parties; there are 16 at most, so that the server cannot be made to start threads without end.
 
 We also looked at one game thread plus one thread per client. With UDP it does not help: all the clients send to the same socket, so all the packets arrive in one place anyway. One thread per client would only add threads (more players, more threads) to do the same work.
 
@@ -29,7 +31,8 @@ We also looked at one game thread plus one thread per client. With UDP it does n
 | ------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
 | Entities and components         | sparse set ECS, one row per entity                            | see the [engine decisions](https://boz0o0.github.io/Ampersand-Engine/decisions/) |
 | Deaths during a tick            | a `Deaths` list, destroyed at the end of the tick             | no system destroys an entity another one is using            |
-| Packets between the two threads | a list behind a mutex, swapped once per tick, 4096 max        | the lock is held only for a push or a swap; a flood cannot fill the memory |
+| Packets between threads         | a list behind a mutex, swapped once per tick, 4096 max        | the lock is held only for a push or a swap; a flood cannot fill the memory |
+| Party of each client            | a hash map (IP + port -> party), only touched by the lobby    | no lock needed; the parties send their changes through a queue |
 | Time                            | fixed tick of 1/60 s, at most 10 late ticks caught up         | same game on every CPU; no burst of ticks after a pause      |
 | Collisions                      | every pair is tested (engine)                                 | simplest, and fast enough for a few hundred entities         |
 | Players                         | an array of 4 sessions, the index is the player id            | a free id is an empty slot                                   |

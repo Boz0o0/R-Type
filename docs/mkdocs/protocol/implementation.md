@@ -113,14 +113,18 @@ while (auto length = socket.receive(buffer, from)) {
 
 ## Server loop
 
-The server runs two threads, in `src/server/` (headers in
-`include/rtype/server/`):
+The server runs one network thread, one lobby thread and one thread per
+party, in `src/server/` (headers in `include/rtype/server/`):
 
 ```mermaid
 flowchart LR
     Socket["UdpSocket"] -->|"receive + decode()"| Net["Network thread<br/>(ServerNetwork)"]
     Net -->|"push"| Queue["MessageQueue<br/>(std::mutex)"]
-    Queue -->|"drain, each tick"| Server["Game thread<br/>(GameServer, 60 Hz)"]
+    Queue -->|"drain"| Lobby["Lobby thread<br/>(Lobby, main)"]
+    Lobby -->|"push to the party of the sender"| Inbox["MessageQueue<br/>of each party"]
+    Inbox -->|"drain, each tick"| Server["Party threads<br/>(GameServer, 60 Hz each)"]
+    Server -->|"joined / left"| Changes["MessageQueue<br/>of the Lobby"]
+    Changes --> Lobby
     Server -->|"addPlayer / setInput"| Game["Game logic<br/>(Game, World + systems)"]
     Game -->|"GameEvents"| Server
     Server -->|"send()"| Socket
@@ -132,20 +136,35 @@ flowchart LR
   game. The queue is bounded (`MAX_QUEUED_MESSAGES`), so a flood can't eat all
   the memory, and a `RateLimiter` drops what a sender sends past
   `MAX_PACKETS_PER_SECOND`.
-- **Game thread** (`GameServer::run`): 60 times per second, even when no
-  client sends anything, it takes the queued packets, runs one tick of the
-  `Game`, sends its events to every client, and sends a `WORLD_SNAPSHOT`
-  every 2 ticks (30 per second, split when there are more than 59 entities).
-- The socket is shared by both threads, so every use of it locks a mutex.
-- `Ctrl+C` stops the loop: the server sends `DISCONNECT(server shutdown)` to
-  every client and exits.
+- **Lobby thread** (`Lobby::run`, the main thread): keeps the party of each
+  client (IP + port). It gives every packet of a known client to its party. A
+  `CONNECT_REQUEST` from a new address without party code goes to the first
+  public party with a free place, or to a new party when they are all full.
+  With a code, it goes to the private party of that code (table code ->
+  party), opened if needed. 16 parties at most, then
+  `CONNECT_REJECT(server full)`. A party is closed as soon as it is empty, and
+  its code is freed.
+- **Party threads** (`GameServer::run`): one per party, each with its own
+  `Game` and `World`. 60 times per second, even when no client sends
+  anything, it takes the packets the Lobby gave it, runs one tick of its
+  `Game`, sends its events to its clients, and sends a `WORLD_SNAPSHOT` every
+  2 ticks (30 per second, split when there are more than 59 entities).
+- Only the Lobby touches its table of clients. A party tells it who joined or
+  left (`SessionChange`) through a `MessageQueue`, which the Lobby reads
+  before routing new packets.
+- The socket is shared by every thread, so every use of it locks a mutex.
+  Logs go through `logLine()`, so lines of two threads never get mixed.
+- `Ctrl+C` stops the loop: every party sends `DISCONNECT(server shutdown)` to
+  its clients and the server exits.
 
 | File | What's inside |
 | --- | --- |
 | `ServerNetwork` | the socket, the network thread, `send()` / `encode()` + `sendDatagram()` |
-| `MessageQueue` | the bounded queue between the two threads |
+| `MessageQueue` | the bounded queue between two threads |
 | `RateLimiter` | packets per sender per second |
-| `GameServer` | the clients (IP + port -> player), PING/PONG, timeouts, joins and leaves, turns `GameEvents` into packets |
+| `Lobby` | the parties, and which client plays in which party |
+| `GameServer` | one party: its clients (IP + port -> player), PING/PONG, timeouts, joins and leaves, turns `GameEvents` into packets |
+| `Log.hpp` | `logLine()`, one whole line per call, whatever the thread |
 | `ReliableOutbox` | the reliable packets of one client waiting for their ACK |
 | `Game` | the game logic: `World`, systems, ships, lives, score, game phases |
 | `WaveSystem` | the waves of Bydos of a level |

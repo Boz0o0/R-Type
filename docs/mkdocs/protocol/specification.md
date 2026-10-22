@@ -7,7 +7,7 @@ Quick facts:
 
 - Transport: **UDP** only (IPv4)
 - Default port: **4242**
-- Binary protocol, current version: **1**
+- Binary protocol, current version: **2**
 - Code: `include/rtype/common/protocol/` and `src/common/protocol/` (see [Implementation](implementation.md))
 
 The server runs the game. The client only sends the player's inputs and draws
@@ -62,7 +62,7 @@ Every packet starts with the same 12 bytes:
 | Offset | Field | Type | What it is |
 | --- | --- | --- | --- |
 | 0 | `magic` | `u16` | always `0x5254` ("RT") |
-| 2 | `version` | `u8` | protocol version, `1` for now |
+| 2 | `version` | `u8` | protocol version, `2` for now |
 | 3 | `type` | `u8` | packet type (see list below) |
 | 4 | `flags` | `u8` | `0x01` = reliable, the other bits are unused |
 | 5 | `reserved` | `u8` | unused, send 0 |
@@ -79,7 +79,7 @@ internet. One UDP datagram = one packet.
 
 | Type | Name | Who sends it | Reliable | Data size |
 | --- | --- | --- | --- | --- |
-| `0x01` | [CONNECT_REQUEST](#connect_request-0x01) | client | no | 1 + n |
+| `0x01` | [CONNECT_REQUEST](#connect_request-0x01) | client | no | 2 + n + m |
 | `0x02` | [CONNECT_ACCEPT](#connect_accept-0x02) | server | yes | 2 |
 | `0x03` | [CONNECT_REJECT](#connect_reject-0x03) | server | no | 1 |
 | `0x04` | [DISCONNECT](#disconnect-0x04) | both | no | 1 |
@@ -110,7 +110,7 @@ screen, `2` collected.
 **DisconnectReason**: `0` quit, `1` timeout, `2` kicked, `3` server shutdown.
 
 **RejectReason**: `0` server full, `1` game already started, `2` wrong version,
-`3` invalid name.
+`3` invalid name, `4` party full, `5` invalid party code.
 
 **GameResult**: `0` victory, `1` defeat.
 
@@ -120,11 +120,22 @@ Player ids go from `0` to `3` (4 players max). `0xFF` means "no player".
 
 #### CONNECT_REQUEST (0x01)
 
-Sent by the client to join the game.
+Sent by the client to join a party.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
 | 0 | `playerName` | `string` | 1 to 16 bytes |
+| 1 + n | `partyCode` | `string` | 0 to 8 bytes, see below |
+
+- Empty `partyCode`: the server puts the client in any **public** party that
+  has a free place, or opens a new one.
+- Otherwise the code (1 to 8 ASCII letters and digits, letter case ignored)
+  names a **private** party: the client joins it, or opens it if no party has
+  this code yet. Players without the code never end up in it. The code is
+  free again once its party is closed (when its last player leaves).
+- Refused with `party full` when the private party already has 4 players,
+  `invalid party code` when the code has other characters, and `server full`
+  when a new party is needed but the server already runs as many as it can.
 
 #### CONNECT_ACCEPT (0x02)
 
@@ -360,9 +371,10 @@ sequenceDiagram
 - The server knows a client by its **IP + port**. If the same IP + port sends
   CONNECT_REQUEST again, the server sends the same CONNECT_ACCEPT again, it
   doesn't create a new player.
-- The server refuses when there are already 4 players, when the name is not
-  valid UTF-8 or holds control characters, or (if it wants) when the game
-  already started. If the version is different, it answers "wrong version".
+- The server refuses when there are already 4 players in the party asked for
+  (`party full`) or no party can be opened (`server full`), when the name is
+  not valid UTF-8 or holds control characters, when the party code is
+  invalid, or (if it wants) when the game already started. If the version is different, it answers "wrong version".
   Our server lets players join a running game.
 - After accepting, the server sends the new client everything it needs:
   a PLAYER_JOINED per player (him included), an ENTITY_SPAWN per entity, a
@@ -408,7 +420,7 @@ packet is **dropped**: no answer, no crash.
 1. At least 12 bytes
 2. At most 1200 bytes
 3. `magic` is `0x5254`
-4. `version` is 1 (if it's a CONNECT_REQUEST, the server can answer "wrong
+4. `version` is 2 (if it's a CONNECT_REQUEST, the server can answer "wrong
    version")
 5. `payloadSize` = packet size - 12
 6. `type` is in the list
@@ -440,13 +452,14 @@ memory or read outside the buffer.
 | Name | Value |
 | --- | --- |
 | `MAGIC` | `0x5254` |
-| `VERSION` | `1` |
+| `VERSION` | `2` |
 | `DEFAULT_PORT` | `4242` |
 | `HEADER_SIZE` | 12 bytes |
 | `MAX_DATAGRAM_SIZE` | 1200 bytes |
 | `MAX_PAYLOAD_SIZE` | 1188 bytes |
 | `MAX_PLAYERS` | 4 |
 | `MAX_PLAYER_NAME_LENGTH` | 16 bytes |
+| `MAX_PARTY_CODE_LENGTH` | 8 bytes |
 | `NO_OWNER` | `0xFF` |
 | `MAX_SNAPSHOT_ENTITIES` | 59 |
 | `SERVER_TICK_RATE` | 60 per second |

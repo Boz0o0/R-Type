@@ -37,15 +37,17 @@ The headers are in `include/rtype/`, in the same folders.
 
 ## Server
 
-Two threads (details in [Code](protocol/implementation.md#server-loop)):
+Several parties run at once, each on its own thread (details in
+[Code](protocol/implementation.md#server-loop)):
 
-| Thread  | Class           | Does                                                               |
-| ------- | --------------- | ------------------------------------------------------------------ |
-| Network | `ServerNetwork` | reads every datagram, decodes it, queues the valid packets         |
-| Game    | `GameServer`    | 60 ticks per second: handles the queued packets, updates the `World`, sends a snapshot 30 times per second |
+| Thread             | Class           | Does                                                               |
+| ------------------ | --------------- | ------------------------------------------------------------------ |
+| Network            | `ServerNetwork` | reads every datagram, decodes it, queues the valid packets         |
+| Lobby (main)       | `Lobby`         | gives each packet to the party of its sender, opens and closes the parties |
+| One per party      | `GameServer`    | 60 ticks per second: handles its packets, updates its `World`, sends a snapshot 30 times per second |
 
-The two threads only share the socket (behind a mutex) and a bounded
-`MessageQueue`.
+The threads only share the socket (behind a mutex) and bounded
+`MessageQueue`s: no other data is shared.
 
 ## Client
 

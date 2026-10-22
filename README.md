@@ -41,12 +41,17 @@ To build only one of them, turn the other off with `-DRTYPE_CLIENT=OFF` or `-DRT
 
 ### Run
 
-Start the server, then one client per player (4 players max):
+Start the server, then one client per player (4 players per party, 16 parties at once):
 
 ```sh
-./build/bin/r-type_server [port]                 # default port: 4242
-./build/bin/r-type_client [host] [port] [name]   # default: 127.0.0.1 4242 Player
+./build/bin/r-type_server [port]                              # default port: 4242
+./build/bin/r-type_client [host] [port] [name] [party code]   # default: 127.0.0.1 4242 Player
 ```
+
+Without a party code, a client joins any public party with a free place. To
+play with your friends only, give everyone the same code (1 to 8 letters and
+digits, e.g. `./build/bin/r-type_client 127.0.0.1 4242 Alice FRIENDS`): you
+all join the same private party.
 
 Stop the server with `Ctrl+C`: it tells every client before closing.
 
