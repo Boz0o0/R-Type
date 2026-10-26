@@ -31,6 +31,7 @@ void checkPlayerName(const std::string& name) {
   }
 }
 
+/** @brief Throws if a party code is too long to be sent. */
 void checkPartyCode(const std::string& code) {
   if (code.size() > MAX_PARTY_CODE_LENGTH) {
     throw ProtocolError("party code must be 0 to 8 bytes");

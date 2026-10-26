@@ -103,6 +103,7 @@ class GameServer {
    * @brief Queues a packet for the next step(). Can be called from any
    *        thread.
    *
+   * @param message The packet and its sender.
    * @return false if the queue is full and the packet was dropped.
    */
   bool push(IncomingMessage message);
@@ -129,7 +130,12 @@ class GameServer {
   /** @brief The game logic, to inspect it (tests). */
   [[nodiscard]] Game& game() noexcept;
 
-  /** @brief Whether a name is valid UTF-8 without control characters. */
+  /**
+   * @brief Whether a name is valid UTF-8 without control characters.
+   *
+   * @param name Player name, as sent in CONNECT_REQUEST.
+   * @return true if the name can be used.
+   */
   [[nodiscard]] static bool isValidName(std::string_view name);
 
  private:
@@ -171,7 +177,12 @@ class GameServer {
   [[nodiscard]] ClientSession* findSession(
       const ampersand::net::Endpoint& endpoint);
 
-  /** @brief Tells the listener, if any. */
+  /**
+   * @brief Tells the listener, if any.
+   *
+   * @param endpoint Address of the client that joined or left.
+   * @param change Whether it joined or left.
+   */
   void notify(const ampersand::net::Endpoint& endpoint, SessionChange change);
 
   /**
@@ -184,9 +195,11 @@ class GameServer {
       protocol::DisconnectReason reason);
 
   ServerNetwork& _network;
+  /** @brief Packets given by push(), handled by the next step(). */
   MessageQueue<IncomingMessage> _inbox{ServerNetwork::MAX_QUEUED_MESSAGES};
   /** @brief "[party N]", at the start of every log line. */
   std::string _logPrefix;
+  /** @brief Told about every client that joins or leaves, if set. */
   SessionListener _listener;
   Game _game;
   /** @brief Indexed by player id; empty slots are free ids. */

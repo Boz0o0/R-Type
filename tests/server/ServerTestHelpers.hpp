@@ -26,7 +26,11 @@ struct TestClient {
       : server(ampersand::net::UdpSocket::resolve("127.0.0.1",
                                                   network.localPort())) {}
 
-  /** @brief Address of this client, as the server sees it. */
+  /**
+   * @brief Address of this client, as the server sees it.
+   *
+   * @return 127.0.0.1 and the port of the socket.
+   */
   [[nodiscard]] ampersand::net::Endpoint endpoint() const {
     return ampersand::net::UdpSocket::resolve("127.0.0.1",
                                               this->socket.localPort());
@@ -57,12 +61,22 @@ struct TestClient {
  */
 class TestServer : public GameServer {
  public:
+  /**
+   * @brief Creates an empty game, as party 0.
+   *
+   * @param network Where packets come from and go to.
+   * @param listener Told about every client that joins or leaves, if set.
+   */
   explicit TestServer(ServerNetwork& network, SessionListener listener = {})
       : GameServer(network, std::random_device{}(),
                    {.id = 0, .listener = std::move(listener)}),
         _network(network) {}
 
-  /** @brief Pushes the packets received, then runs one tick. */
+  /**
+   * @brief Pushes the packets received, then runs one tick.
+   *
+   * @param now Time of the tick.
+   */
   void step(Clock::time_point now) {
     for (IncomingMessage& message : this->_network.receive()) {
       this->push(std::move(message));
@@ -71,6 +85,7 @@ class TestServer : public GameServer {
   }
 
  private:
+  /** @brief Read by step(), in place of the Lobby. */
   ServerNetwork& _network;
 };
 

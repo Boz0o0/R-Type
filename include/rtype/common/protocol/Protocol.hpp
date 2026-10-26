@@ -159,6 +159,7 @@ enum class GameResult : std::uint8_t {
  *        MAX_PARTY_CODE_LENGTH ASCII letters and digits.
  *
  * @param code Code typed by the player.
+ * @return true if the code can be sent in CONNECT_REQUEST.
  */
 [[nodiscard]] constexpr bool isValidPartyCode(std::string_view code) noexcept {
   if (code.empty() || code.size() > MAX_PARTY_CODE_LENGTH) {

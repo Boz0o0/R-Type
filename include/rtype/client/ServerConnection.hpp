@@ -105,6 +105,7 @@ class ServerConnection {
   ampersand::net::UdpSocket _socket;
   ampersand::net::Endpoint _server;
   std::string _playerName;
+  /** @brief Sent in CONNECT_REQUEST; empty for any public party. */
   std::string _partyCode;
   State _state{State::Connecting};
   std::optional<std::uint8_t> _playerId;
