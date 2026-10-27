@@ -6,7 +6,8 @@
 #include <exception>
 #include <iostream>
 #include <rtype/common/protocol/Protocol.hpp>
-#include <rtype/server/GameServer.hpp>
+#include <rtype/server/Lobby.hpp>
+#include <rtype/server/Log.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 
@@ -18,7 +19,8 @@ static std::atomic<bool> stopRequested{false};
 extern "C" void requestStop(int /*signal*/) { stopRequested = true; }
 
 int32_t main(int32_t argc, char** argv) {
-  using rtype::server::GameServer;
+  using rtype::server::Lobby;
+  using rtype::server::logLine;
   using rtype::server::ServerNetwork;
 
   try {
@@ -26,14 +28,13 @@ int32_t main(int32_t argc, char** argv) {
                                    : rtype::protocol::DEFAULT_PORT;
 
     ServerNetwork network(port);
-    GameServer game(network);
-    std::cout << "[server] listening on UDP port " << network.localPort()
-              << '\n';
+    Lobby lobby(network);
+    logLine(std::cout, "[server] listening on UDP port ", network.localPort());
 
     std::signal(SIGINT, requestStop);
     std::signal(SIGTERM, requestStop);
-    game.run(stopRequested);
-    std::cout << "[server] stopped\n";
+    lobby.run(stopRequested);
+    logLine(std::cout, "[server] stopped");
   } catch (const std::exception& e) {
     std::fprintf(stderr, "[server] error: %s\n", e.what());
     return 84;

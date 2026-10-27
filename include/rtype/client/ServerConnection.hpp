@@ -60,10 +60,12 @@ class ServerConnection {
    * @param host Host name or address of the server.
    * @param port UDP port of the server.
    * @param playerName Name sent in CONNECT_REQUEST (1 to 16 bytes).
+   * @param partyCode Private party to join (0 to 8 letters and digits);
+   *        empty for any public party.
    * @throws ampersand::net::NetError If the host cannot be resolved.
    */
   ServerConnection(const std::string& host, std::uint16_t port,
-                   std::string playerName);
+                   std::string playerName, std::string partyCode = {});
 
   /**
    * @brief Reads every packet waiting, then sends CONNECT_REQUEST or PING if
@@ -103,6 +105,8 @@ class ServerConnection {
   ampersand::net::UdpSocket _socket;
   ampersand::net::Endpoint _server;
   std::string _playerName;
+  /** @brief Sent in CONNECT_REQUEST; empty for any public party. */
+  std::string _partyCode;
   State _state{State::Connecting};
   std::optional<std::uint8_t> _playerId;
   std::optional<protocol::RejectReason> _rejectReason;

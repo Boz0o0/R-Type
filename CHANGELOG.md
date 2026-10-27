@@ -22,6 +22,12 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+### Added
+
+- **Server**: several parties at once. Each party has its own thread and tick loop; a new client goes to the first party with a free place, or to a new party when they are all full (16 at most). Empty parties are closed.
+- **Protocol**: party codes (protocol version 2). `CONNECT_REQUEST` carries an optional `partyCode`; players with the same code join the same private party, which players without the code never join. New reject reasons `party full` and `invalid party code`.
+- **Client**: optional fifth argument, the party code: `r-type_client [host] [port] [name] [party code]`.
+
 ### Changed
 
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`, currently `0.2.0`) instead of being included as a git subtree.

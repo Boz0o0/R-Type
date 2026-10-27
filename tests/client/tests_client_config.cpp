@@ -71,8 +71,9 @@ TEST(ClientConfig, RejectsEmptyHost) {
 }
 
 TEST(ClientConfig, RejectsExtraArguments) {
-  EXPECT_FALSE(parse({"r-type_client", "localhost", "4242", "Bob", "extra"})
-                   .has_value());
+  EXPECT_FALSE(
+      parse({"r-type_client", "localhost", "4242", "Bob", "CODE", "extra"})
+          .has_value());
 }
 
 TEST(ClientConfig, UsesPlayerAsTheDefaultName) {
@@ -90,6 +91,27 @@ TEST(ClientConfig, RejectsEmptyOrTooLongNames) {
     EXPECT_FALSE(
         nameOf({"r-type_client", "localhost", "4242", name}).has_value())
         << "name: \"" << name << '"';
+  }
+}
+
+TEST(ClientConfig, UsesNoPartyCodeByDefault) {
+  const auto config = configOf({"r-type_client", "localhost", "4242", "Bob"});
+  ASSERT_TRUE(config.has_value());
+  EXPECT_TRUE(config->partyCode().empty());
+}
+
+TEST(ClientConfig, ReadsThePartyCode) {
+  const auto config =
+      configOf({"r-type_client", "localhost", "4242", "Bob", "friends1"});
+  ASSERT_TRUE(config.has_value());
+  EXPECT_EQ(config->partyCode(), "friends1");
+}
+
+TEST(ClientConfig, RejectsInvalidPartyCodes) {
+  for (const char* code : {"", "NINECHARS", "ab-c"}) {
+    EXPECT_FALSE(configOf({"r-type_client", "localhost", "4242", "Bob", code})
+                     .has_value())
+        << "code: \"" << code << '"';
   }
 }
 

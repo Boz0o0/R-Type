@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +10,9 @@
 #include <rtype/server/Game.hpp>
 #include <rtype/server/GameEvents.hpp>
 #include <rtype/server/GameServer.hpp>
+#include <rtype/server/Log.hpp>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -23,17 +24,25 @@ namespace rtype::server {
 
 using ampersand::net::Endpoint;
 
-GameServer::GameServer(ServerNetwork& network, std::uint32_t seed)
-    : _network(network), _game(seed) {}
+GameServer::GameServer(ServerNetwork& network, std::uint32_t seed,
+                       PartyLink link)
+    : _network(network),
+      _logPrefix("[party " + std::to_string(link.id) + "] "),
+      _listener(std::move(link.listener)),
+      _game(seed) {}
 
-void GameServer::run(const std::atomic<bool>& stopRequested) {
+bool GameServer::push(IncomingMessage message) {
+  return this->_inbox.push(std::move(message));
+}
+
+void GameServer::run(const std::stop_token& stopToken) {
   auto nextTick = Clock::now();
-  while (!stopRequested) {
+  while (!stopToken.stop_requested()) {
     try {
       this->step(Clock::now());
     } catch (const std::exception& error) {
-      std::cerr << "[server] tick " << this->_tick
-                << " failed: " << error.what() << '\n';
+      logLine(std::cerr, this->_logPrefix, "tick ", this->_tick,
+              " failed: ", error.what());
     }
     nextTick += TICK_DURATION;
     const auto now = Clock::now();
@@ -68,7 +77,7 @@ std::size_t GameServer::playerCount() const noexcept {
 Game& GameServer::game() noexcept { return this->_game; }
 
 void GameServer::handleMessages(Clock::time_point now) {
-  for (const IncomingMessage& message : this->_network.receive()) {
+  for (const IncomingMessage& message : this->_inbox.drain()) {
     this->handleMessage(message, now);
   }
 }
@@ -121,6 +130,7 @@ void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
     this->_network.send(
         protocol::ConnectReject{.reason = protocol::RejectReason::InvalidName},
         from);
+    this->notify(from, SessionChange::Left);
     return;
   }
 
@@ -136,8 +146,9 @@ void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
         .name = name,
         .lastSeen = now,
     };
-    std::cout << "[server] player " << static_cast<int>(playerId) << " ("
-              << name << ") joined from " << from.toString() << '\n';
+    logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
+            " (", name, ") joined from ", from.toString());
+    this->notify(from, SessionChange::Joined);
     this->sendTo(*session, protocol::ConnectAccept{.playerId = playerId}, now);
     this->welcome(*session, now);
     for (auto& other : this->_sessions) {
@@ -154,6 +165,7 @@ void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
   this->_network.send(
       protocol::ConnectReject{.reason = protocol::RejectReason::ServerFull},
       from);
+  this->notify(from, SessionChange::Left);
 }
 
 void GameServer::welcome(ClientSession& session, Clock::time_point now) {
@@ -185,9 +197,11 @@ void GameServer::removePlayer(std::uint8_t playerId,
   if (!session) {
     return;
   }
-  std::cout << "[server] player " << static_cast<int>(playerId) << " ("
-            << session->name << ") left: " << toString(reason) << '\n';
+  logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
+          " (", session->name, ") left: ", toString(reason));
+  const Endpoint endpoint = session->endpoint;
   session.reset();
+  this->notify(endpoint, SessionChange::Left);
   this->_game.removePlayer(playerId);
   this->broadcast(protocol::PlayerLeft{.playerId = playerId, .reason = reason},
                   now);
@@ -225,11 +239,11 @@ void GameServer::broadcastEvents(const std::vector<GameEvent>& events,
                                  Clock::time_point now) {
   for (const GameEvent& event : events) {
     if (std::holds_alternative<GameStarted>(event)) {
-      std::cout << "[server] game started\n";
+      logLine(std::cout, this->_logPrefix, "game started");
     } else if (const auto* ended = std::get_if<GameEnded>(&event)) {
-      std::cout << "[server] game over: "
-                << (ended->victory ? "victory" : "defeat") << ", score "
-                << ended->score << '\n';
+      logLine(std::cout, this->_logPrefix,
+              "game over: ", ended->victory ? "victory" : "defeat", ", score ",
+              ended->score);
     }
     this->broadcast(this->toPacket(event), now);
   }
@@ -277,11 +291,13 @@ void GameServer::shutdown() {
           },
           session->endpoint);
     }
-    std::cout << "[server] player " << static_cast<int>(playerId) << " ("
-              << session->name << ") left: "
-              << toString(protocol::DisconnectReason::ServerShutdown) << '\n';
+    logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
+            " (", session->name,
+            ") left: ", toString(protocol::DisconnectReason::ServerShutdown));
+    const Endpoint endpoint = session->endpoint;
     session.reset();
     this->_game.removePlayer(playerId);
+    this->notify(endpoint, SessionChange::Left);
   }
 }
 
@@ -341,6 +357,12 @@ protocol::Payload GameServer::toPacket(const GameEvent& event) const {
     };
   }
   return protocol::GameStart{.serverTick = this->_tick};
+}
+
+void GameServer::notify(const Endpoint& endpoint, SessionChange change) {
+  if (this->_listener) {
+    this->_listener(endpoint, change);
+  }
 }
 
 ClientSession* GameServer::findSession(const Endpoint& endpoint) {

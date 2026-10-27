@@ -118,6 +118,10 @@ std::string Hud::rejectText(std::optional<protocol::RejectReason> reason) {
       return "Wrong game version";
     case protocol::RejectReason::InvalidName:
       return "Invalid player name";
+    case protocol::RejectReason::PartyFull:
+      return "Party full";
+    case protocol::RejectReason::InvalidPartyCode:
+      return "Invalid party code";
   }
   return "Refused by the server";
 }

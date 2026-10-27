@@ -28,7 +28,7 @@ namespace render = ampersand::render;
 ClientApp::ClientApp(ClientConfig config)
     : _config(std::move(config)),
       _connection(this->_config.host(), this->_config.port(),
-                  this->_config.name()),
+                  this->_config.name(), this->_config.partyCode()),
       _inputSystem(pollWindow) {}
 
 void ClientApp::run() {

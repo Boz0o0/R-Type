@@ -39,7 +39,7 @@ TEST(protocol, header_layout_is_big_endian) {
       encode(Ping{.timestampMs = 0x01020304}, 0xAABBCCDD);
   const std::vector<std::byte> expected = {
       std::byte{0x52}, std::byte{0x54},  // magic "RT"
-      std::byte{0x01},                   // version
+      std::byte{0x02},                   // version
       std::byte{0x05},                   // type PING
       std::byte{0x00},                   // flags
       std::byte{0x00},                   // reserved
@@ -58,11 +58,18 @@ TEST(protocol, reliable_flag_follows_type) {
 TEST(protocol, round_trip_session_packets) {
   EXPECT_EQ(roundTrip(ConnectRequest{.playerName = "Seenau"}).playerName,
             "Seenau");
+  const auto request =
+      roundTrip(ConnectRequest{.playerName = "Seenau", .partyCode = "AB12"});
+  EXPECT_EQ(request.playerName, "Seenau");
+  EXPECT_EQ(request.partyCode, "AB12");
   const auto accept = roundTrip(ConnectAccept{.playerId = 3, .tickRate = 60});
   EXPECT_EQ(accept.playerId, 3);
   EXPECT_EQ(accept.tickRate, 60);
   EXPECT_EQ(roundTrip(ConnectReject{.reason = RejectReason::ServerFull}).reason,
             RejectReason::ServerFull);
+  EXPECT_EQ(
+      roundTrip(ConnectReject{.reason = RejectReason::InvalidPartyCode}).reason,
+      RejectReason::InvalidPartyCode);
   EXPECT_EQ(roundTrip(Disconnect{.reason = DisconnectReason::Quit}).reason,
             DisconnectReason::Quit);
   EXPECT_EQ(roundTrip(Ping{.timestampMs = 123}).timestampMs, 123U);
@@ -145,6 +152,10 @@ TEST(protocol, encode_rejects_invalid_payloads) {
   EXPECT_THROW(
       (void)encode(ConnectRequest{.playerName = "a name way too long"}, 0),
       ProtocolError);
+  EXPECT_THROW(
+      (void)encode(
+          ConnectRequest{.playerName = "Bob", .partyCode = "NINECHARS"}, 0),
+      ProtocolError);
   EXPECT_THROW((void)encode(ConnectAccept{.playerId = MAX_PLAYERS}, 0),
                ProtocolError);
   EXPECT_THROW((void)encode(PlayerInput{.clientTick = 0, .inputMask = 0x80}, 0),
@@ -167,10 +178,10 @@ TEST(protocol, decode_rejects_bad_headers) {
   EXPECT_EQ(decodeBytes(badMagic), DecodeError::BadMagic);
 
   auto badVersion = datagram;
-  badVersion[2] = std::byte{0x02};
+  badVersion[2] = std::byte{0x01};
   Packet packet;
   EXPECT_EQ(decode(badVersion, packet), DecodeError::VersionMismatch);
-  EXPECT_EQ(packet.header.version, 2);
+  EXPECT_EQ(packet.header.version, 1);
 
   auto unknownType = datagram;
   unknownType[3] = std::byte{0x7F};
@@ -216,6 +227,16 @@ TEST(protocol, decode_rejects_malformed_payloads) {
   auto longName = encode(ConnectRequest{.playerName = "abc"}, 0);
   longName[HEADER_SIZE] = std::byte{10};
   EXPECT_EQ(decodeBytes(longName), DecodeError::MalformedPayload);
+}
+
+TEST(protocol, party_codes_are_letters_and_digits) {
+  for (const char* code : {"A", "abcd", "AB12cd34", "00000000"}) {
+    EXPECT_TRUE(isValidPartyCode(code)) << "code: \"" << code << '"';
+  }
+  for (const char* code :
+       {"", "NINECHARS", "ab-c", "a b", "\xC3\xA9t\xC3\xA9"}) {
+    EXPECT_FALSE(isValidPartyCode(code)) << "code: \"" << code << '"';
+  }
 }
 
 TEST(protocol, decode_survives_random_bytes) {

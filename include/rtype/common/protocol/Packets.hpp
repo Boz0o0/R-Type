@@ -18,11 +18,13 @@
 
 namespace rtype::protocol {
 
-/** @brief C->S, unreliable, 1 + n bytes. Asks to join the game. */
+/** @brief C->S, unreliable, 2 + n + m bytes. Asks to join a party. */
 struct ConnectRequest {
   static constexpr PacketType TYPE = PacketType::ConnectRequest;
   /** @brief 1 to MAX_PLAYER_NAME_LENGTH bytes of UTF-8. */
   std::string playerName;
+  /** @brief 0 to MAX_PARTY_CODE_LENGTH bytes. Empty: any public party. */
+  std::string partyCode;
 };
 
 /** @brief S->C, reliable, 2 bytes. The client is now in the game. */

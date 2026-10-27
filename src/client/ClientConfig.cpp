@@ -9,7 +9,7 @@ namespace rtype::client {
 std::optional<ClientConfig> ClientConfig::fromArguments(
     std::span<char* const> args) {
   ClientConfig config;
-  if (args.size() > 4) {
+  if (args.size() > 5) {
     return std::nullopt;
   }
   if (!args.empty()) {
@@ -36,12 +36,19 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
       return std::nullopt;
     }
   }
+  if (args.size() > 4) {
+    config._partyCode = args[4];
+    if (!protocol::isValidPartyCode(config._partyCode)) {
+      return std::nullopt;
+    }
+  }
   return config;
 }
 
 const std::string& ClientConfig::host() const { return this->_host; }
 std::uint16_t ClientConfig::port() const { return this->_port; }
 const std::string& ClientConfig::name() const { return this->_name; }
+const std::string& ClientConfig::partyCode() const { return this->_partyCode; }
 const std::filesystem::path& ClientConfig::assetsDirectory() const {
   return this->_assetsDirectory;
 }

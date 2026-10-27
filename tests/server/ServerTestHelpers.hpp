@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <optional>
+#include <random>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/server/GameServer.hpp>
 #include <rtype/server/ServerNetwork.hpp>
@@ -25,6 +26,16 @@ struct TestClient {
       : server(ampersand::net::UdpSocket::resolve("127.0.0.1",
                                                   network.localPort())) {}
 
+  /**
+   * @brief Address of this client, as the server sees it.
+   *
+   * @return 127.0.0.1 and the port of the socket.
+   */
+  [[nodiscard]] ampersand::net::Endpoint endpoint() const {
+    return ampersand::net::UdpSocket::resolve("127.0.0.1",
+                                              this->socket.localPort());
+  }
+
   void send(const protocol::Payload& payload, std::uint32_t sequence = 0) {
     this->socket.send(protocol::encode(payload, sequence), this->server);
   }
@@ -44,6 +55,40 @@ struct TestClient {
   }
 };
 
+/**
+ * @brief A GameServer fed straight from the network, as if the Lobby gave it
+ *        every packet.
+ */
+class TestServer : public GameServer {
+ public:
+  /**
+   * @brief Creates an empty game, as party 0.
+   *
+   * @param network Where packets come from and go to.
+   * @param listener Told about every client that joins or leaves, if set.
+   */
+  explicit TestServer(ServerNetwork& network, SessionListener listener = {})
+      : GameServer(network, std::random_device{}(),
+                   {.id = 0, .listener = std::move(listener)}),
+        _network(network) {}
+
+  /**
+   * @brief Pushes the packets received, then runs one tick.
+   *
+   * @param now Time of the tick.
+   */
+  void step(Clock::time_point now) {
+    for (IncomingMessage& message : this->_network.receive()) {
+      this->push(std::move(message));
+    }
+    GameServer::step(now);
+  }
+
+ private:
+  /** @brief Read by step(), in place of the Lobby. */
+  ServerNetwork& _network;
+};
+
 inline constexpr std::chrono::milliseconds DEFAULT_WAIT{1000};
 
 /**
@@ -54,7 +99,7 @@ inline constexpr std::chrono::milliseconds DEFAULT_WAIT{1000};
  * @return The payload, or std::nullopt after the wait.
  */
 template <typename T>
-std::optional<T> stepUntil(GameServer& game, TestClient& client,
+std::optional<T> stepUntil(TestServer& game, TestClient& client,
                            GameServer::Clock::time_point now,
                            std::chrono::milliseconds wait = DEFAULT_WAIT) {
   const auto deadline = std::chrono::steady_clock::now() + wait;
@@ -75,7 +120,7 @@ std::optional<T> stepUntil(GameServer& game, TestClient& client,
  *        client received meanwhile, in order.
  */
 inline std::vector<protocol::Packet> collect(
-    GameServer& game, TestClient& client, GameServer::Clock::time_point now,
+    TestServer& game, TestClient& client, GameServer::Clock::time_point now,
     std::chrono::milliseconds wait = std::chrono::milliseconds(200)) {
   const auto deadline = std::chrono::steady_clock::now() + wait;
   std::vector<protocol::Packet> packets;

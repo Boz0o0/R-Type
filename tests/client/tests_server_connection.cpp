@@ -114,6 +114,19 @@ TEST(ServerConnection, SendsConnectRequestWithThePlayerName) {
   EXPECT_EQ(connection.state(), State::Connecting);
 }
 
+TEST(ServerConnection, SendsThePartyCode) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob",
+                              "FRIENDS");
+
+  connection.update(START);
+  const Packet packet = server.receive();
+
+  const auto* request = std::get_if<ConnectRequest>(&packet.payload);
+  ASSERT_NE(request, nullptr);
+  EXPECT_EQ(request->partyCode, "FRIENDS");
+}
+
 TEST(ServerConnection, ConnectsWhenTheServerAccepts) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");

@@ -38,6 +38,9 @@ TEST(Hud, ShowsWhyTheServerRefusedUs) {
 
   EXPECT_EQ(hud.banner(), "Server full");
   EXPECT_EQ(hud.event(), "Press any key to quit");
+
+  hud.showConnection(State::Rejected, std::nullopt, RejectReason::PartyFull);
+  EXPECT_EQ(hud.banner(), "Party full");
 }
 
 TEST(Hud, ShowsOnlyOurOwnStats) {
