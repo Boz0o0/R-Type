@@ -25,6 +25,9 @@ class WorldMirror {
   void spawn(const protocol::EntitySpawn& packet);
   void applySnapshot(const protocol::WorldSnapshot& packet);
   void destroy(const protocol::EntityDestroy& packet);
+  // Removes every entity, to mirror another room: each room numbers its
+  // entities and its ticks from the start.
+  void clear();
 
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> find(
       std::uint32_t entityId) const;

@@ -89,6 +89,15 @@ void WorldMirror::destroy(const protocol::EntityDestroy& packet) {
   this->_entities.erase(found);
 }
 
+void WorldMirror::clear() {
+  for (const auto& [entityId, mirrored] : this->_entities) {
+    this->_world.destroy(mirrored.entity);
+  }
+  this->_entities.clear();
+  this->_destroyed.clear();
+  this->_lastSnapshotTick = 0;
+}
+
 std::optional<core::ecs::Entity> WorldMirror::find(
     std::uint32_t entityId) const {
   const auto found = this->_entities.find(entityId);

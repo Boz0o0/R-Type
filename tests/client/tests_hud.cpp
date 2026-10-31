@@ -17,6 +17,7 @@ using rtype::protocol::PlayerJoined;
 using rtype::protocol::PlayerLeft;
 using rtype::protocol::PlayerState;
 using rtype::protocol::RejectReason;
+using rtype::protocol::RoomJoined;
 
 TEST(Hud, ShowsConnectingThenOurPlayer) {
   World world;
@@ -25,9 +26,41 @@ TEST(Hud, ShowsConnectingThenOurPlayer) {
   hud.showConnection(State::Connecting, std::nullopt, std::nullopt);
   EXPECT_EQ(hud.status(), "Connecting...");
 
-  hud.showConnection(State::Connected, 2, std::nullopt);
-  EXPECT_EQ(hud.status(), "You: P3");
+  hud.showConnection(State::InRoom, RoomJoined{.roomId = 4, .playerId = 2},
+                     std::nullopt);
+  EXPECT_EQ(hud.status(), "You: P3   Room 4");
   EXPECT_TRUE(hud.banner().empty());
+}
+
+// The code is shown so that the player can give it to friends.
+TEST(Hud, ShowsTheCodeOfAPrivateRoom) {
+  World world;
+  Hud hud(world, 0);
+
+  hud.showConnection(State::InRoom,
+                     RoomJoined{.roomId = 4, .playerId = 0, .code = "123456"},
+                     std::nullopt);
+
+  EXPECT_EQ(hud.status(), "You: P1   Code 123456");
+}
+
+// The lobby menu takes the screen: nothing of the old room stays.
+TEST(Hud, IsEmptyInTheLobby) {
+  World world;
+  Hud hud(world, 0);
+  hud.showConnection(State::InRoom, RoomJoined{.roomId = 1, .playerId = 0},
+                     std::nullopt);
+  hud.apply(PlayerState{.playerId = 0, .health = 3, .lives = 2, .score = 150});
+  hud.apply(GameOver{.result = GameResult::Defeat, .finalScore = 150});
+
+  hud.showConnection(State::InLobby, std::nullopt, std::nullopt);
+
+  EXPECT_TRUE(hud.status().empty());
+  EXPECT_TRUE(hud.stats().empty());
+  EXPECT_TRUE(hud.event().empty());
+  EXPECT_TRUE(hud.banner().empty());
+  hud.apply(PlayerState{.playerId = 0, .health = 3, .lives = 3, .score = 0});
+  EXPECT_TRUE(hud.stats().empty());  // not our player anymore
 }
 
 TEST(Hud, ShowsWhyTheServerRefusedUs) {
@@ -40,13 +73,14 @@ TEST(Hud, ShowsWhyTheServerRefusedUs) {
   EXPECT_EQ(hud.event(), "Press any key to quit");
 
   hud.showConnection(State::Rejected, std::nullopt, RejectReason::PartyFull);
-  EXPECT_EQ(hud.banner(), "Party full");
+  EXPECT_EQ(hud.banner(), "Room full");
 }
 
 TEST(Hud, ShowsOnlyOurOwnStats) {
   World world;
   Hud hud(world, 0);
-  hud.showConnection(State::Connected, 0, std::nullopt);
+  hud.showConnection(State::InRoom, RoomJoined{.roomId = 1, .playerId = 0},
+                     std::nullopt);
 
   hud.apply(PlayerState{.playerId = 1, .health = 1, .lives = 1, .score = 5});
   EXPECT_TRUE(hud.stats().empty());

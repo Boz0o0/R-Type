@@ -10,6 +10,7 @@
 #include <optional>
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
+#include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <string>
 
@@ -27,11 +28,16 @@ class Hud {
 
   Hud(ampersand::core::ecs::World& world, ampersand::render::FontId font);
 
+  // In the lobby the HUD is empty, the LobbyMenu is shown instead. In a room
+  // it shows our player and the room (its code if it is private).
   void showConnection(ServerConnection::State state,
-                      std::optional<std::uint8_t> playerId,
+                      const std::optional<protocol::RoomJoined>& room,
                       std::optional<protocol::RejectReason> rejectReason);
 
   void apply(const protocol::Payload& packet);
+
+  [[nodiscard]] static std::string rejectText(
+      std::optional<protocol::RejectReason> reason);
 
   [[nodiscard]] const std::string& status() const;
   [[nodiscard]] const std::string& stats() const;
@@ -53,9 +59,11 @@ class Hud {
   static constexpr const char* QUIT_HINT = "Press any key to quit";
 
   [[nodiscard]] static std::string playerLabel(std::uint8_t playerId);
-  [[nodiscard]] static std::string rejectText(
-      std::optional<protocol::RejectReason> reason);
+  [[nodiscard]] static std::string roomLabel(const protocol::RoomJoined& room);
   [[nodiscard]] static std::string leftText(protocol::DisconnectReason reason);
+
+  // Empties every text, for the lobby.
+  void clear();
 
   ampersand::core::ecs::Entity addText(ampersand::render::FontId font,
                                        ampersand::core::math::Vec2f position,

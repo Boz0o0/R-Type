@@ -55,6 +55,24 @@ struct FakeServer {
     throw std::runtime_error("no packet from the client");
   }
 
+  /**
+   * @brief Waits for the next T, skipping the other packets (PING,
+   *        ROOM_LIST...).
+   * @throws std::runtime_error If no T comes within a second.
+   */
+  template <typename T>
+  T receive() {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (std::chrono::steady_clock::now() < deadline) {
+      const Packet packet = this->receive();
+      if (const auto* payload = std::get_if<T>(&packet.payload)) {
+        return *payload;
+      }
+    }
+    throw std::runtime_error("not the packet expected from the client");
+  }
+
   void send(const Payload& payload, std::uint32_t sequence = 0) {
     this->socket.send(encode(payload, sequence), this->client);
   }
@@ -73,13 +91,38 @@ void updateUntilStateChanges(ServerConnection& connection,
   }
 }
 
-/** @brief Connects the client, then reads its ACK of CONNECT_ACCEPT. */
-void connectToServer(FakeServer& server, ServerConnection& connection) {
+/** @brief Calls update() for a while, to read what the server sent. */
+void updateFor(ServerConnection& connection,
+               ServerConnection::Clock::time_point now) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
+  while (std::chrono::steady_clock::now() < deadline) {
+    connection.update(now);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
+/** @brief Brings the client into the lobby. */
+void connectToLobby(FakeServer& server, ServerConnection& connection) {
   connection.update(START);
-  server.receive();
-  server.send(ConnectAccept{.playerId = 0}, 1);
+  server.receive<ConnectRequest>();
+  server.send(ConnectAccept{});
   updateUntilStateChanges(connection, START);
-  server.receive();
+  ASSERT_EQ(connection.state(), State::InLobby);
+}
+
+/** @brief Brings the client into room 3, then reads its ACK of ROOM_JOINED.
+ */
+void enterRoom(FakeServer& server, ServerConnection& connection,
+               std::uint8_t playerId = 0) {
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{});
+  connection.update(START);
+  server.receive<RoomJoin>();
+  server.send(RoomJoined{.roomId = 3, .playerId = playerId}, 1);
+  updateUntilStateChanges(connection, START);
+  ASSERT_EQ(connection.state(), State::InRoom);
+  EXPECT_EQ(server.receive<Ack>().sequence, 1U);
 }
 
 /** @brief Calls update() until count game packets came, or a second passed. */
@@ -101,6 +144,8 @@ std::vector<Payload> takeGamePackets(ServerConnection& connection,
 
 }  // namespace
 
+// Entering the lobby
+
 TEST(ServerConnection, SendsConnectRequestWithThePlayerName) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
@@ -114,35 +159,20 @@ TEST(ServerConnection, SendsConnectRequestWithThePlayerName) {
   EXPECT_EQ(connection.state(), State::Connecting);
 }
 
-TEST(ServerConnection, SendsThePartyCode) {
-  FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob",
-                              "FRIENDS");
-
-  connection.update(START);
-  const Packet packet = server.receive();
-
-  const auto* request = std::get_if<ConnectRequest>(&packet.payload);
-  ASSERT_NE(request, nullptr);
-  EXPECT_EQ(request->partyCode, "FRIENDS");
-}
-
-TEST(ServerConnection, ConnectsWhenTheServerAccepts) {
+TEST(ServerConnection, EntersTheLobbyWhenTheServerAccepts) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
   connection.update(START);
   server.receive();
 
-  server.send(ConnectAccept{.playerId = 2}, 77);
+  server.send(ConnectAccept{});
   updateUntilStateChanges(connection, START);
 
-  EXPECT_EQ(connection.state(), State::Connected);
+  EXPECT_EQ(connection.state(), State::InLobby);
   EXPECT_FALSE(connection.hasEnded());
-  EXPECT_EQ(connection.playerId(), 2);
-  // CONNECT_ACCEPT is reliable, so the client acknowledges it.
-  const Packet ack = server.receive();
-  ASSERT_TRUE(std::holds_alternative<Ack>(ack.payload));
-  EXPECT_EQ(std::get<Ack>(ack.payload).sequence, 77U);
+  EXPECT_FALSE(connection.playerId().has_value());
+  // The first thing it wants: the rooms.
+  EXPECT_TRUE(std::holds_alternative<RoomList>(server.receive().payload));
 }
 
 TEST(ServerConnection, StopsWhenTheServerRejects) {
@@ -194,38 +224,181 @@ TEST(ServerConnection, IgnoresGarbageAndOtherSenders) {
   server.socket.send(std::span<const std::byte>{}, server.client);
   server.socket.send("garbage", server.client);
   UdpSocket stranger;
-  stranger.send(encode(ConnectAccept{.playerId = 3}, 0), server.client);
+  stranger.send(encode(ConnectAccept{}, 0), server.client);
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   connection.update(START);
 
   EXPECT_EQ(connection.state(), State::Connecting);
-  EXPECT_FALSE(connection.playerId().has_value());
+}
+
+// In the lobby
+
+TEST(ServerConnection, KeepsTheRoomListUpToDate) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  server.receive<RoomList>();
+
+  server.send(RoomListReply{.rooms = {{.roomId = 2, .players = 3}}});
+  updateFor(connection, START);
+  ASSERT_EQ(connection.rooms().size(), 1U);
+  EXPECT_EQ(connection.rooms()[0].roomId, 2U);
+  EXPECT_EQ(connection.rooms()[0].players, 3);
+
+  connection.update(START + ServerConnection::ROOM_LIST_INTERVAL);
+  EXPECT_NO_THROW(server.receive<RoomList>());
+}
+
+TEST(ServerConnection, IgnoresRoomRequestsOutsideTheLobby) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+
+  connection.enterRoom(RoomJoin{});  // still connecting
+
+  EXPECT_EQ(connection.state(), State::Connecting);
 }
 
 TEST(ServerConnection, PingsWhileConnectedAndSaysGoodbye) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
-  connection.update(START);
-  server.receive();
-  server.send(ConnectAccept{.playerId = 0});
-  updateUntilStateChanges(connection, START);
-  server.receive();  // the ACK
+  connectToLobby(server, connection);
 
   connection.update(START + ServerConnection::PING_INTERVAL);
-  EXPECT_TRUE(std::holds_alternative<Ping>(server.receive().payload));
+  EXPECT_NO_THROW(server.receive<Ping>());
 
   connection.disconnect();
   EXPECT_EQ(connection.state(), State::Disconnected);
-  const Packet goodbye = server.receive();
-  ASSERT_TRUE(std::holds_alternative<Disconnect>(goodbye.payload));
-  EXPECT_EQ(std::get<Disconnect>(goodbye.payload).reason,
-            DisconnectReason::Quit);
+  EXPECT_EQ(server.receive<Disconnect>().reason, DisconnectReason::Quit);
 }
+
+TEST(ServerConnection, DisconnectsWhenTheServerGoesSilent) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+
+  connection.update(START + ServerConnection::SERVER_TIMEOUT);
+  EXPECT_EQ(connection.state(), State::InLobby);
+
+  connection.update(START + ServerConnection::SERVER_TIMEOUT +
+                    std::chrono::milliseconds(1));
+  EXPECT_EQ(connection.state(), State::Disconnected);
+  EXPECT_TRUE(connection.hasEnded());
+}
+
+// Entering and leaving a room
+
+TEST(ServerConnection, AsksForTheRoomUntilTheServerAnswers) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+
+  connection.enterRoom(RoomJoin{.roomId = 3});
+  EXPECT_EQ(connection.state(), State::Joining);
+  connection.update(START);
+  EXPECT_EQ(server.receive<RoomJoin>().roomId, 3U);
+  connection.update(START + ServerConnection::REQUEST_RETRY_DELAY);
+  EXPECT_EQ(server.receive<RoomJoin>().roomId, 3U);
+
+  server.send(RoomJoined{.roomId = 3, .playerId = 2}, 77);
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::InRoom);
+  EXPECT_EQ(connection.playerId(), 2);
+  ASSERT_TRUE(connection.room().has_value());
+  EXPECT_EQ(connection.room()->roomId, 3U);
+  // ROOM_JOINED is reliable, so the client acknowledges it.
+  EXPECT_EQ(server.receive<Ack>().sequence, 77U);
+}
+
+TEST(ServerConnection, SendsTheRoomToCreate) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+
+  connection.enterRoom(RoomCreate{.visibility = RoomVisibility::Private});
+  connection.update(START);
+
+  EXPECT_EQ(server.receive<RoomCreate>().visibility, RoomVisibility::Private);
+}
+
+TEST(ServerConnection, StaysInTheLobbyWhenARoomIsRefused) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{.roomId = 3});
+  connection.update(START);
+  server.receive<RoomJoin>();
+
+  server.send(RoomReject{.reason = RejectReason::PartyFull});
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::InLobby);
+  EXPECT_FALSE(connection.hasEnded());
+  EXPECT_EQ(connection.roomRejectReason(), RejectReason::PartyFull);
+  connection.enterRoom(RoomJoin{});
+  EXPECT_FALSE(connection.roomRejectReason().has_value());
+}
+
+TEST(ServerConnection, LeavesTheRoomForTheLobby) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  enterRoom(server, connection);
+
+  connection.leaveRoom();
+  EXPECT_EQ(connection.state(), State::Leaving);
+  connection.update(START);
+  EXPECT_NO_THROW(server.receive<RoomLeave>());
+
+  server.send(RoomLeft{});
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::InLobby);
+  EXPECT_FALSE(connection.room().has_value());
+  EXPECT_FALSE(connection.playerId().has_value());
+  EXPECT_NO_THROW(server.receive<RoomList>());
+}
+
+TEST(ServerConnection, DropsTheGamePacketsOfARoomItLeft) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  enterRoom(server, connection);
+  server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy}, 5);
+  ASSERT_EQ(takeGamePackets(connection, 1).size(), 1U);
+  EXPECT_EQ(server.receive<Ack>().sequence, 5U);
+
+  connection.leaveRoom();
+  server.send(EntitySpawn{.entityId = 8, .entityType = EntityKind::Enemy}, 6);
+  updateFor(connection, START);
+  EXPECT_TRUE(connection.takePackets().empty());
+  EXPECT_EQ(server.receive<Ack>().sequence, 6U);  // still acknowledged
+
+  server.send(RoomLeft{});
+  server.send(WorldSnapshot{.serverTick = 9}, 7);
+  updateFor(connection, START);
+  EXPECT_EQ(connection.state(), State::InLobby);
+  EXPECT_TRUE(connection.takePackets().empty());
+  EXPECT_EQ(connection.lastServerTick(), 0U);
+}
+
+TEST(ServerConnection, LeavesARoomItNoLongerWants) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+
+  // A late answer to a request it no longer sends.
+  server.send(RoomJoined{.roomId = 5, .playerId = 0}, 9);
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::Leaving);
+  EXPECT_NO_THROW(server.receive<RoomLeave>());
+}
+
+// In a room
 
 TEST(ServerConnection, HandsGamePacketsToTheApp) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
-  connectToServer(server, connection);
+  enterRoom(server, connection);
 
   server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy}, 5);
   server.send(WorldSnapshot{.serverTick = 3}, 6);
@@ -242,7 +415,7 @@ TEST(ServerConnection, HandsGamePacketsToTheApp) {
 TEST(ServerConnection, HandlesAReliablePacketOnceButAcksEveryCopy) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
-  connectToServer(server, connection);
+  enterRoom(server, connection);
 
   const EntitySpawn spawn{.entityId = 7, .entityType = EntityKind::Enemy};
   server.send(spawn, 5);
@@ -254,46 +427,27 @@ TEST(ServerConnection, HandlesAReliablePacketOnceButAcksEveryCopy) {
   EXPECT_TRUE(std::holds_alternative<EntitySpawn>(packets[0]));
   EXPECT_TRUE(std::holds_alternative<WorldSnapshot>(packets[1]));
   for (int copy = 0; copy < 2; ++copy) {
-    const Packet ack = server.receive();
-    ASSERT_TRUE(std::holds_alternative<Ack>(ack.payload));
-    EXPECT_EQ(std::get<Ack>(ack.payload).sequence, 5U);
+    EXPECT_EQ(server.receive<Ack>().sequence, 5U);
   }
 }
 
-TEST(ServerConnection, DisconnectsWhenTheServerGoesSilent) {
+TEST(ServerConnection, SendsInputOnlyInARoom) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
-  connectToServer(server, connection);
-
-  connection.update(START + ServerConnection::SERVER_TIMEOUT);
-  EXPECT_EQ(connection.state(), State::Connected);
-
-  connection.update(START + ServerConnection::SERVER_TIMEOUT +
-                    std::chrono::milliseconds(1));
-  EXPECT_EQ(connection.state(), State::Disconnected);
-  EXPECT_TRUE(connection.hasEnded());
-}
-
-TEST(ServerConnection, SendsInputOnlyOnceConnected) {
-  FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.sendInput(InputFlag::SHOOT);  // in the lobby: not sent
+  connection.enterRoom(RoomJoin{});
   connection.update(START);
-  connection.sendInput(InputFlag::SHOOT);  // still connecting: not sent
-  server.receive();
-  server.send(ConnectAccept{.playerId = 0}, 1);
+  server.receive<RoomJoin>();
+  server.send(RoomJoined{.roomId = 3, .playerId = 0}, 1);
   updateUntilStateChanges(connection, START);
-  EXPECT_TRUE(std::holds_alternative<Ack>(server.receive().payload));
 
   connection.sendInput(InputFlag::MOVE_UP);
   connection.sendInput(InputFlag::MOVE_UP | InputFlag::SHOOT);
-  const Packet first = server.receive();
-  const Packet second = server.receive();
+  const auto first = server.receive<PlayerInput>();
+  const auto second = server.receive<PlayerInput>();
 
-  const auto* firstInput = std::get_if<PlayerInput>(&first.payload);
-  const auto* secondInput = std::get_if<PlayerInput>(&second.payload);
-  ASSERT_NE(firstInput, nullptr);
-  ASSERT_NE(secondInput, nullptr);
-  EXPECT_EQ(firstInput->inputMask, InputFlag::MOVE_UP);
-  EXPECT_EQ(secondInput->inputMask, InputFlag::MOVE_UP | InputFlag::SHOOT);
-  EXPECT_GT(secondInput->clientTick, firstInput->clientTick);
+  EXPECT_EQ(first.inputMask, InputFlag::MOVE_UP);
+  EXPECT_EQ(second.inputMask, InputFlag::MOVE_UP | InputFlag::SHOOT);
+  EXPECT_GT(second.clientTick, first.clientTick);
 }

@@ -31,16 +31,26 @@ Hud::Hud(core::ecs::World& world, render::FontId font)
   this->_world.get<render::Text>(this->_banner).color = BANNER_COLOR;
 }
 
-void Hud::showConnection(State state, std::optional<std::uint8_t> playerId,
+void Hud::showConnection(State state,
+                         const std::optional<protocol::RoomJoined>& room,
                          std::optional<protocol::RejectReason> rejectReason) {
   switch (state) {
     case State::Connecting:
       this->setText(this->_status, "Connecting...");
       break;
-    case State::Connected: {
-      const std::uint8_t player = playerId.value_or(0);
+    case State::InLobby:
+    case State::Joining:
+    case State::Leaving:
+      this->clear();
+      break;
+    case State::InRoom: {
+      const std::uint8_t player = room ? room->playerId : 0;
       this->_playerId = player;
-      this->setText(this->_status, "You: " + playerLabel(player));
+      std::string status = "You: " + playerLabel(player);
+      if (room) {
+        status += "   " + roomLabel(*room);
+      }
+      this->setText(this->_status, std::move(status));
       this->_world.get<render::Text>(this->_status).color =
           PLAYER_COLORS[player % protocol::MAX_PLAYERS];
       break;
@@ -105,6 +115,13 @@ std::string Hud::playerLabel(std::uint8_t playerId) {
   return "P" + std::to_string(playerId + 1);
 }
 
+std::string Hud::roomLabel(const protocol::RoomJoined& room) {
+  if (!room.code.empty()) {
+    return "Code " + room.code;
+  }
+  return "Room " + std::to_string(room.roomId);
+}
+
 std::string Hud::rejectText(std::optional<protocol::RejectReason> reason) {
   if (!reason) {
     return "Refused by the server";
@@ -119,9 +136,11 @@ std::string Hud::rejectText(std::optional<protocol::RejectReason> reason) {
     case protocol::RejectReason::InvalidName:
       return "Invalid player name";
     case protocol::RejectReason::PartyFull:
-      return "Party full";
+      return "Room full";
     case protocol::RejectReason::InvalidPartyCode:
-      return "Invalid party code";
+      return "Invalid room code";
+    case protocol::RejectReason::RoomNotFound:
+      return "Room closed";
   }
   return "Refused by the server";
 }
@@ -147,6 +166,15 @@ core::ecs::Entity Hud::addText(render::FontId font, core::math::Vec2f position,
                            });
   this->_world.add(entity, render::Text{.font = font, .size = size});
   return entity;
+}
+
+void Hud::clear() {
+  this->_gameOver = false;
+  this->_playerId.reset();
+  for (const core::ecs::Entity entity :
+       {this->_status, this->_stats, this->_event, this->_banner}) {
+    this->setText(entity, {});
+  }
 }
 
 void Hud::setText(core::ecs::Entity entity, std::string value) {

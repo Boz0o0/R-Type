@@ -15,6 +15,7 @@
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
 #include <rtype/client/Hud.hpp>
+#include <rtype/client/LobbyMenu.hpp>
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/ExplosionSystem.hpp>
@@ -42,8 +43,13 @@ class ClientApp {
 
   static constexpr float MAX_FRAME_TIME = 0.1F;
 
-  [[nodiscard]] static bool pressedAKey(
-      const ampersand::input::InputManager& keys);
+  // Escape leaves the room, or quits from anywhere else. Once the
+  // connection has ended, any key quits. In the lobby, the keys go to the
+  // menu.
+  void onKey(ampersand::input::Key key, LobbyMenu& menu,
+             WorldMirror& worldMirror, bool& windowOpen);
+  // Shows the lobby menu while in the lobby, with what is going on.
+  void showLobby(LobbyMenu& menu) const;
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);
   static void applyPacket(WorldMirror& worldMirror, Hud& hud,
@@ -51,6 +57,8 @@ class ClientApp {
 
   ClientConfig _config;
   ServerConnection _connection;
+  // Set once the party code of the command line was sent.
+  bool _joinedPartyCode{false};
   ampersand::render::SfmlRenderer _backend;
   ampersand::audio::SfmlAudioEngine _audioEngine;
   ampersand::core::ecs::World _world;
