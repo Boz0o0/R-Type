@@ -30,8 +30,8 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ### Changed
 
-- **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`, currently `0.2.0`) instead of being included as a git subtree.
-- **Build**: Ampersand Engine 0.5 (`AMPERSAND_ENGINE_VERSION` `0.5.1`).
+- **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`) instead of being included as a git subtree.
+- **Build**: Ampersand Engine goes from 0.2.0 to 0.5.1.
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
 
 ### Removed
