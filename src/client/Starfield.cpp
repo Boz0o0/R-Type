@@ -25,10 +25,10 @@ void Starfield::addCopy(core::ecs::World& world, render::TextureId texture,
                         const Layer& layer, float positionX) {
   const core::ecs::Entity entity = world.create();
   world.add(entity, core::Transform{
-                        .position = {positionX, 0.0F, layer.depth},
+                        .position = {positionX, 0.0F, 0.0F},
                         .scale = {SCALE, SCALE, 1.0F},
                     });
-  world.add(entity, render::Sprite{.texture = texture});
+  world.add(entity, render::Sprite{.texture = texture, .layer = layer.depth});
   world.add(entity, physics::Velocity{.value = {-layer.speed, 0.0F}});
   world.add(entity, Scrolling{.width = WIDTH});
 }

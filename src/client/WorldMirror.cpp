@@ -161,7 +161,7 @@ void WorldMirror::explode(const core::Transform& transform,
     return;
   }
   const core::ecs::Entity explosion = *created;
-  this->_world.get<core::Transform>(explosion).position.z = EXPLOSION_LAYER;
+  this->_world.get<render::Sprite>(explosion).layer = EXPLOSION_LAYER;
   this->_world.add(explosion, Explosion{});
   this->play(explosion, this->_looks.explosionSound, EXPLOSION_VOLUME);
 }

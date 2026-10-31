@@ -31,7 +31,7 @@ endif()
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
-set(AMPERSAND_ENGINE_VERSION 0.2.0)
+set(AMPERSAND_ENGINE_VERSION 0.5.1)
 CPMAddPackage(
     NAME AmpersandEngine
     GITHUB_REPOSITORY Boz0o0/Ampersand-Engine

@@ -34,7 +34,7 @@ class WorldMirror {
   static constexpr float SHOOT_VOLUME = 40.0F;
   static constexpr float EXPLOSION_VOLUME = 70.0F;
   // Drawn over the ships and the missiles.
-  static constexpr float EXPLOSION_LAYER = 1.0F;
+  static constexpr std::int32_t EXPLOSION_LAYER = 1;
 
   struct Mirrored {
     ampersand::core::ecs::Entity entity;

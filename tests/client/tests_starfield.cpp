@@ -51,10 +51,10 @@ TEST(Starfield, DrawsBehindTheGame) {
   Starfield::spawn(world, {BACK, FRONT});
 
   for (const Entity entity : world.owners<Scrolling>()) {
-    EXPECT_LT(world.get<Transform>(entity).position.z, 0.0F);
+    EXPECT_LT(world.get<Sprite>(entity).layer, 0);
   }
-  EXPECT_LT(world.get<Transform>(copiesOf(world, BACK)[0]).position.z,
-            world.get<Transform>(copiesOf(world, FRONT)[0]).position.z);
+  EXPECT_LT(world.get<Sprite>(copiesOf(world, BACK)[0]).layer,
+            world.get<Sprite>(copiesOf(world, FRONT)[0]).layer);
 }
 
 TEST(Starfield, ScrollsLeftWithTheFrontLayerFaster) {
