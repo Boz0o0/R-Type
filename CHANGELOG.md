@@ -31,7 +31,7 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 ### Changed
 
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`, currently `0.2.0`) instead of being included as a git subtree.
-- **Build**: Ampersand Engine 0.5 (`AMPERSAND_ENGINE_VERSION` `0.5.0`). Until v0.5.0 is released, CMake builds the commit of the engine pull request #35 (Lua scripting).
+- **Build**: Ampersand Engine 0.5 (`AMPERSAND_ENGINE_VERSION` `0.5.1`).
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
 
 ### Removed
