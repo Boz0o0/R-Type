@@ -121,7 +121,8 @@ flowchart LR
     Socket["UdpSocket"] -->|"receive + decode()"| Net["Network thread<br/>(ServerNetwork)"]
     Net -->|"push"| Queue["MessageQueue<br/>(std::mutex)"]
     Queue -->|"drain"| Lobby["Lobby thread<br/>(Lobby, main)"]
-    Lobby -->|"push to the party of the sender"| Inbox["MessageQueue<br/>of each party"]
+    Lobby -->|"answers the clients in no party"| Socket
+    Lobby -->|"admit / push to the party of the sender"| Inbox["MessageQueue<br/>of each party"]
     Inbox -->|"drain, each tick"| Server["Party threads<br/>(GameServer, 60 Hz each)"]
     Server -->|"joined / left"| Changes["MessageQueue<br/>of the Lobby"]
     Changes --> Lobby
@@ -136,34 +137,41 @@ flowchart LR
   game. The queue is bounded (`MAX_QUEUED_MESSAGES`), so a flood can't eat all
   the memory, and a `RateLimiter` drops what a sender sends past
   `MAX_PACKETS_PER_SECOND`.
-- **Lobby thread** (`Lobby::run`, the main thread): keeps the party of each
-  client (IP + port). It gives every packet of a known client to its party. A
-  `CONNECT_REQUEST` from a new address without party code goes to the first
-  public party with a free place, or to a new party when they are all full.
-  With a code, it goes to the private party of that code (table code ->
-  party), opened if needed. 16 parties at most, then
-  `CONNECT_REJECT(server full)`. A party is closed as soon as it is empty, and
+- **Lobby thread** (`Lobby::run`, the main thread): keeps every client (IP +
+  port -> name, party). A `CONNECT_REQUEST` from a new address makes it a
+  client of the lobby (256 at most). The Lobby answers the clients in no party
+  itself: `PING`, `ROOM_LIST` (at most every 250 ms per client),
+  `ROOM_CREATE` (always a new party; a private one gets a code of 6 digits)
+  and `ROOM_JOIN` (by room id, by code, or the first public party with a free
+  place), and drops them after 5 s of silence. To put a client in a party, it
+  routes the client there and calls `GameServer::admit()`. Then it gives
+  every packet of that client to its party. 16 parties at most, then
+  `ROOM_REJECT(server full)`. A party is closed as soon as it is empty, and
   its code is freed.
 - **Party threads** (`GameServer::run`): one per party, each with its own
   `Game` and `World`. 60 times per second, even when no client sends
-  anything, it takes the packets the Lobby gave it, runs one tick of its
+  anything, it takes the clients and packets the Lobby gave it (it answers
+  an admission with `ROOM_JOINED`, or `ROOM_REJECT` when it is full), runs one tick of its
   `Game`, sends its events to its clients, and sends a `WORLD_SNAPSHOT` every
   2 ticks (30 per second, split when there are more than 59 entities).
-- Only the Lobby touches its table of clients. A party tells it who joined or
-  left (`SessionChange`) through a `MessageQueue`, which the Lobby reads
-  before routing new packets.
+- Only the Lobby touches its table of clients. A party tells it who joined,
+  who left the server (quit, timeout) and who went back to the lobby
+  (`ROOM_LEAVE`) with a `SessionChange` through a `MessageQueue`, which the
+  Lobby reads before routing new packets. For a client back in the lobby, the
+  Lobby sends `ROOM_LEFT` itself, so the client never asks the Lobby
+  something before the Lobby knows it is back.
 - The socket is shared by every thread, so every use of it locks a mutex.
   Logs go through `logLine()`, so lines of two threads never get mixed.
-- `Ctrl+C` stops the loop: every party sends `DISCONNECT(server shutdown)` to
-  its clients and the server exits.
+- `Ctrl+C` stops the loop: every party, and the Lobby for the clients in no
+  party, sends `DISCONNECT(server shutdown)` and the server exits.
 
 | File | What's inside |
 | --- | --- |
 | `ServerNetwork` | the socket, the network thread, `send()` / `encode()` + `sendDatagram()` |
 | `MessageQueue` | the bounded queue between two threads |
 | `RateLimiter` | packets per sender per second |
-| `Lobby` | the parties, and which client plays in which party |
-| `GameServer` | one party: its clients (IP + port -> player), PING/PONG, timeouts, joins and leaves, turns `GameEvents` into packets |
+| `Lobby` | the clients, the ones in no party (room list, create, join, timeout), the parties, and which client plays in which party |
+| `GameServer` | one party: its clients (IP + port -> player), PING/PONG, timeouts, admissions, `ROOM_LEAVE` and quits, turns `GameEvents` into packets |
 | `Log.hpp` | `logLine()`, one whole line per call, whatever the thread |
 | `ReliableOutbox` | the reliable packets of one client waiting for their ACK |
 | `Game` | the game logic: `World`, systems, ships, lives, score, game phases |
@@ -204,9 +212,31 @@ The client sends no reliable packet, so the server never needs to drop
 duplicates.
 
 On the client, `ServerConnection` sends `CONNECT_REQUEST` every 500 ms (10
-tries max) until the server answers `CONNECT_ACCEPT` with its player id, then
-sends a `PING` every second so the server doesn't time it out. It answers
-every reliable packet with an `ACK` and drops the copies it already handled.
+tries max) until the server answers `CONNECT_ACCEPT`, then sends a `PING`
+every second so the server doesn't time it out. It answers every reliable
+packet with an `ACK` and drops the copies it already handled.
+
+Its states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Connecting
+    Connecting --> InLobby: CONNECT_ACCEPT
+    Connecting --> Rejected: CONNECT_REJECT
+    Connecting --> Unreachable: 10 requests without answer
+    InLobby --> Joining: enterRoom()
+    Joining --> InRoom: ROOM_JOINED
+    Joining --> InLobby: ROOM_REJECT
+    InRoom --> Leaving: leaveRoom()
+    Leaving --> InLobby: ROOM_LEFT
+```
+
+From any state but `Connecting`, `DISCONNECT` or 5 s without any packet from
+the server leads to `Disconnected`. In the lobby it sends `ROOM_LIST` every
+second (`rooms()`); in `Joining` and `Leaving` it sends its request every
+500 ms until the answer comes. It only hands out the game packets
+(`0x20`-`0x3F`) while `Joining` or `InRoom`: those of a room it left are
+acknowledged and dropped.
 
 ## TODO
 

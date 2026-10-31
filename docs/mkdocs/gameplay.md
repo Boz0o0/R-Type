@@ -85,11 +85,11 @@ The server runs the game in `rtype::server::Game` (see
 
 | Rule | Value |
 | ---- | ----- |
-| Game starts | as soon as one player is connected |
+| Game starts | as soon as one player is in the room (each room has its own game) |
 | Ship speed | 450 units/s, keys from `PLAYER_INPUT`, kept on the screen |
 | Lives | 3 per player; a lost ship comes back after 2 s |
 | Waves | 10 waves, one every 5 s (first after 2 s); wave n has 3 + n Bydos |
 | Score | 100 per Bydos, to the player whose missile killed it |
 | Defeat | every player has lost all its lives |
 | Victory | every wave was sent and no Bydos is left |
-| Restart | 5 s after the end, with the players still connected |
+| Restart | 5 s after the end, with the players still in the room |

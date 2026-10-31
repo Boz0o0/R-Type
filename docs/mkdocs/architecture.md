@@ -43,7 +43,7 @@ Several parties run at once, each on its own thread (details in
 | Thread             | Class           | Does                                                               |
 | ------------------ | --------------- | ------------------------------------------------------------------ |
 | Network            | `ServerNetwork` | reads every datagram, decodes it, queues the valid packets         |
-| Lobby (main)       | `Lobby`         | gives each packet to the party of its sender, opens and closes the parties |
+| Lobby (main)       | `Lobby`         | answers the clients in no party (room list, create, join), gives each other packet to the party of its sender, opens and closes the parties |
 | One per party      | `GameServer`    | 60 ticks per second: handles its packets, updates its `World`, sends a snapshot 30 times per second |
 
 The threads only share the socket (behind a mutex) and bounded
@@ -69,26 +69,35 @@ frame rate.
 
 One loop, once per frame:
 
-1. `InputSystem` (engine): reads the keyboard and the mouse. Escape quits.
+1. `InputSystem` (engine): reads the keyboard and the mouse. In a room,
+   Escape goes back to the lobby; anywhere else, it quits.
 2. `ServerConnection`: connects to the server, sends a `PING` every second,
-   acknowledges the reliable packets and drops their copies, then hands out
-   the game packets it received.
-3. `Hud`: shows the connection state, our health, lives and score, who
-   joined or left, and the result of the game.
-4. `WorldMirror`: applies the game packets to the local `World`. It keeps one
+   asks for the room list in the lobby, sends the room requests until they
+   are answered, acknowledges the reliable packets and drops their copies,
+   then hands out the game packets of the room.
+3. `LobbyMenu`, in the lobby: the menu (quick match, create a public or a
+   private room, join with a code typed with the letters and digits) and the
+   public rooms, chosen with the arrows and Enter. With a party code on the
+   command line, the client joins that room at once instead.
+4. `Hud`, in a room: our player and the room (or its code, to give to
+   friends), our health, lives and score, who joined or left, and the result
+   of the game.
+5. `WorldMirror`: applies the game packets to the local `World`. It keeps one
    entity per server entity, with the sprite, animation and size of its kind
    (each ship has the colour of its player), plays the sound of our shots,
-   and leaves an explosion where a ship or an enemy is killed.
-5. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
-6. `MovementSystem` (engine): moves the entities with their speed between two
+   and leaves an explosion where a ship or an enemy is killed. It is emptied
+   when we leave a room: each room numbers its entities from the start.
+6. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
+7. `MovementSystem` (engine): moves the entities with their speed between two
    snapshots, and the star-field layers.
-7. `ScrollingSystem`: once a star-field copy has fully left the screen on the
+8. `ScrollingSystem`: once a star-field copy has fully left the screen on the
    left, puts it back behind the other copy, so the background never ends.
-8. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
    remove an explosion once its animation and its sound are over.
-9. `AudioSystem` (engine): plays the sounds.
-10. `RenderSystem` (engine): draws the `World`, the star-field at the back and
-    the HUD on top. The game area is 1920x1080, scaled to fit the window.
+10. `AudioSystem` (engine): plays the sounds.
+11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+    the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
+    fit the window.
 
 If the server refuses the client, does not answer, or goes silent for 5
 seconds, the HUD shows why and waits: the next key pressed stops the client,

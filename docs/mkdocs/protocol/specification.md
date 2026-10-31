@@ -7,7 +7,7 @@ Quick facts:
 
 - Transport: **UDP** only (IPv4)
 - Default port: **4242**
-- Binary protocol, current version: **2**
+- Binary protocol, current version: **3**
 - Code: `include/rtype/common/protocol/` and `src/common/protocol/` (see [Implementation](implementation.md))
 
 The server runs the game. The client only sends the player's inputs and draws
@@ -21,7 +21,11 @@ sequenceDiagram
     participant C as Client
     participant S as Server
     C->>S: CONNECT_REQUEST(name)
-    S-->>C: CONNECT_ACCEPT(playerId)
+    S-->>C: CONNECT_ACCEPT (the client is in the lobby)
+    C->>S: ROOM_LIST
+    S-->>C: ROOM_LIST_REPLY(public rooms)
+    C->>S: ROOM_CREATE or ROOM_JOIN
+    S-->>C: ROOM_JOINED(roomId, playerId)
     C->>S: ACK
     S-->>C: PLAYER_JOINED, ENTITY_SPAWN (current state)
     S-->>C: GAME_START
@@ -33,7 +37,13 @@ sequenceDiagram
     end
     S-->>C: ENTITY_SPAWN / ENTITY_DESTROY / PLAYER_STATE
     S-->>C: GAME_OVER
+    C->>S: ROOM_LEAVE
+    S-->>C: ROOM_LEFT (back in the lobby)
 ```
+
+The server has a **lobby** and **rooms** (we also call them parties). A
+client first enters the lobby, then plays in one room at a time, and can go
+back to the lobby to pick another one.
 
 ## Data types
 
@@ -62,7 +72,7 @@ Every packet starts with the same 12 bytes:
 | Offset | Field | Type | What it is |
 | --- | --- | --- | --- |
 | 0 | `magic` | `u16` | always `0x5254` ("RT") |
-| 2 | `version` | `u8` | protocol version, `2` for now |
+| 2 | `version` | `u8` | protocol version, `3` for now |
 | 3 | `type` | `u8` | packet type (see list below) |
 | 4 | `flags` | `u8` | `0x01` = reliable, the other bits are unused |
 | 5 | `reserved` | `u8` | unused, send 0 |
@@ -79,8 +89,8 @@ internet. One UDP datagram = one packet.
 
 | Type | Name | Who sends it | Reliable | Data size |
 | --- | --- | --- | --- | --- |
-| `0x01` | [CONNECT_REQUEST](#connect_request-0x01) | client | no | 2 + n + m |
-| `0x02` | [CONNECT_ACCEPT](#connect_accept-0x02) | server | yes | 2 |
+| `0x01` | [CONNECT_REQUEST](#connect_request-0x01) | client | no | 1 + n |
+| `0x02` | [CONNECT_ACCEPT](#connect_accept-0x02) | server | no | 1 |
 | `0x03` | [CONNECT_REJECT](#connect_reject-0x03) | server | no | 1 |
 | `0x04` | [DISCONNECT](#disconnect-0x04) | both | no | 1 |
 | `0x05` | [PING](#ping-0x05) | both | no | 4 |
@@ -95,9 +105,21 @@ internet. One UDP datagram = one packet.
 | `0x25` | [WORLD_SNAPSHOT](#world_snapshot-0x25) | server | no | 6 + 20 x n |
 | `0x26` | [PLAYER_STATE](#player_state-0x26) | server | yes | 7 |
 | `0x27` | [GAME_OVER](#game_over-0x27) | server | yes | 5 |
+| `0x40` | [ROOM_LIST](#room_list-0x40) | client | no | 0 |
+| `0x41` | [ROOM_CREATE](#room_create-0x41) | client | no | 1 |
+| `0x42` | [ROOM_JOIN](#room_join-0x42) | client | no | 5 + n |
+| `0x43` | [ROOM_LEAVE](#room_leave-0x43) | client | no | 0 |
+| `0x50` | [ROOM_LIST_REPLY](#room_list_reply-0x50) | server | no | 1 + 5 x n |
+| `0x51` | [ROOM_JOINED](#room_joined-0x51) | server | yes | 6 + n |
+| `0x52` | [ROOM_REJECT](#room_reject-0x52) | server | no | 1 |
+| `0x53` | [ROOM_LEFT](#room_left-0x53) | server | no | 0 |
 
 `0x00` and every value not in this list are invalid. The reliable flag is set
 on the "yes" packets and only on them.
+
+The ranges: `0x01`-`0x0F` session (both ways), `0x10`-`0x1F` game from the
+client, `0x20`-`0x3F` game from the server, `0x40`-`0x4F` lobby from the
+client, `0x50`-`0x5F` lobby from the server.
 
 ### Enums
 
@@ -110,7 +132,10 @@ screen, `2` collected.
 **DisconnectReason**: `0` quit, `1` timeout, `2` kicked, `3` server shutdown.
 
 **RejectReason**: `0` server full, `1` game already started, `2` wrong version,
-`3` invalid name, `4` party full, `5` invalid party code.
+`3` invalid name, `4` party full, `5` invalid party code, `6` room not found.
+
+**RoomVisibility**: `0` public (in the room list, anyone can join it), `1`
+private (hidden, joined with its code only).
 
 **GameResult**: `0` victory, `1` defeat.
 
@@ -120,35 +145,25 @@ Player ids go from `0` to `3` (4 players max). `0xFF` means "no player".
 
 #### CONNECT_REQUEST (0x01)
 
-Sent by the client to join a party.
+Sent by the client to enter the lobby.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
 | 0 | `playerName` | `string` | 1 to 16 bytes |
-| 1 + n | `partyCode` | `string` | 0 to 8 bytes, see below |
-
-- Empty `partyCode`: the server puts the client in any **public** party that
-  has a free place, or opens a new one.
-- Otherwise the code (1 to 8 ASCII letters and digits, letter case ignored)
-  names a **private** party: the client joins it, or opens it if no party has
-  this code yet. Players without the code never end up in it. The code is
-  free again once its party is closed (when its last player leaves).
-- Refused with `party full` when the private party already has 4 players,
-  `invalid party code` when the code has other characters, and `server full`
-  when a new party is needed but the server already runs as many as it can.
 
 #### CONNECT_ACCEPT (0x02)
 
-The server accepted the client.
+The client is in the lobby. Not reliable: the client sends CONNECT_REQUEST
+again until it gets an answer, and the server answers every one.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
-| 0 | `playerId` | `u8` | id of this player (0 to 3) |
-| 1 | `tickRate` | `u8` | server ticks per second (60), never 0 |
+| 0 | `tickRate` | `u8` | server ticks per second (60), never 0 |
 
 #### CONNECT_REJECT (0x03)
 
-The server refused the client. The client stops trying.
+The server refused the client (`server full` when it already has 256
+clients, `invalid name`, `wrong version`). The client stops trying.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
@@ -307,6 +322,101 @@ End of the game.
 | 0 | `result` | `GameResult` | |
 | 1 | `finalScore` | `u32` | score of the team |
 
+### Lobby packets
+
+The client sends them only once it got CONNECT_ACCEPT. None of them is
+reliable: the client sends a request again every 500 ms until the server
+answers it, and the server answers every copy (see [Lobby and
+rooms](#lobby-and-rooms)).
+
+#### ROOM_LIST (0x40)
+
+From the lobby: asks for the public rooms. No data. The server answers with
+ROOM_LIST_REPLY, at most once every 250 ms per client (the extra requests get
+no answer).
+
+#### ROOM_CREATE (0x41)
+
+From the lobby: opens a new room and joins it.
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `visibility` | `RoomVisibility` | a private room gets a code of 6 digits, chosen by the server |
+
+Refused with `server full` when the server already runs as many rooms as it
+can (16 for ours).
+
+#### ROOM_JOIN (0x42)
+
+From the lobby: joins a room.
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `roomId` | `u32` | a public room of the list, or 0 |
+| 4 | `code` | `string` | 0 to 8 bytes |
+
+`roomId` and `code` can't both be set (the packet is dropped).
+
+- `code` set (1 to 8 ASCII letters and digits, letter case ignored): the
+  **private** room of this code. If no room has this code yet, it is opened,
+  so friends who all type the same code end up together. Players without the
+  code never end up in it. The code is free again once its room is closed.
+- `roomId` set: this **public** room.
+- Neither (**quick match**): any public room with a free place, or a new one
+  when they are all full.
+- Refused with `party full` when the room already has 4 players, `room not
+  found` when no public room has this id (it was closed, or it is private),
+  `invalid party code` when the code has other characters, and `server full`
+  when a new room is needed but the server already runs as many as it can.
+
+#### ROOM_LEAVE (0x43)
+
+From a room: leaves it and goes back to the lobby. No data. The others get
+PLAYER_LEFT (reason "quit"). From the lobby, the server just answers
+ROOM_LEFT again.
+
+#### ROOM_LIST_REPLY (0x50)
+
+The public rooms, oldest first. Private rooms are never listed.
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `count` | `u8` | number of rooms, 32 max |
+| 1 | `rooms` | list | `count` entries of 5 bytes |
+
+Each entry:
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `roomId` | `u32` | to send in ROOM_JOIN, never 0 |
+| 4 | `players` | `u8` | 0 to 4 |
+
+`payloadSize` has to be exactly `1 + 5 x count`.
+
+#### ROOM_JOINED (0x51)
+
+The client is now in a room. Sent by the room itself, then come the
+PLAYER_JOINED, ENTITY_SPAWN... of the game (see [Connection](#connection)).
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `roomId` | `u32` | never 0 |
+| 4 | `playerId` | `u8` | id of this player in the room (0 to 3) |
+| 5 | `code` | `string` | 0 to 8 bytes: the code of a private room, to give to friends; empty for a public one |
+
+#### ROOM_REJECT (0x52)
+
+The room request was refused. The client stays in the lobby.
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `reason` | `RejectReason` | |
+
+#### ROOM_LEFT (0x53)
+
+The client is back in the lobby: after ROOM_LEAVE, or after a room refused it.
+No data.
+
 ## Reliable packets
 
 UDP can lose packets, send them twice or in the wrong order. We have two kinds
@@ -357,10 +467,7 @@ sequenceDiagram
     Note right of S: no answer? the client tries again after 500 ms
     C->>S: CONNECT_REQUEST("Alice")
     alt accepted
-        S-->>C: CONNECT_ACCEPT(playerId=1)
-        C->>S: ACK
-        S-->>C: PLAYER_JOINED for each player
-        S-->>C: ENTITY_SPAWN for each entity
+        S-->>C: CONNECT_ACCEPT
     else refused
         S-->>C: CONNECT_REJECT(server full)
     end
@@ -369,23 +476,60 @@ sequenceDiagram
 - The client sends CONNECT_REQUEST every 500 ms until it gets an answer. It
   gives up after 10 tries.
 - The server knows a client by its **IP + port**. If the same IP + port sends
-  CONNECT_REQUEST again, the server sends the same CONNECT_ACCEPT again, it
-  doesn't create a new player.
-- The server refuses when there are already 4 players in the party asked for
-  (`party full`) or no party can be opened (`server full`), when the name is
-  not valid UTF-8 or holds control characters, when the party code is
-  invalid, or (if it wants) when the game already started. If the version is different, it answers "wrong version".
-  Our server lets players join a running game.
-- After accepting, the server sends the new client everything it needs:
-  a PLAYER_JOINED per player (him included), an ENTITY_SPAWN per entity, a
-  PLAYER_STATE per other player, and GAME_START if a game is running.
-  The other clients get a PLAYER_JOINED, then everyone gets the ENTITY_SPAWN
-  and the PLAYER_STATE of the new ship on the next tick.
+  CONNECT_REQUEST again from the lobby, the server sends CONNECT_ACCEPT
+  again, it doesn't create a new client. If it is in a room, the server
+  thinks the client restarted: it takes it out of its room, and accepts its
+  next CONNECT_REQUEST.
+- The server refuses when it already has 256 clients (`server full`), when
+  the name is not valid UTF-8 or holds control characters (`invalid name`).
+  If the version is different, it answers "wrong version".
+
+## Lobby and rooms
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Server (lobby)
+    participant R as Server (room 3)
+    C->>L: ROOM_LIST (every second)
+    L-->>C: ROOM_LIST_REPLY([room 3: 2 players])
+    C->>L: ROOM_JOIN(roomId=3)
+    L->>R: adds the client
+    R-->>C: ROOM_JOINED(roomId=3, playerId=2)
+    C->>R: ACK
+    R-->>C: PLAYER_JOINED for each player, ENTITY_SPAWN for each entity...
+    Note over C,R: the game
+    C->>R: ROOM_LEAVE
+    R->>L: the client is back
+    L-->>C: ROOM_LEFT
+```
+
+- A client in the **lobby** is in no room: it can ask for the room list,
+  create a room or join one, and must keep talking (PING every second) or it
+  is dropped after 5 seconds.
+- A client in a **room** plays: every packet it sends goes to its room.
+- Every request is sent again every 500 ms until it is answered, and the
+  server answers every copy: a ROOM_CREATE or ROOM_JOIN that arrives once the
+  client is in a room gets the same ROOM_JOINED again (no second room is
+  opened), and a ROOM_LEAVE from the lobby gets ROOM_LEFT again.
+- A client that gets ROOM_JOINED for a room it did not ask for anymore (late
+  answer) sends ROOM_LEAVE.
+- After ROOM_JOINED, the room sends the new client everything it needs: a
+  PLAYER_JOINED per player (him included), an ENTITY_SPAWN per entity, a
+  PLAYER_STATE per other player, and GAME_START if a game is running. The
+  other clients get a PLAYER_JOINED, then everyone gets the ENTITY_SPAWN and
+  the PLAYER_STATE of the new ship on the next tick. Our server lets players
+  join a running game.
+- A room is closed as soon as it has no player left (they all left with
+  ROOM_LEAVE, quit or timed out).
+- Each room has its own game: entity ids and server ticks start again from
+  the beginning in every room. A client that changes room forgets the
+  entities of the old one, and drops its game packets that still arrive.
 
 ## During the game
 
-- The server sends GAME_START when the game starts: as soon as the first
-  player joins. A player who joins later gets it right away.
+- The server sends GAME_START when the game of a room starts: as soon as its
+  first player joins. A player who joins later gets it right away.
 - The client sends PLAYER_INPUT every frame (at least 60 per second) and right
   away when a key changes. The server uses the last input of each player at
   each tick. Inputs sent before GAME_START are ignored.
@@ -407,10 +551,10 @@ sequenceDiagram
   DISCONNECT(kicked) to remove a player.
 - Both sides send a PING every second, and answer a PING with a PONG.
 - Every valid packet counts as "still alive". If nothing comes from someone for
-  **5 seconds**, he is disconnected.
-- When a player leaves (quit, timeout, kick), the server removes his ship with
-  ENTITY_DESTROY and sends PLAYER_LEFT to the others. The game keeps going for
-  them. That's how a crashed client is handled.
+  **5 seconds**, he is disconnected, in the lobby as in a room.
+- When a player leaves (ROOM_LEAVE, quit, timeout, kick), the server removes
+  his ship with ENTITY_DESTROY and sends PLAYER_LEFT to the others. The game
+  keeps going for them. That's how a crashed client is handled.
 
 ## Bad packets
 
@@ -420,7 +564,7 @@ packet is **dropped**: no answer, no crash.
 1. At least 12 bytes
 2. At most 1200 bytes
 3. `magic` is `0x5254`
-4. `version` is 2 (if it's a CONNECT_REQUEST, the server can answer "wrong
+4. `version` is 3 (if it's a CONNECT_REQUEST, the server can answer "wrong
    version")
 5. `payloadSize` = packet size - 12
 6. `type` is in the list
@@ -439,9 +583,14 @@ memory or read outside the buffer.
 
 - There is no encryption and no login. The protocol is made for LAN games.
 - Someone who can fake his IP could pretend to be another player.
-- The answer to an unknown IP (CONNECT_REJECT, 13 bytes) is always smaller
-  than the request (at least 14 bytes), so the server can't be used for a
-  DDoS amplification attack.
+- The answer to an unknown IP (CONNECT_ACCEPT or CONNECT_REJECT, 13 bytes)
+  is always smaller than the request (at least 14 bytes), so the server can't
+  be used for a DDoS amplification attack.
+- ROOM_LIST_REPLY is bigger than ROOM_LIST, so the server sends it at most
+  once every 250 ms to the same client: someone who fakes the address of a
+  client can't use it to flood that address.
+- Private rooms are hidden from the room list, but their code is not a
+  password: someone who tries many codes can find one.
 - The server accepts at most 500 packets per second from one sender (IP +
   port) and drops the rest. It counts per IP + port, not per IP, so that
   several players can play from the same machine; it counts at most 1024
@@ -452,7 +601,7 @@ memory or read outside the buffer.
 | Name | Value |
 | --- | --- |
 | `MAGIC` | `0x5254` |
-| `VERSION` | `2` |
+| `VERSION` | `3` |
 | `DEFAULT_PORT` | `4242` |
 | `HEADER_SIZE` | 12 bytes |
 | `MAX_DATAGRAM_SIZE` | 1200 bytes |
@@ -460,6 +609,7 @@ memory or read outside the buffer.
 | `MAX_PLAYERS` | 4 |
 | `MAX_PLAYER_NAME_LENGTH` | 16 bytes |
 | `MAX_PARTY_CODE_LENGTH` | 8 bytes |
+| `MAX_LISTED_ROOMS` | 32 |
 | `NO_OWNER` | `0xFF` |
 | `MAX_SNAPSHOT_ENTITIES` | 59 |
 | `SERVER_TICK_RATE` | 60 per second |
@@ -474,18 +624,18 @@ memory or read outside the buffer.
 PLAYER_INPUT, sequence 42, frame 500, up + shoot:
 
 ```text
-52 54 01 10 00 00 00 05 00 00 00 2A | 00 00 01 F4 11
+52 54 03 10 00 00 00 05 00 00 00 2A | 00 00 01 F4 11
 magic ver type flags res size seq   | clientTick  keys
 ```
 
 ENTITY_DESTROY of entity 1234 (killed), sequence 7, reliable:
 
 ```text
-52 54 01 24 01 00 00 05 00 00 00 07 | 00 00 04 D2 00
+52 54 03 24 01 00 00 05 00 00 00 07 | 00 00 04 D2 00
 ```
 
 The ACK the client sends back for it:
 
 ```text
-52 54 01 07 00 00 00 04 00 00 00 2B | 00 00 00 07
+52 54 03 07 00 00 00 04 00 00 00 2B | 00 00 00 07
 ```

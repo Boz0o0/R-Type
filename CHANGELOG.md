@@ -27,9 +27,14 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Server**: several parties at once. Each party has its own thread and tick loop; a new client goes to the first party with a free place, or to a new party when they are all full (16 at most). Empty parties are closed.
 - **Protocol**: party codes (protocol version 2). `CONNECT_REQUEST` carries an optional `partyCode`; players with the same code join the same private party, which players without the code never join. New reject reasons `party full` and `invalid party code`.
 - **Client**: optional fifth argument, the party code: `r-type_client [host] [port] [name] [party code]`.
+- **Server**: a lobby. A new client enters the lobby, sees the public rooms, and creates one (public, or private with a code of 6 digits made by the server) or joins one (from the list, with a code, or with a quick match). It can leave its room to go back to the lobby. Clients of the lobby are dropped after 5 s of silence; 256 clients at most.
+- **Protocol**: lobby packets (protocol version 3): `ROOM_LIST`, `ROOM_CREATE`, `ROOM_JOIN`, `ROOM_LEAVE` from the client, `ROOM_LIST_REPLY`, `ROOM_JOINED`, `ROOM_REJECT`, `ROOM_LEFT` from the server, and the reject reason `room not found`.
+- **Client**: the lobby screen (quick match, create a public or a private room, join with a code, list of the public rooms). The HUD shows the room, or its code. In a room, Escape goes back to the lobby.
 
 ### Changed
 
+- **Protocol**: version 3. `CONNECT_REQUEST` only carries the name and puts the client in the lobby; the party code moved to `ROOM_JOIN`. `CONNECT_ACCEPT` only carries the tick rate and is no longer reliable; the player id now comes in `ROOM_JOINED`.
+- **Client**: with a party code on the command line, the client joins that private room as soon as it is in the lobby. Without one, it shows the lobby instead of joining any public party.
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`, currently `0.2.0`) instead of being included as a git subtree.
 
 ### Removed

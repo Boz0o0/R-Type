@@ -48,10 +48,23 @@ Start the server, then one client per player (4 players per party, 16 parties at
 ./build/bin/r-type_client [host] [port] [name] [party code]   # default: 127.0.0.1 4242 Player
 ```
 
-Without a party code, a client joins any public party with a free place. To
-play with your friends only, give everyone the same code (1 to 8 letters and
-digits, e.g. `./build/bin/r-type_client 127.0.0.1 4242 Alice FRIENDS`): you
-all join the same private party.
+Without a party code, the client opens the **lobby**: choose a line with the
+arrows and press Enter.
+
+- **Quick match**: any public room with a free place (or a new one).
+- **Create a public room**: a new room, shown to everyone in the list.
+- **Create a private room**: a new hidden room; its code (6 digits) is shown
+  at the top of the screen, give it to your friends.
+- **Join with a code**: type the code with the letters and digits, then
+  Enter.
+- **The public rooms**: the list of the server, with their players.
+
+In a room, Escape brings you back to the lobby; in the lobby, Escape quits.
+
+With a party code (1 to 8 letters and digits, e.g.
+`./build/bin/r-type_client 127.0.0.1 4242 Alice FRIENDS`), the client skips the
+menu and joins the private room of this code at once (opened if there is
+none yet): give everyone the same code to play together.
 
 Stop the server with `Ctrl+C`: it tells every client before closing.
 
