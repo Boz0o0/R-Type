@@ -1,10 +1,14 @@
-#include <algorithm>
 #include <ampersand/audio/resources/AudioListener.hpp>
-#include <ampersand/core/resources/Clock.hpp>
+#include <ampersand/audio/systems/AudioSystem.hpp>
+#include <ampersand/core/ecs/Scheduler.hpp>
+#include <ampersand/core/time/FrameTimer.hpp>
+#include <ampersand/input/systems/InputSystem.hpp>
+#include <ampersand/physics/systems/MovementSystem.hpp>
 #include <ampersand/render/resources/Camera.hpp>
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
-#include <chrono>
+#include <ampersand/render/systems/AnimationSystem.hpp>
+#include <ampersand/render/systems/RenderSystem.hpp>
 #include <optional>
 #include <rtype/client/AssetLoader.hpp>
 #include <rtype/client/ClientApp.hpp>
@@ -12,9 +16,12 @@
 #include <rtype/client/Hud.hpp>
 #include <rtype/client/Starfield.hpp>
 #include <rtype/client/WorldMirror.hpp>
-#include <rtype/common/protocol/PacketCodec.hpp>
-#include <rtype/common/protocol/Packets.hpp>
+#include <rtype/client/systems/ExplosionSystem.hpp>
+#include <rtype/client/systems/NetworkSystem.hpp>
+#include <rtype/client/systems/QuitSystem.hpp>
+#include <rtype/client/systems/ScrollingSystem.hpp>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -23,13 +30,13 @@ namespace rtype::client {
 namespace audio = ampersand::audio;
 namespace core = ampersand::core;
 namespace input = ampersand::input;
+namespace physics = ampersand::physics;
 namespace render = ampersand::render;
 
 ClientApp::ClientApp(ClientConfig config)
     : _config(std::move(config)),
       _connection(this->_config.host(), this->_config.port(),
-                  this->_config.name(), this->_config.partyCode()),
-      _inputSystem(pollWindow) {}
+                  this->_config.name(), this->_config.partyCode()) {}
 
 void ClientApp::run() {
   auto& window = this->_world.addResource<render::Renderer>(
@@ -44,8 +51,7 @@ void ClientApp::run() {
   });
   this->_world.addResource<render::ClearColor>(
       render::ClearColor{.value = SPACE_COLOR});
-  const auto& keys = this->_world.addResource<input::InputManager>();
-  auto& clock = this->_world.addResource<core::Clock>();
+  Controls::bind(this->_world.addResource<input::InputManager>());
   this->_world.addResource<audio::AudioListener>(
       audio::AudioListener{.engine = this->_audioEngine});
   const Assets assets = AssetLoader::load(this->_backend, this->_audioEngine,
@@ -54,33 +60,20 @@ void ClientApp::run() {
   WorldMirror worldMirror(this->_world, assets.looks);
   Hud hud(this->_world, assets.font);
 
-  auto previous = std::chrono::steady_clock::now();
-  bool ended = false;
-  while (window.isOpen) {
-    const auto now = std::chrono::steady_clock::now();
-    clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
-                        MAX_FRAME_TIME);
-    clock.elapsed += clock.dt;
-    previous = now;
+  core::ecs::Scheduler scheduler(this->_world);
+  scheduler.add<input::InputSystem>(pollWindow);
+  scheduler.add<QuitSystem>(this->_connection);
+  scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
+  scheduler.add<physics::MovementSystem>();
+  scheduler.add<ScrollingSystem>();
+  scheduler.add<render::AnimationSystem>();
+  scheduler.add<ExplosionSystem>();
+  scheduler.add<audio::AudioSystem>();
+  scheduler.add<render::RenderSystem>();
 
-    this->_inputSystem.update(this->_world);
-    if (keys.getKey(input::KeyCode::Escape) || (ended && pressedAKey(keys))) {
-      window.isOpen = false;
-    }
-    this->_connection.update(now);
-    hud.showConnection(this->_connection.state(), this->_connection.playerId(),
-                       this->_connection.rejectReason());
-    ended = this->_connection.hasEnded();
-    for (const protocol::Payload& packet : this->_connection.takePackets()) {
-      applyPacket(worldMirror, hud, packet);
-    }
-    this->_connection.sendInput(Controls::inputMask(keys.keysDown()));
-    this->_movementSystem.update(this->_world);
-    this->_scrollingSystem.update(this->_world);
-    this->_animationSystem.update(this->_world);
-    this->_explosionSystem.update(this->_world);
-    this->_audioSystem.update(this->_world);
-    this->_renderSystem.update(this->_world);
+  core::FrameTimer timer;
+  while (window.isOpen) {
+    scheduler.update(timer.tick());
   }
   if (this->_connection.hasEnded()) {
     // The HUD showed why, and ServerConnection printed it.
@@ -89,44 +82,26 @@ void ClientApp::run() {
   this->_connection.disconnect();
 }
 
-bool ClientApp::pressedAKey(const input::InputManager& keys) {
-  return !keys.keysPressed().empty();
-}
-
-void ClientApp::applyPacket(WorldMirror& worldMirror, Hud& hud,
-                            const protocol::Payload& packet) {
-  hud.apply(packet);
-  if (const auto* spawn = std::get_if<protocol::EntitySpawn>(&packet)) {
-    worldMirror.spawn(*spawn);
-  } else if (const auto* snapshot =
-                 std::get_if<protocol::WorldSnapshot>(&packet)) {
-    worldMirror.applySnapshot(*snapshot);
-  } else if (const auto* destroyed =
-                 std::get_if<protocol::EntityDestroy>(&packet)) {
-    worldMirror.destroy(*destroyed);
-  }
-}
-
 std::optional<input::Event> ClientApp::pollWindow(core::ecs::World& world) {
   auto& window = world.getResource<render::Renderer>();
   while (const auto event = window.renderer.pollEvent()) {
     if (std::holds_alternative<render::Closed>(*event)) {
       window.isOpen = false;
-    } else if (const auto* pressed = std::get_if<input::KeyPressed>(&*event)) {
-      return *pressed;
-    } else if (const auto* released =
-                   std::get_if<input::KeyReleased>(&*event)) {
-      return *released;
-    } else if (const auto* clicked =
-                   std::get_if<input::MousePressed>(&*event)) {
-      return *clicked;
-    } else if (const auto* unclicked =
-                   std::get_if<input::MouseReleased>(&*event)) {
-      return *unclicked;
-    } else if (const auto* moved = std::get_if<input::MouseMoved>(&*event)) {
-      return *moved;
-    } else if (std::holds_alternative<input::FocusLost>(*event)) {
-      return input::FocusLost{};
+      continue;
+    }
+    // Every window event that the InputManager knows: keys, mouse, controllers.
+    auto forwarded = std::visit(
+        [](const auto& windowEvent) -> std::optional<input::Event> {
+          if constexpr (std::is_constructible_v<input::Event,
+                                                decltype(windowEvent)>) {
+            return windowEvent;
+          } else {
+            return std::nullopt;
+          }
+        },
+        *event);
+    if (forwarded) {
+      return forwarded;
     }
   }
   return std::nullopt;

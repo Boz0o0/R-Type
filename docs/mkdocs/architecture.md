@@ -61,35 +61,44 @@ with a planet and a moon), each drawn twice side by side, behind everything
 else. The back layer scrolls left at 30 px/s and the front one at 90 px/s, so
 the front stars look closer.
 
-Each frame starts by measuring the real time since the previous one
-(`std::chrono::steady_clock`, at most 0.1 s so a frozen window does not make
-everything jump) into the engine `Clock`. Every move, scroll and animation
-uses it, so the game runs at the same speed on any computer, whatever its
-frame rate.
+`Controls` sets the engine input actions: the `Horizontal` and `Vertical`
+axes (arrow keys or a controller's left stick), `Fire` (Space or the A button)
+and `Quit` (Escape or Start).
 
-One loop, once per frame:
+The loop is the engine `Scheduler`, fed by a `FrameTimer`: each frame, the
+timer gives the real time since the previous one (at most 0.1 s, so a frozen
+window does not make everything jump), and the `Scheduler` puts it in the
+engine `Clock`, then runs the systems in this order. Every move, scroll and
+animation uses the `Clock`, so the game runs at the same speed on any
+computer, whatever its frame rate.
 
-1. `InputSystem` (engine): reads the keyboard and the mouse. Escape quits.
-2. `ServerConnection`: connects to the server, sends a `PING` every second,
-   acknowledges the reliable packets and drops their copies, then hands out
-   the game packets it received.
-3. `Hud`: shows the connection state, our health, lives and score, who
-   joined or left, and the result of the game.
-4. `WorldMirror`: applies the game packets to the local `World`. It keeps one
-   entity per server entity, with the sprite, animation and size of its kind
-   (each ship has the colour of its player), plays the sound of our shots,
-   and leaves an explosion where a ship or an enemy is killed.
-5. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
-6. `MovementSystem` (engine): moves the entities with their speed between two
+1. `InputSystem` (engine): reads the keyboard, the mouse and the controllers.
+2. `QuitSystem`: closes the window on `Quit`, or on any key or button once the
+   connection has ended.
+3. `NetworkSystem`:
+    - `ServerConnection` connects to the server, sends a `PING` every second,
+      acknowledges the reliable packets and drops their copies, then hands
+      out the game packets it received;
+    - `Hud` shows the connection state, our health, lives and score, who
+      joined or left, and the result of the game;
+    - `WorldMirror` applies the game packets to the local `World`. It keeps
+      one entity per server entity, with the sprite, animation and size of its
+      kind (each ship has the colour of its player), plays the sound of our
+      shots, and leaves an explosion where a ship or an enemy is killed;
+    - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server.
+4. `MovementSystem` (engine): moves the entities with their speed between two
    snapshots, and the star-field layers.
-7. `ScrollingSystem`: once a star-field copy has fully left the screen on the
+5. `ScrollingSystem`: once a star-field copy has fully left the screen on the
    left, puts it back behind the other copy, so the background never ends.
-8. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+6. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
    remove an explosion once its animation and its sound are over.
-9. `AudioSystem` (engine): plays the sounds.
-10. `RenderSystem` (engine): draws the `World`, the star-field at the back and
-    the HUD on top. The game area is 1920x1080, scaled to fit the window.
+7. `AudioSystem` (engine): plays the sounds.
+8. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+   the HUD on top. The game area is 1920x1080, scaled to fit the window.
+
+Systems never destroy an entity while the others run: they queue it in the
+engine `CommandQueue`, which the `Scheduler` applies at the end of the frame.
 
 If the server refuses the client, does not answer, or goes silent for 5
-seconds, the HUD shows why and waits: the next key pressed stops the client,
-with exit code 84.
+seconds, the HUD shows why and waits: the next key or button pressed stops the
+client, with exit code 84.

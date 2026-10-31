@@ -1,46 +1,29 @@
 #pragma once
 
 #include <ampersand/input/Event.hpp>
-#include <array>
+#include <ampersand/input/resources/InputManager.hpp>
 #include <cstdint>
-#include <rtype/common/protocol/Protocol.hpp>
-#include <set>
+#include <string_view>
 
 namespace rtype::client {
 
 class Controls {
  public:
+  static constexpr std::string_view HORIZONTAL = "Horizontal";
+  static constexpr std::string_view VERTICAL = "Vertical";
+  static constexpr std::string_view FIRE = "Fire";
+  static constexpr std::string_view QUIT = "Quit";
+
+  static void bind(ampersand::input::InputManager& manager);
   [[nodiscard]] static std::uint8_t inputMask(
-      const std::set<ampersand::input::KeyCode>& keysDown);
+      const ampersand::input::InputManager& manager);
 
  private:
-  struct Binding {
-    ampersand::input::KeyCode key;
-    std::uint8_t flag;
-  };
-
-  static constexpr std::array BINDINGS{
-      Binding{
-          .key = ampersand::input::KeyCode::UpArrow,
-          .flag = protocol::InputFlag::MOVE_UP,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::DownArrow,
-          .flag = protocol::InputFlag::MOVE_DOWN,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::LeftArrow,
-          .flag = protocol::InputFlag::MOVE_LEFT,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::RightArrow,
-          .flag = protocol::InputFlag::MOVE_RIGHT,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::Space,
-          .flag = protocol::InputFlag::SHOOT,
-      },
-  };
+  // SFML numbers an Xbox pad's A button 0 and its Start button 7.
+  static constexpr ampersand::input::JoystickButton FIRE_BUTTON =
+      ampersand::input::JoystickButton::Button0;
+  static constexpr ampersand::input::JoystickButton START_BUTTON =
+      ampersand::input::JoystickButton::Button7;
 };
 
 }  // namespace rtype::client

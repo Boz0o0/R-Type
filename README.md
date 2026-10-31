@@ -53,6 +53,9 @@ play with your friends only, give everyone the same code (1 to 8 letters and
 digits, e.g. `./build/bin/r-type_client 127.0.0.1 4242 Alice FRIENDS`): you
 all join the same private party.
 
+Controls: the arrow keys move and Space shoots, Escape quits. A controller
+works too: left stick, A to shoot, Start to quit.
+
 Stop the server with `Ctrl+C`: it tells every client before closing.
 
 ## Project structure
