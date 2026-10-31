@@ -35,10 +35,11 @@ constexpr std::chrono::milliseconds NO_ANSWER_WAIT{200};
 
 const GameServer::Clock::time_point START = GameServer::Clock::now();
 
-std::optional<ConnectAccept> join(TestServer& game, TestClient& client,
-                                  const std::string& name = "Player") {
+/** @brief Admits a client with a name, as the Lobby would. */
+std::optional<RoomJoined> join(TestServer& game, TestClient& client,
+                               const std::string& name = "Player") {
   client.send(ConnectRequest{.playerName = name});
-  return stepUntil<ConnectAccept>(game, client, START);
+  return stepUntil<RoomJoined>(game, client, START);
 }
 
 /** @brief Owners of the ships spawned in a list of packets, in order. */
@@ -96,7 +97,8 @@ TEST(GameServer, AcceptsAClientAndGivesItAnId) {
 
   ASSERT_TRUE(accept.has_value());
   EXPECT_EQ(accept->playerId, 0);
-  EXPECT_EQ(accept->tickRate, SERVER_TICK_RATE);
+  EXPECT_EQ(accept->roomId, TestServer::ROOM_ID);
+  EXPECT_TRUE(accept->code.empty());
   EXPECT_EQ(game.playerCount(), 1U);
 }
 
@@ -139,10 +141,10 @@ TEST(GameServer, RejectsClientsWhenFull) {
 
   TestClient extra(network);
   extra.send(ConnectRequest{.playerName = "Late"});
-  const auto reject = stepUntil<ConnectReject>(game, extra, START);
+  const auto reject = stepUntil<RoomReject>(game, extra, START);
 
   ASSERT_TRUE(reject.has_value());
-  EXPECT_EQ(reject->reason, RejectReason::ServerFull);
+  EXPECT_EQ(reject->reason, RejectReason::PartyFull);
   EXPECT_EQ(game.playerCount(), MAX_PLAYERS);
 }
 
@@ -256,7 +258,7 @@ TEST(GameServer, RejectsNamesThatAreNotUtf8) {
   TestClient client(network);
 
   client.send(ConnectRequest{.playerName = "Bad\xFF\xFEName"});
-  const auto reject = stepUntil<ConnectReject>(game, client, START);
+  const auto reject = stepUntil<RoomReject>(game, client, START);
 
   ASSERT_TRUE(reject.has_value());
   EXPECT_EQ(reject->reason, RejectReason::InvalidName);
@@ -369,12 +371,12 @@ TEST(GameServer, ResendsReliablePacketsUntilAcknowledged) {
   TestServer game(network);
   TestClient client(network);
   client.send(ConnectRequest{.playerName = "Alice"});
-  const auto sent = sequencesOf<ConnectAccept>(collect(game, client, START));
+  const auto sent = sequencesOf<RoomJoined>(collect(game, client, START));
   ASSERT_EQ(sent.size(), 1U);
 
   const auto resent = collect(
       game, client, START + rtype::server::ReliableOutbox::RESEND_INTERVAL);
-  EXPECT_EQ(sequencesOf<ConnectAccept>(resent), sent);  // same sequence
+  EXPECT_EQ(sequencesOf<RoomJoined>(resent), sent);  // same sequence
   acknowledge(client, resent);
   // The PONG comes after the ACKs, so they are handled.
   client.send(Ping{});
@@ -386,7 +388,7 @@ TEST(GameServer, ResendsReliablePacketsUntilAcknowledged) {
   const auto afterAck =
       collect(game, client,
               START + (rtype::server::ReliableOutbox::RESEND_INTERVAL * 3));
-  EXPECT_TRUE(payloadsOf<ConnectAccept>(afterAck).empty());
+  EXPECT_TRUE(payloadsOf<RoomJoined>(afterAck).empty());
 }
 
 TEST(GameServer, DropsAClientThatNeverAcknowledges) {
@@ -449,7 +451,7 @@ TEST(GameServer, TellsTheListenerWhoJoinsAndLeaves) {
                                   rtype::server::SessionChange::Left}));
 }
 
-TEST(GameServer, TellsTheListenerAboutRefusedNames) {
+TEST(GameServer, SendsRefusedClientsBackToTheLobby) {
   ServerNetwork network(0);
   std::vector<rtype::server::SessionChange> changes;
   TestServer game(network,
@@ -460,7 +462,62 @@ TEST(GameServer, TellsTheListenerAboutRefusedNames) {
   TestClient client(network);
 
   client.send(ConnectRequest{.playerName = "Bad\x01Name"});
-  ASSERT_TRUE(stepUntil<ConnectReject>(game, client, START).has_value());
+  ASSERT_TRUE(stepUntil<RoomReject>(game, client, START).has_value());
 
-  EXPECT_EQ(changes, std::vector{rtype::server::SessionChange::Left});
+  EXPECT_EQ(changes, std::vector{rtype::server::SessionChange::Returned});
+}
+
+TEST(GameServer, IgnoresConnectRequestsPushedByAnyoneButTheLobby) {
+  ServerNetwork network(0);
+  TestServer game(network);
+  TestClient client(network);
+  const auto endpoint = client.endpoint();
+  Packet request;
+  request.payload = ConnectRequest{.playerName = "Sneaky"};
+
+  game.push({.from = endpoint, .packet = request});
+  game.step(START);
+
+  EXPECT_EQ(game.playerCount(), 0U);
+}
+
+TEST(GameServer, SendsTheSameRoomJoinedToARepeatedRequest) {
+  ServerNetwork network(0);
+  TestServer game(network);
+  TestClient client(network);
+  const auto first = join(game, client);
+  ASSERT_TRUE(first.has_value());
+
+  // The client did not get ROOM_JOINED in time and asks again.
+  client.send(RoomJoin{});
+  const auto again = stepUntil<RoomJoined>(game, client, START);
+
+  ASSERT_TRUE(again.has_value());
+  EXPECT_EQ(again->playerId, first->playerId);
+  EXPECT_EQ(game.playerCount(), 1U);
+}
+
+TEST(GameServer, SendsAPlayerWhoLeavesTheRoomBackToTheLobby) {
+  ServerNetwork network(0);
+  std::vector<rtype::server::SessionChange> changes;
+  TestServer game(network,
+                  [&changes](const ampersand::net::Endpoint& /*endpoint*/,
+                             rtype::server::SessionChange change) {
+                    changes.push_back(change);
+                  });
+  TestClient leaving(network);
+  TestClient staying(network);
+  ASSERT_TRUE(join(game, leaving).has_value());
+  ASSERT_TRUE(join(game, staying).has_value());
+
+  leaving.send(RoomLeave{});
+  const auto left = stepUntil<PlayerLeft>(game, staying, START);
+
+  ASSERT_TRUE(left.has_value());
+  EXPECT_EQ(left->playerId, 0);
+  EXPECT_EQ(left->reason, DisconnectReason::Quit);
+  EXPECT_EQ(game.playerCount(), 1U);
+  EXPECT_EQ(changes, (std::vector{rtype::server::SessionChange::Joined,
+                                  rtype::server::SessionChange::Joined,
+                                  rtype::server::SessionChange::Returned}));
 }

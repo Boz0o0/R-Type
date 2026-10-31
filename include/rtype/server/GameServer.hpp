@@ -18,6 +18,7 @@
 #include <stop_token>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace rtype::server {
@@ -39,9 +40,13 @@ struct ClientSession {
 enum class SessionChange : std::uint8_t {
   /** @brief The address is now a client of the game. */
   Joined,
-  /** @brief The address is not a client anymore: it left, was dropped, or
-   *         was refused. */
+  /** @brief The address is not a client anymore and left the server: it
+   *         quit or was dropped. */
   Left,
+  /** @brief The address is not a client anymore but is still connected: it
+   *         left the room (ROOM_LEAVE) or was refused, and goes back to the
+   *         lobby. */
+  Returned,
 };
 
 /**
@@ -53,23 +58,37 @@ using SessionListener =
 
 /** @brief How the Lobby knows a GameServer. */
 struct PartyLink {
-  /** @brief Number of the party, shown in the logs. */
-  std::uint32_t id{};
+  /** @brief Number of the party, sent in ROOM_JOINED and shown in the logs;
+   *         never 0. */
+  std::uint32_t id{1};
+  /** @brief Code of a private party, sent in ROOM_JOINED; empty if public. */
+  std::string code;
   /** @brief Told about every client that joins or leaves, if set. */
   SessionListener listener;
 };
 
+/** @brief A client the Lobby puts in a party. */
+struct Admission {
+  /** @brief Address of the client. */
+  ampersand::net::Endpoint endpoint;
+  /** @brief Name it gave in CONNECT_REQUEST, already checked. */
+  std::string name;
+};
+
+/** @brief What the Lobby gives a party: a packet, or a client to add. */
+using PartyMessage = std::variant<IncomingMessage, Admission>;
+
 /**
  * @brief One party of the server: the link between its clients and its Game.
  *
- * The Lobby gives it the packets of its clients with push(); each party runs
- * in its own thread. run() calls step() SERVER_TICK_RATE times per second,
- * whether clients send something or not. Each step handles the packets
- * pushed since the last one (joins, inputs, ACKs...), runs one tick of the
- * Game, sends its
- * events to every client, and sends a WORLD_SNAPSHOT SNAPSHOT_RATE times per
- * second. Reliable packets without ACK are sent again; a client that stays
- * silent, or never acknowledges them, is removed and the others are told.
+ * The Lobby adds clients with admit() and gives it the packets of its clients
+ * with push(); each party runs in its own thread. run() calls step()
+ * SERVER_TICK_RATE times per second, whether clients send something or not.
+ * Each step handles the admissions and packets given since the last one
+ * (inputs, ACKs, ROOM_LEAVE...), runs one tick of the Game, sends its events
+ * to every client, and sends a WORLD_SNAPSHOT SNAPSHOT_RATE times per second.
+ * Reliable packets without ACK are sent again; a client that stays silent, or
+ * never acknowledges them, is removed and the others are told.
  */
 class GameServer {
  public:
@@ -93,20 +112,33 @@ class GameServer {
    *
    * @param network Where packets are sent; must outlive the game.
    * @param seed Seed of the random parts of the Game.
-   * @param link Number of the party and who to tell about its clients.
+   * @param link Number and code of the party, and who to tell about its
+   *        clients.
    */
   explicit GameServer(ServerNetwork& network,
                       std::uint32_t seed = std::random_device{}(),
                       PartyLink link = {});
 
   /**
-   * @brief Queues a packet for the next step(). Can be called from any
-   *        thread.
+   * @brief Queues a packet of a client for the next step(). Can be called
+   *        from any thread.
    *
-   * @param message The packet and its sender.
+   * @param message The packet and its sender; packets of addresses that are
+   *        not clients of the party are ignored.
    * @return false if the queue is full and the packet was dropped.
    */
   bool push(IncomingMessage message);
+
+  /**
+   * @brief Queues a client to add on the next step(), which answers it with
+   *        ROOM_JOINED, or ROOM_REJECT if the party is full. Can be called
+   *        from any thread.
+   *
+   * @param endpoint Address of the client.
+   * @param name Name of the player, already checked by the Lobby.
+   * @return false if the queue is full and the client was dropped.
+   */
+  bool admit(const ampersand::net::Endpoint& endpoint, std::string name);
 
   /**
    * @brief Runs a tick every TICK_DURATION until a stop is requested, then
@@ -148,12 +180,25 @@ class GameServer {
   void handleMessages(Clock::time_point now);
   void handleMessage(const IncomingMessage& message, Clock::time_point now);
   void handleInput(ClientSession& session, const protocol::PlayerInput& input);
-  void acceptPlayer(const ampersand::net::Endpoint& from,
-                    const std::string& name, Clock::time_point now);
+  void acceptPlayer(const Admission& admission, Clock::time_point now);
+  /** @brief Refuses a client with ROOM_REJECT and sends it back to the lobby.
+   */
+  void refuse(const ampersand::net::Endpoint& endpoint,
+              protocol::RejectReason reason);
+  /** @brief The ROOM_JOINED of a client. */
+  [[nodiscard]] protocol::RoomJoined joinedPacket(
+      const ClientSession& session) const;
   /** @brief Sends a new client everything it needs to join the game. */
   void welcome(ClientSession& session, Clock::time_point now);
+  /**
+   * @brief Removes a player and tells the others with PLAYER_LEFT.
+   *
+   * @param change Left if it left the server, Returned if it goes back to
+   *        the lobby.
+   */
   void removePlayer(std::uint8_t playerId, protocol::DisconnectReason reason,
-                    Clock::time_point now);
+                    Clock::time_point now,
+                    SessionChange change = SessionChange::Left);
   void dropSilentPlayers(Clock::time_point now);
   void resendReliable(Clock::time_point now);
   void broadcastEvents(const std::vector<GameEvent>& events,
@@ -195,8 +240,12 @@ class GameServer {
       protocol::DisconnectReason reason);
 
   ServerNetwork& _network;
-  /** @brief Packets given by push(), handled by the next step(). */
-  MessageQueue<IncomingMessage> _inbox{ServerNetwork::MAX_QUEUED_MESSAGES};
+  /** @brief Given by push() and admit(), handled by the next step(). */
+  MessageQueue<PartyMessage> _inbox{ServerNetwork::MAX_QUEUED_MESSAGES};
+  /** @brief Number of the party, sent in ROOM_JOINED. */
+  std::uint32_t _partyId;
+  /** @brief Code of a private party; empty if public. */
+  std::string _code;
   /** @brief "[party N]", at the start of every log line. */
   std::string _logPrefix;
   /** @brief Told about every client that joins or leaves, if set. */

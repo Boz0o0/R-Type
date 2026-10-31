@@ -57,19 +57,23 @@ struct TestClient {
 
 /**
  * @brief A GameServer fed straight from the network, as if the Lobby gave it
- *        every packet.
+ *        every packet: a CONNECT_REQUEST admits its sender, with its name.
  */
 class TestServer : public GameServer {
  public:
+  /** @brief Room id of the party, sent in ROOM_JOINED. */
+  static constexpr std::uint32_t ROOM_ID = 1;
+
   /**
-   * @brief Creates an empty game, as party 0.
+   * @brief Creates an empty game, as public party ROOM_ID.
    *
    * @param network Where packets come from and go to.
    * @param listener Told about every client that joins or leaves, if set.
    */
   explicit TestServer(ServerNetwork& network, SessionListener listener = {})
-      : GameServer(network, std::random_device{}(),
-                   {.id = 0, .listener = std::move(listener)}),
+      : GameServer(
+            network, std::random_device{}(),
+            {.id = ROOM_ID, .code = {}, .listener = std::move(listener)}),
         _network(network) {}
 
   /**
@@ -79,7 +83,12 @@ class TestServer : public GameServer {
    */
   void step(Clock::time_point now) {
     for (IncomingMessage& message : this->_network.receive()) {
-      this->push(std::move(message));
+      if (const auto* request =
+              std::get_if<protocol::ConnectRequest>(&message.packet.payload)) {
+        this->admit(message.from, request->playerName);
+      } else {
+        this->push(std::move(message));
+      }
     }
     GameServer::step(now);
   }
