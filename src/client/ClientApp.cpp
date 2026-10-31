@@ -64,8 +64,7 @@ void ClientApp::run() {
     previous = now;
 
     this->_inputSystem.update(this->_world);
-    if (keys.keysDown.contains(input::Key::Escape) ||
-        (ended && pressedAKey(keys))) {
+    if (keys.getKey(input::KeyCode::Escape) || (ended && pressedAKey(keys))) {
       window.isOpen = false;
     }
     this->_connection.update(now);
@@ -75,7 +74,7 @@ void ClientApp::run() {
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, hud, packet);
     }
-    this->_connection.sendInput(Controls::inputMask(keys.keysDown));
+    this->_connection.sendInput(Controls::inputMask(keys.keysDown()));
     this->_movementSystem.update(this->_world);
     this->_scrollingSystem.update(this->_world);
     this->_animationSystem.update(this->_world);
@@ -91,9 +90,7 @@ void ClientApp::run() {
 }
 
 bool ClientApp::pressedAKey(const input::InputManager& keys) {
-  return std::ranges::any_of(keys.events, [](const input::Event& event) {
-    return std::holds_alternative<input::KeyPressed>(event);
-  });
+  return !keys.keysPressed().empty();
 }
 
 void ClientApp::applyPacket(WorldMirror& worldMirror, Hud& hud,

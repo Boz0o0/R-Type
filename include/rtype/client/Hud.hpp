@@ -41,7 +41,7 @@ class Hud {
  private:
   static constexpr unsigned int TEXT_SIZE = 36;
   static constexpr unsigned int BANNER_SIZE = 80;
-  static constexpr float HUD_LAYER = 10.0F;
+  static constexpr std::int32_t HUD_LAYER = 10;
   static constexpr float MARGIN = 30.0F;
   static constexpr float STATS_X = 1300.0F;
   static constexpr float EVENT_Y = 1020.0F;

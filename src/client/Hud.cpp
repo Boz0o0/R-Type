@@ -143,9 +143,10 @@ core::ecs::Entity Hud::addText(render::FontId font, core::math::Vec2f position,
                                unsigned int size) {
   const core::ecs::Entity entity = this->_world.create();
   this->_world.add(entity, core::Transform{
-                               .position = {position.x, position.y, HUD_LAYER},
+                               .position = {position.x, position.y, 0.0F},
                            });
-  this->_world.add(entity, render::Text{.font = font, .size = size});
+  this->_world.add(
+      entity, render::Text{.font = font, .size = size, .layer = HUD_LAYER});
   return entity;
 }
 
