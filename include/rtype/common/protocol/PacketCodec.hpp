@@ -16,7 +16,8 @@ using Payload =
     std::variant<ConnectRequest, ConnectAccept, ConnectReject, Disconnect, Ping,
                  Pong, Ack, PlayerInput, GameStart, PlayerJoined, PlayerLeft,
                  EntitySpawn, EntityDestroy, WorldSnapshot, PlayerState,
-                 GameOver>;
+                 GameOver, RoomList, RoomCreate, RoomJoin, RoomLeave,
+                 RoomListReply, RoomJoined, RoomReject, RoomLeft>;
 
 /** @brief A decoded datagram. */
 struct Packet {

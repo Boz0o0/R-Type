@@ -38,14 +38,14 @@ TEST(protocol, header_layout_is_big_endian) {
   const std::vector<std::byte> datagram =
       encode(Ping{.timestampMs = 0x01020304}, 0xAABBCCDD);
   const std::vector<std::byte> expected = {
-      std::byte{0x52}, std::byte{0x54},  // magic "RT"
-      std::byte{0x02},                   // version
-      std::byte{0x05},                   // type PING
-      std::byte{0x00},                   // flags
-      std::byte{0x00},                   // reserved
-      std::byte{0x00}, std::byte{0x04},  // payload size
-      std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
-      std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+      std::byte{0x52},    std::byte{0x54},  // magic "RT"
+      std::byte{VERSION},                   // version
+      std::byte{0x05},                      // type PING
+      std::byte{0x00},                      // flags
+      std::byte{0x00},                      // reserved
+      std::byte{0x00},    std::byte{0x04},  // payload size
+      std::byte{0xAA},    std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
+      std::byte{0x01},    std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
   };
   EXPECT_EQ(datagram, expected);
 }
@@ -58,13 +58,7 @@ TEST(protocol, reliable_flag_follows_type) {
 TEST(protocol, round_trip_session_packets) {
   EXPECT_EQ(roundTrip(ConnectRequest{.playerName = "Seenau"}).playerName,
             "Seenau");
-  const auto request =
-      roundTrip(ConnectRequest{.playerName = "Seenau", .partyCode = "AB12"});
-  EXPECT_EQ(request.playerName, "Seenau");
-  EXPECT_EQ(request.partyCode, "AB12");
-  const auto accept = roundTrip(ConnectAccept{.playerId = 3, .tickRate = 60});
-  EXPECT_EQ(accept.playerId, 3);
-  EXPECT_EQ(accept.tickRate, 60);
+  EXPECT_EQ(roundTrip(ConnectAccept{.tickRate = 60}).tickRate, 60);
   EXPECT_EQ(roundTrip(ConnectReject{.reason = RejectReason::ServerFull}).reason,
             RejectReason::ServerFull);
   EXPECT_EQ(
@@ -127,6 +121,57 @@ TEST(protocol, round_trip_game_packets) {
   EXPECT_EQ(over.finalScore, 10U);
 }
 
+TEST(protocol, round_trip_lobby_packets) {
+  (void)roundTrip(RoomList{});
+  EXPECT_EQ(
+      roundTrip(RoomCreate{.visibility = RoomVisibility::Private}).visibility,
+      RoomVisibility::Private);
+
+  const auto byId = roundTrip(RoomJoin{.roomId = 12, .code = ""});
+  EXPECT_EQ(byId.roomId, 12U);
+  EXPECT_TRUE(byId.code.empty());
+  const auto byCode = roundTrip(RoomJoin{.roomId = 0, .code = "AB12"});
+  EXPECT_EQ(byCode.roomId, 0U);
+  EXPECT_EQ(byCode.code, "AB12");
+  (void)roundTrip(RoomLeave{});
+
+  const auto list = roundTrip(RoomListReply{
+      .rooms = {{.roomId = 1, .players = 4}, {.roomId = 7, .players = 0}},
+  });
+  ASSERT_EQ(list.rooms.size(), 2U);
+  EXPECT_EQ(list.rooms[0].roomId, 1U);
+  EXPECT_EQ(list.rooms[0].players, 4);
+  EXPECT_EQ(list.rooms[1].roomId, 7U);
+  EXPECT_TRUE(roundTrip(RoomListReply{}).rooms.empty());
+
+  const auto joined =
+      roundTrip(RoomJoined{.roomId = 3, .playerId = 2, .code = "123456"});
+  EXPECT_EQ(joined.roomId, 3U);
+  EXPECT_EQ(joined.playerId, 2);
+  EXPECT_EQ(joined.code, "123456");
+  EXPECT_EQ(roundTrip(RoomReject{.reason = RejectReason::RoomNotFound}).reason,
+            RejectReason::RoomNotFound);
+  (void)roundTrip(RoomLeft{});
+}
+
+TEST(protocol, room_list_fits_in_a_datagram) {
+  RoomListReply reply;
+  for (std::uint32_t id = 1; id <= MAX_LISTED_ROOMS; ++id) {
+    reply.rooms.push_back({.roomId = id, .players = 1});
+  }
+  EXPECT_LE(encode(reply, 0).size(), MAX_DATAGRAM_SIZE);
+  EXPECT_EQ(roundTrip(reply).rooms.size(), MAX_LISTED_ROOMS);
+}
+
+TEST(protocol, only_server_game_packets_are_game_packets) {
+  EXPECT_TRUE(isGamePacket(PacketType::GameStart));
+  EXPECT_TRUE(isGamePacket(PacketType::GameOver));
+  EXPECT_FALSE(isGamePacket(PacketType::PlayerInput));
+  EXPECT_FALSE(isGamePacket(PacketType::ConnectAccept));
+  EXPECT_FALSE(isGamePacket(PacketType::RoomJoined));
+  EXPECT_FALSE(isGamePacket(PacketType::RoomListReply));
+}
+
 TEST(protocol, round_trip_full_snapshot) {
   WorldSnapshot snapshot{.serverTick = 1000, .entities = {}};
   for (std::uint32_t id = 0; id < MAX_SNAPSHOT_ENTITIES; ++id) {
@@ -152,17 +197,80 @@ TEST(protocol, encode_rejects_invalid_payloads) {
   EXPECT_THROW(
       (void)encode(ConnectRequest{.playerName = "a name way too long"}, 0),
       ProtocolError);
-  EXPECT_THROW(
-      (void)encode(
-          ConnectRequest{.playerName = "Bob", .partyCode = "NINECHARS"}, 0),
-      ProtocolError);
-  EXPECT_THROW((void)encode(ConnectAccept{.playerId = MAX_PLAYERS}, 0),
-               ProtocolError);
+  EXPECT_THROW((void)encode(ConnectAccept{.tickRate = 0}, 0), ProtocolError);
   EXPECT_THROW((void)encode(PlayerInput{.clientTick = 0, .inputMask = 0x80}, 0),
                ProtocolError);
   WorldSnapshot snapshot;
   snapshot.entities.resize(MAX_SNAPSHOT_ENTITIES + 1);
   EXPECT_THROW((void)encode(snapshot, 0), ProtocolError);
+}
+
+TEST(protocol, encode_rejects_invalid_lobby_payloads) {
+  EXPECT_THROW((void)encode(RoomJoin{.roomId = 0, .code = "NINECHARS"}, 0),
+               ProtocolError);
+  EXPECT_THROW((void)encode(RoomJoin{.roomId = 3, .code = "AB"}, 0),
+               ProtocolError);
+  EXPECT_THROW(
+      (void)encode(RoomListReply{.rooms = {{.roomId = 0, .players = 1}}}, 0),
+      ProtocolError);
+  EXPECT_THROW((void)encode(RoomListReply{.rooms = {{
+                                              .roomId = 1,
+                                              .players = MAX_PLAYERS + 1,
+                                          }}},
+                            0),
+               ProtocolError);
+  RoomListReply tooMany;
+  tooMany.rooms.resize(MAX_LISTED_ROOMS + 1, {.roomId = 1, .players = 0});
+  EXPECT_THROW((void)encode(tooMany, 0), ProtocolError);
+  EXPECT_THROW((void)encode(RoomJoined{.roomId = 0, .playerId = 0}, 0),
+               ProtocolError);
+  EXPECT_THROW(
+      (void)encode(RoomJoined{.roomId = 1, .playerId = MAX_PLAYERS}, 0),
+      ProtocolError);
+}
+
+TEST(protocol, decode_rejects_malformed_lobby_payloads) {
+  // Visibility out of range.
+  auto badVisibility = encode(RoomCreate{}, 0);
+  badVisibility[HEADER_SIZE] = std::byte{2};
+  EXPECT_EQ(decodeBytes(badVisibility), DecodeError::MalformedPayload);
+
+  // Both a room id and a code.
+  auto both = encode(RoomJoin{.roomId = 0, .code = "AB"}, 0);
+  both[HEADER_SIZE + 3] = std::byte{1};
+  EXPECT_EQ(decodeBytes(both), DecodeError::MalformedPayload);
+
+  // Room list announcing more rooms than it carries.
+  auto lyingList =
+      encode(RoomListReply{.rooms = {{.roomId = 1, .players = 1}}}, 0);
+  lyingList[HEADER_SIZE] = std::byte{2};
+  EXPECT_EQ(decodeBytes(lyingList), DecodeError::MalformedPayload);
+
+  // Room 0, and a room with too many players.
+  auto roomZero =
+      encode(RoomListReply{.rooms = {{.roomId = 1, .players = 1}}}, 0);
+  roomZero[HEADER_SIZE + 4] = std::byte{0};
+  EXPECT_EQ(decodeBytes(roomZero), DecodeError::MalformedPayload);
+  auto crowded =
+      encode(RoomListReply{.rooms = {{.roomId = 1, .players = 1}}}, 0);
+  crowded[HEADER_SIZE + 5] = std::byte{MAX_PLAYERS + 1};
+  EXPECT_EQ(decodeBytes(crowded), DecodeError::MalformedPayload);
+
+  // Player id out of range in ROOM_JOINED.
+  auto badPlayer = encode(RoomJoined{.roomId = 1, .playerId = 0}, 0);
+  badPlayer[HEADER_SIZE + 4] = std::byte{MAX_PLAYERS};
+  EXPECT_EQ(decodeBytes(badPlayer), DecodeError::MalformedPayload);
+
+  // Reject reason past the last one.
+  auto badReason = encode(RoomReject{.reason = RejectReason::RoomNotFound}, 0);
+  badReason[HEADER_SIZE] = std::byte{7};
+  EXPECT_EQ(decodeBytes(badReason), DecodeError::MalformedPayload);
+
+  // An empty packet with a byte in it.
+  auto notEmpty = encode(RoomLeft{}, 0);
+  notEmpty.push_back(std::byte{0});
+  notEmpty[7] = std::byte{1};
+  EXPECT_EQ(decodeBytes(notEmpty), DecodeError::MalformedPayload);
 }
 
 TEST(protocol, decode_rejects_bad_headers) {
@@ -244,7 +352,7 @@ TEST(protocol, decode_survives_random_bytes) {
   std::mt19937 generator(42);  // NOLINT(bugprone-random-generator-seed)
   std::uniform_int_distribution<int> byteValue(0, 255);
   std::uniform_int_distribution<std::size_t> length(0, MAX_DATAGRAM_SIZE + 8);
-  std::uniform_int_distribution<int> typeValue(0, 0x30);
+  std::uniform_int_distribution<int> typeValue(0, 0x60);
 
   for (int iteration = 0; iteration < 20000; ++iteration) {
     std::vector<std::byte> datagram(length(generator));

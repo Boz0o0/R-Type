@@ -18,25 +18,21 @@
 
 namespace rtype::protocol {
 
-/** @brief C->S, unreliable, 2 + n + m bytes. Asks to join a party. */
+/** @brief C->S, unreliable, 1 + n bytes. Asks to enter the lobby. */
 struct ConnectRequest {
   static constexpr PacketType TYPE = PacketType::ConnectRequest;
   /** @brief 1 to MAX_PLAYER_NAME_LENGTH bytes of UTF-8. */
   std::string playerName;
-  /** @brief 0 to MAX_PARTY_CODE_LENGTH bytes. Empty: any public party. */
-  std::string partyCode;
 };
 
-/** @brief S->C, reliable, 2 bytes. The client is now in the game. */
+/** @brief S->C, unreliable, 1 byte. The client is now in the lobby. */
 struct ConnectAccept {
   static constexpr PacketType TYPE = PacketType::ConnectAccept;
-  /** @brief Id given to this client, from 0 to MAX_PLAYERS - 1. */
-  std::uint8_t playerId{};
   /** @brief SERVER_TICK_RATE of the server, for client-side timing. */
   std::uint8_t tickRate{SERVER_TICK_RATE};
 };
 
-/** @brief S->C, unreliable, 1 byte. The client may not join. */
+/** @brief S->C, unreliable, 1 byte. The client may not enter the lobby. */
 struct ConnectReject {
   static constexpr PacketType TYPE = PacketType::ConnectReject;
   RejectReason reason{};
@@ -162,6 +158,78 @@ struct GameOver {
   static constexpr PacketType TYPE = PacketType::GameOver;
   GameResult result{};
   std::uint32_t finalScore{};
+};
+
+/** @brief C->S, unreliable, 0 bytes. Asks for the public rooms. */
+struct RoomList {
+  static constexpr PacketType TYPE = PacketType::RoomList;
+};
+
+/** @brief C->S, unreliable, 1 byte. Opens a new room and joins it. */
+struct RoomCreate {
+  static constexpr PacketType TYPE = PacketType::RoomCreate;
+  /** @brief A private room gets a code chosen by the server. */
+  RoomVisibility visibility{};
+};
+
+/**
+ * @brief C->S, unreliable, 5 + n bytes. Joins a room.
+ *
+ * With a code: the private room of this code, opened if there is none.
+ * Otherwise with a room id: this public room. With neither: any public room
+ * with a free place, opened if they are all full (quick match).
+ */
+struct RoomJoin {
+  static constexpr PacketType TYPE = PacketType::RoomJoin;
+  /** @brief Public room to join, or 0. Must be 0 when code is set. */
+  std::uint32_t roomId{};
+  /** @brief 0 to MAX_PARTY_CODE_LENGTH bytes. */
+  std::string code;
+};
+
+/** @brief C->S, unreliable, 0 bytes. Leaves the room, back to the lobby. */
+struct RoomLeave {
+  static constexpr PacketType TYPE = PacketType::RoomLeave;
+};
+
+/** @brief One public room inside a ROOM_LIST_REPLY, 5 bytes. */
+struct RoomInfo {
+  /** @brief Id to send in ROOM_JOIN, never 0. */
+  std::uint32_t roomId{};
+  /** @brief Players in it, from 0 to MAX_PLAYERS. */
+  std::uint8_t players{};
+};
+
+/** @brief Size of one RoomInfo on the wire. */
+inline constexpr std::size_t ROOM_INFO_SIZE = 5;
+
+/** @brief S->C, unreliable, 1 + 5 * n bytes. The public rooms. */
+struct RoomListReply {
+  static constexpr PacketType TYPE = PacketType::RoomListReply;
+  /** @brief At most MAX_LISTED_ROOMS, oldest room first. */
+  std::vector<RoomInfo> rooms;
+};
+
+/** @brief S->C, reliable, 6 + n bytes. The client is now in a room. */
+struct RoomJoined {
+  static constexpr PacketType TYPE = PacketType::RoomJoined;
+  /** @brief Id of the room, never 0. */
+  std::uint32_t roomId{};
+  /** @brief Id given to this client, from 0 to MAX_PLAYERS - 1. */
+  std::uint8_t playerId{};
+  /** @brief Code of a private room, to give to friends; empty if public. */
+  std::string code;
+};
+
+/** @brief S->C, unreliable, 1 byte. The client may not join this room. */
+struct RoomReject {
+  static constexpr PacketType TYPE = PacketType::RoomReject;
+  RejectReason reason{};
+};
+
+/** @brief S->C, unreliable, 0 bytes. The client is back in the lobby. */
+struct RoomLeft {
+  static constexpr PacketType TYPE = PacketType::RoomLeft;
 };
 
 }  // namespace rtype::protocol

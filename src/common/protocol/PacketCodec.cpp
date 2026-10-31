@@ -44,18 +44,23 @@ void checkPlayerId(std::uint8_t playerId) {
   }
 }
 
+void checkRoomId(std::uint32_t roomId) {
+  if (roomId == 0) {
+    throw ProtocolError("room id 0 is not a room");
+  }
+}
+
 // The famous writes functions :)
 
 void writePayload(BinaryWriter& writer, const ConnectRequest& payload) {
   checkPlayerName(payload.playerName);
-  checkPartyCode(payload.partyCode);
   writer.writeString(payload.playerName);
-  writer.writeString(payload.partyCode);
 }
 
 void writePayload(BinaryWriter& writer, const ConnectAccept& payload) {
-  checkPlayerId(payload.playerId);
-  writer.write(payload.playerId);
+  if (payload.tickRate == 0) {
+    throw ProtocolError("tick rate must not be 0");
+  }
   writer.write(payload.tickRate);
 }
 
@@ -150,6 +155,53 @@ void writePayload(BinaryWriter& writer, const GameOver& payload) {
   writer.write(payload.finalScore);
 }
 
+void writePayload(BinaryWriter& /*writer*/, const RoomList& /*payload*/) {}
+
+void writePayload(BinaryWriter& writer, const RoomCreate& payload) {
+  writer.writeEnum(payload.visibility);
+}
+
+void writePayload(BinaryWriter& writer, const RoomJoin& payload) {
+  checkPartyCode(payload.code);
+  if (payload.roomId != 0 && !payload.code.empty()) {
+    throw ProtocolError("join a room by id or by code, not both");
+  }
+  writer.write(payload.roomId);
+  writer.writeString(payload.code);
+}
+
+void writePayload(BinaryWriter& /*writer*/, const RoomLeave& /*payload*/) {}
+
+void writePayload(BinaryWriter& writer, const RoomListReply& payload) {
+  if (payload.rooms.size() > MAX_LISTED_ROOMS) {
+    throw ProtocolError("too many rooms in one list");
+  }
+  writer.write(static_cast<std::uint8_t>(payload.rooms.size()));
+  for (const RoomInfo& room : payload.rooms) {
+    checkRoomId(room.roomId);
+    if (room.players > MAX_PLAYERS) {
+      throw ProtocolError("more players than a room can hold");
+    }
+    writer.write(room.roomId);
+    writer.write(room.players);
+  }
+}
+
+void writePayload(BinaryWriter& writer, const RoomJoined& payload) {
+  checkRoomId(payload.roomId);
+  checkPlayerId(payload.playerId);
+  checkPartyCode(payload.code);
+  writer.write(payload.roomId);
+  writer.write(payload.playerId);
+  writer.writeString(payload.code);
+}
+
+void writePayload(BinaryWriter& writer, const RoomReject& payload) {
+  writer.writeEnum(payload.reason);
+}
+
+void writePayload(BinaryWriter& /*writer*/, const RoomLeft& /*payload*/) {}
+
 // And the reading functions
 
 bool readPlayerId(BinaryReader& reader, std::uint8_t& playerId) {
@@ -161,17 +213,19 @@ bool readPlayerName(BinaryReader& reader, std::string& name) {
 }
 
 bool readPayload(BinaryReader& reader, ConnectRequest& payload) {
-  return readPlayerName(reader, payload.playerName) &&
-         reader.readString(payload.partyCode, MAX_PARTY_CODE_LENGTH);
+  return readPlayerName(reader, payload.playerName);
 }
 
 bool readPayload(BinaryReader& reader, ConnectAccept& payload) {
-  return readPlayerId(reader, payload.playerId) &&
-         reader.read(payload.tickRate) && payload.tickRate != 0;
+  return reader.read(payload.tickRate) && payload.tickRate != 0;
+}
+
+bool readRejectReason(BinaryReader& reader, RejectReason& reason) {
+  return reader.readEnum(reason, RejectReason::RoomNotFound);
 }
 
 bool readPayload(BinaryReader& reader, ConnectReject& payload) {
-  return reader.readEnum(payload.reason, RejectReason::InvalidPartyCode);
+  return readRejectReason(reader, payload.reason);
 }
 
 bool readPayload(BinaryReader& reader, Disconnect& payload) {
@@ -253,6 +307,54 @@ bool readPayload(BinaryReader& reader, GameOver& payload) {
          reader.read(payload.finalScore);
 }
 
+bool readPayload(BinaryReader& /*reader*/, RoomList& /*payload*/) {
+  return true;
+}
+
+bool readPayload(BinaryReader& reader, RoomCreate& payload) {
+  return reader.readEnum(payload.visibility, RoomVisibility::Private);
+}
+
+bool readPayload(BinaryReader& reader, RoomJoin& payload) {
+  return reader.read(payload.roomId) &&
+         reader.readString(payload.code, MAX_PARTY_CODE_LENGTH) &&
+         (payload.roomId == 0 || payload.code.empty());
+}
+
+bool readPayload(BinaryReader& /*reader*/, RoomLeave& /*payload*/) {
+  return true;
+}
+
+bool readPayload(BinaryReader& reader, RoomListReply& payload) {
+  std::uint8_t count = 0;
+  if (!reader.read(count) || count > MAX_LISTED_ROOMS ||
+      reader.remaining() != count * ROOM_INFO_SIZE) {
+    return false;
+  }
+  payload.rooms.resize(count);
+  for (RoomInfo& room : payload.rooms) {
+    if (!reader.read(room.roomId) || room.roomId == 0 ||
+        !reader.read(room.players) || room.players > MAX_PLAYERS) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool readPayload(BinaryReader& reader, RoomJoined& payload) {
+  return reader.read(payload.roomId) && payload.roomId != 0 &&
+         readPlayerId(reader, payload.playerId) &&
+         reader.readString(payload.code, MAX_PARTY_CODE_LENGTH);
+}
+
+bool readPayload(BinaryReader& reader, RoomReject& payload) {
+  return readRejectReason(reader, payload.reason);
+}
+
+bool readPayload(BinaryReader& /*reader*/, RoomLeft& /*payload*/) {
+  return true;
+}
+
 /**
  * @brief Reads a payload of type T, which must use every byte left.
  */
@@ -300,6 +402,22 @@ DecodeError decodePayload(PacketType type, BinaryReader& reader, Payload& out) {
       return decodeAs<PlayerState>(reader, out);
     case PacketType::GameOver:
       return decodeAs<GameOver>(reader, out);
+    case PacketType::RoomList:
+      return decodeAs<RoomList>(reader, out);
+    case PacketType::RoomCreate:
+      return decodeAs<RoomCreate>(reader, out);
+    case PacketType::RoomJoin:
+      return decodeAs<RoomJoin>(reader, out);
+    case PacketType::RoomLeave:
+      return decodeAs<RoomLeave>(reader, out);
+    case PacketType::RoomListReply:
+      return decodeAs<RoomListReply>(reader, out);
+    case PacketType::RoomJoined:
+      return decodeAs<RoomJoined>(reader, out);
+    case PacketType::RoomReject:
+      return decodeAs<RoomReject>(reader, out);
+    case PacketType::RoomLeft:
+      return decodeAs<RoomLeft>(reader, out);
     case PacketType::Invalid:
       break;
   }

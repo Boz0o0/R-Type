@@ -21,7 +21,7 @@ namespace rtype::protocol {
 /** @brief First two bytes of every datagram ("RT" in ASCII). */
 inline constexpr std::uint16_t MAGIC = 0x5254;
 /** @brief Version of the protocol implemented by this code. */
-inline constexpr std::uint8_t VERSION = 2;
+inline constexpr std::uint8_t VERSION = 3;
 /** @brief UDP port the server listens on when none is given. */
 inline constexpr std::uint16_t DEFAULT_PORT = 4242;
 
@@ -38,6 +38,8 @@ inline constexpr std::uint8_t MAX_PLAYERS = 4;
 inline constexpr std::size_t MAX_PLAYER_NAME_LENGTH = 16;
 /** @brief Longest party code, in ASCII letters and digits. */
 inline constexpr std::size_t MAX_PARTY_CODE_LENGTH = 8;
+/** @brief Most rooms one ROOM_LIST_REPLY can carry. */
+inline constexpr std::size_t MAX_LISTED_ROOMS = 32;
 /** @brief ownerId value of an entity that belongs to no player. */
 inline constexpr std::uint8_t NO_OWNER = 0xFF;
 
@@ -61,6 +63,8 @@ inline constexpr std::uint32_t TIMEOUT_MS = 5000;
  * 0x01-0x0F: session, both directions.
  * 0x10-0x1F: game, client to server.
  * 0x20-0x3F: game, server to client.
+ * 0x40-0x4F: lobby, client to server.
+ * 0x50-0x5F: lobby, server to client.
  */
 enum class PacketType : std::uint8_t {
   /** @brief Never sent; a datagram with this type is rejected. */
@@ -84,6 +88,16 @@ enum class PacketType : std::uint8_t {
   WorldSnapshot = 0x25,
   PlayerState = 0x26,
   GameOver = 0x27,
+
+  RoomList = 0x40,
+  RoomCreate = 0x41,
+  RoomJoin = 0x42,
+  RoomLeave = 0x43,
+
+  RoomListReply = 0x50,
+  RoomJoined = 0x51,
+  RoomReject = 0x52,
+  RoomLeft = 0x53,
 };
 
 /** @brief Bits of PacketHeader::flags. Unknown bits are ignored. */
@@ -114,16 +128,27 @@ enum class DisconnectReason : std::uint8_t {
   ServerShutdown = 3,
 };
 
-/** @brief Why the server refused a CONNECT_REQUEST. */
+/** @brief Why the server refused a CONNECT_REQUEST or a room request. */
 enum class RejectReason : std::uint8_t {
+  /** @brief No more clients, or no more parties, can be opened. */
   ServerFull = 0,
   GameInProgress = 1,
   VersionMismatch = 2,
   InvalidName = 3,
-  /** @brief The party of the code asked already has MAX_PLAYERS players. */
+  /** @brief The party asked already has MAX_PLAYERS players. */
   PartyFull = 4,
   /** @brief The party code is not 1 to 8 ASCII letters and digits. */
   InvalidPartyCode = 5,
+  /** @brief No public party runs with the room id asked. */
+  RoomNotFound = 6,
+};
+
+/** @brief Who can join a room opened with ROOM_CREATE. */
+enum class RoomVisibility : std::uint8_t {
+  /** @brief Shown in ROOM_LIST_REPLY: anyone can join it. */
+  Public = 0,
+  /** @brief Hidden: only the players who know its code can join it. */
+  Private = 1,
 };
 
 /** @brief Outcome of a game. */
@@ -140,7 +165,6 @@ enum class GameResult : std::uint8_t {
  */
 [[nodiscard]] constexpr bool isReliable(PacketType type) noexcept {
   switch (type) {
-    case PacketType::ConnectAccept:
     case PacketType::GameStart:
     case PacketType::PlayerJoined:
     case PacketType::PlayerLeft:
@@ -148,6 +172,7 @@ enum class GameResult : std::uint8_t {
     case PacketType::EntityDestroy:
     case PacketType::PlayerState:
     case PacketType::GameOver:
+    case PacketType::RoomJoined:
       return true;
     default:
       return false;
@@ -155,11 +180,22 @@ enum class GameResult : std::uint8_t {
 }
 
 /**
+ * @brief Whether packets of this type are game packets sent by the server
+ *        (0x20-0x3F), handed by the client to the game.
+ *
+ * @param type Type of the packet.
+ * @return true for GAME_START to GAME_OVER.
+ */
+[[nodiscard]] constexpr bool isGamePacket(PacketType type) noexcept {
+  return type >= PacketType::GameStart && type < PacketType::RoomList;
+}
+
+/**
  * @brief Whether a text can be used as a party code: 1 to
  *        MAX_PARTY_CODE_LENGTH ASCII letters and digits.
  *
  * @param code Code typed by the player.
- * @return true if the code can be sent in CONNECT_REQUEST.
+ * @return true if the code can be sent in ROOM_JOIN.
  */
 [[nodiscard]] constexpr bool isValidPartyCode(std::string_view code) noexcept {
   if (code.empty() || code.size() > MAX_PARTY_CODE_LENGTH) {
