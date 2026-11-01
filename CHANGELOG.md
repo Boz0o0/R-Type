@@ -28,6 +28,8 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Protocol**: party codes (protocol version 2). `CONNECT_REQUEST` carries an optional `partyCode`; players with the same code join the same private party, which players without the code never join. New reject reasons `party full` and `invalid party code`.
 - **Client**: optional fifth argument, the party code: `r-type_client [host] [port] [name] [party code]`.
 - **Client**: controllers: the left stick moves, A shoots and Start quits.
+- **Client**: smooth movement. Our own ship is predicted: it moves as soon as a key is pressed, then slides to the server's position once both have stopped. The other entities slide toward each snapshot instead of jumping to it.
+- **Common**: `ShipMovement`, the speed, diagonals and screen edges of a ship, shared by the server and the client's prediction.
 
 ### Changed
 

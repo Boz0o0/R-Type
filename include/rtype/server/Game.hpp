@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/common/resources/Deaths.hpp>
 #include <rtype/common/systems/CleanupSystem.hpp>
@@ -55,7 +56,7 @@ class Game {
   static constexpr float SCREEN_WIDTH = 1920.0F;
   static constexpr float SCREEN_HEIGHT = 1080.0F;
   /** @brief World units per second of a ship. */
-  static constexpr float SHIP_SPEED = 450.0F;
+  static constexpr float SHIP_SPEED = common::ShipMovement::SPEED;
   /** @brief x of a ship when it appears. */
   static constexpr float SHIP_START_X = 128.0F;
   /** @brief Ships of a player in a game. */
@@ -121,9 +122,6 @@ class Game {
   [[nodiscard]] ampersand::core::ecs::World& world() noexcept;
 
  private:
-  /** @brief Speed factor on each axis when moving diagonally (1 / sqrt 2). */
-  static constexpr float DIAGONAL_FACTOR = 0.70710678F;
-
   struct Player {
     std::optional<ampersand::core::ecs::Entity> ship;
     std::uint8_t inputMask{};
@@ -155,9 +153,6 @@ class Game {
   /** @brief Adds an entity to the Deaths, once. */
   void kill(ampersand::core::ecs::Entity entity, common::DeathReason reason);
   [[nodiscard]] bool isDying(ampersand::core::ecs::Entity entity);
-  /** @brief Direction of the arrows held: -1, 0 or 1 on each axis. */
-  [[nodiscard]] static ampersand::core::math::Vec2f direction(
-      std::uint8_t inputMask);
   [[nodiscard]] bool hasPlayers() const noexcept;
   [[nodiscard]] PlayerChanged stateOf(std::uint8_t playerId,
                                       const Player& player);

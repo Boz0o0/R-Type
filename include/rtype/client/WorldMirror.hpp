@@ -22,6 +22,8 @@ class WorldMirror {
  public:
   WorldMirror(ampersand::core::ecs::World& world, EntityLooks looks);
 
+  // Our own ship is then predicted instead of following the snapshots.
+  void setLocalPlayer(std::uint8_t playerId);
   void spawn(const protocol::EntitySpawn& packet);
   void applySnapshot(const protocol::WorldSnapshot& packet);
   void destroy(const protocol::EntityDestroy& packet);
@@ -35,6 +37,9 @@ class WorldMirror {
   static constexpr float EXPLOSION_VOLUME = 70.0F;
   // Drawn over the ships and the missiles.
   static constexpr std::int32_t EXPLOSION_LAYER = 1;
+  // A bigger error is a jump (several lost snapshots): smoothing it would
+  // show the entity flying across the screen.
+  static constexpr float SNAP_DISTANCE = 128.0F;
 
   struct Mirrored {
     ampersand::core::ecs::Entity entity;
@@ -42,6 +47,9 @@ class WorldMirror {
   };
 
   [[nodiscard]] const Look& lookFor(const protocol::EntitySpawn& packet) const;
+  [[nodiscard]] bool isLocalShip(const protocol::EntitySpawn& packet) const;
+  void correct(ampersand::core::ecs::Entity entity,
+               ampersand::core::math::Vec2f serverPosition);
   std::optional<ampersand::core::ecs::Entity> create(
       const Look& look, ampersand::core::math::Vec2f position);
   void explode(const ampersand::core::Transform& transform,
@@ -55,6 +63,7 @@ class WorldMirror {
   // Ids are never reused, so a spawn arriving after its destroy is dropped.
   std::unordered_set<std::uint32_t> _destroyed;
   std::uint32_t _lastSnapshotTick{0};
+  std::optional<std::uint8_t> _localPlayer;
 };
 
 }  // namespace rtype::client

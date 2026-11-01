@@ -20,6 +20,9 @@ void NetworkSystem::update(ampersand::core::ecs::World& world) {
   this->_hud.showConnection(this->_connection.state(),
                             this->_connection.playerId(),
                             this->_connection.rejectReason());
+  if (const auto playerId = this->_connection.playerId()) {
+    this->_worldMirror.setLocalPlayer(*playerId);
+  }
   for (const protocol::Payload& packet : this->_connection.takePackets()) {
     applyPacket(this->_worldMirror, this->_hud, packet);
   }
