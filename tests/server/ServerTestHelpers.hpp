@@ -63,6 +63,8 @@ class TestServer : public GameServer {
  public:
   /** @brief Room id of the party, sent in ROOM_JOINED. */
   static constexpr std::uint32_t ROOM_ID = 1;
+  /** @brief requestId given to every admission. */
+  static constexpr std::uint8_t REQUEST_ID = 5;
 
   /**
    * @brief Creates an empty game, as public party ROOM_ID.
@@ -85,7 +87,7 @@ class TestServer : public GameServer {
     for (IncomingMessage& message : this->_network.receive()) {
       if (const auto* request =
               std::get_if<protocol::ConnectRequest>(&message.packet.payload)) {
-        this->admit(message.from, request->playerName);
+        this->admit(message.from, request->playerName, REQUEST_ID);
       } else {
         this->push(std::move(message));
       }

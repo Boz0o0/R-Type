@@ -19,6 +19,7 @@
 #include "ServerTestHelpers.hpp"
 
 using namespace rtype::protocol;
+using rtype::server::GameServer;
 using rtype::server::Lobby;
 using rtype::server::ServerNetwork;
 using rtype::server::test::DEFAULT_WAIT;
@@ -28,6 +29,10 @@ using rtype::server::test::TestClient;
 namespace {
 
 constexpr std::chrono::milliseconds NO_ANSWER_WAIT{200};
+/** @brief Time for the network thread to queue a datagram just sent. */
+constexpr std::chrono::milliseconds QUEUE_WAIT{200};
+/** @brief Time for a party thread to handle what it was given (12 ticks). */
+constexpr std::chrono::milliseconds PARTY_WAIT{200};
 
 /**
  * @brief Runs steps of the lobby at a given time until the client receives a
@@ -237,7 +242,7 @@ TEST(Lobby, DropsSilentClientsOfTheLobbyOnly) {
   ASSERT_TRUE(join(lobby, player).has_value());
   const auto now = Lobby::Clock::now();
 
-  lobby.step(now + Lobby::CLIENT_TIMEOUT + std::chrono::milliseconds(100));
+  lobby.step(now + GameServer::CLIENT_TIMEOUT + std::chrono::milliseconds(100));
 
   EXPECT_EQ(lobby.visitorCount(), 0U);
   // Its party times it out, not the lobby.
@@ -730,15 +735,132 @@ TEST(Lobby, TakesARestartedClientOutOfItsParty) {
   Lobby lobby(network);
   TestClient client(network);
   ASSERT_TRUE(join(lobby, client).has_value());
+  const auto later = Lobby::Clock::now() + Lobby::LATE_CONNECT_WINDOW +
+                     std::chrono::milliseconds(100);
 
-  // Same address, but the client starts over: it wants to enter the lobby.
+  // Same address, long after: the client starts over and wants the lobby.
   client.send(ConnectRequest{.playerName = "Again"});
-  const auto accept = stepUntil<ConnectAccept>(lobby, client, NO_ANSWER_WAIT);
+  const auto accept =
+      stepUntilAt<ConnectAccept>(lobby, client, later, NO_ANSWER_WAIT);
   EXPECT_FALSE(accept.has_value());  // it was still in its party
   ASSERT_TRUE(connect(lobby, client, "Again").has_value());
 
   EXPECT_FALSE(lobby.partyOf(client.endpoint()).has_value());
   EXPECT_TRUE(stepUntil(lobby, [&lobby] { return lobby.partyCount() == 0; }));
+}
+
+// The client sent CONNECT_REQUEST twice before CONNECT_ACCEPT came back, and
+// the second copy arrives once it is in a room: it must stay there.
+TEST(Lobby, IgnoresALateCopyOfConnectRequestInARoom) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+  const auto joined = joinCode(lobby, client, "Alice", "FRIENDS");
+  ASSERT_TRUE(joined.has_value());
+
+  client.send(ConnectRequest{.playerName = "Alice"});
+  const auto packets = collect(lobby, client);
+
+  EXPECT_TRUE(payloadsOf<RoomLeft>(packets).empty());
+  EXPECT_TRUE(payloadsOf<ConnectAccept>(packets).empty());
+  EXPECT_EQ(lobby.partyOf(client.endpoint()), joined->roomId);
+}
+
+TEST(Lobby, ChecksTheNameOfAClientThatConnectsAgain) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+  ASSERT_TRUE(connect(lobby, client, "Alice").has_value());
+
+  // It restarted with the same address, and a name that is not valid.
+  const auto reject = ask<ConnectReject>(
+      lobby, client, ConnectRequest{.playerName = "Bob\x01"});
+
+  ASSERT_TRUE(reject.has_value());
+  EXPECT_EQ(reject->reason, RejectReason::InvalidName);
+  EXPECT_EQ(lobby.visitorCount(), 0U);
+}
+
+TEST(Lobby, UsesTheNewNameOfAClientThatConnectsAgain) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+  ASSERT_TRUE(connect(lobby, client, "Alice").has_value());
+  ASSERT_TRUE(connect(lobby, client, "Bob").has_value());
+
+  client.send(RoomCreate{});
+  const auto joined = stepUntil<PlayerJoined>(lobby, client);
+
+  ASSERT_TRUE(joined.has_value());
+  EXPECT_EQ(joined->playerName, "Bob");
+  EXPECT_EQ(lobby.visitorCount() + lobby.playerCount(), 1U);
+}
+
+// The party that was full is left empty in the same step: its place is free.
+TEST(Lobby, CountsARoomJustLeftEmptyAsClosed) {
+  ServerNetwork network(0);
+  Lobby lobby(network, 1);
+  TestClient leaving(network);
+  TestClient next(network);
+  ASSERT_TRUE(create(lobby, leaving).has_value());
+  ASSERT_TRUE(connect(lobby, next).has_value());
+
+  leaving.send(RoomLeave{});
+  std::this_thread::sleep_for(QUEUE_WAIT);
+  lobby.step();  // gives ROOM_LEAVE to the party
+  std::this_thread::sleep_for(PARTY_WAIT);
+  next.send(RoomCreate{});
+  std::this_thread::sleep_for(QUEUE_WAIT);
+  lobby.step();  // the party left empty, and the request, in one step
+
+  const auto joined = stepUntil<RoomJoined>(lobby, next);
+  ASSERT_TRUE(joined.has_value());
+  EXPECT_EQ(lobby.partyCount(), 1U);
+}
+
+TEST(Lobby, EchoesTheRequestIdInItsAnswers) {
+  ServerNetwork network(0);
+  Lobby lobby(network, 1);
+  TestClient alice(network);
+  TestClient bob(network);
+  ASSERT_TRUE(connect(lobby, alice, "Alice").has_value());
+  ASSERT_TRUE(connect(lobby, bob, "Bob").has_value());
+
+  const auto joined =
+      ask<RoomJoined>(lobby, alice, RoomCreate{.requestId = 42});
+  const auto reject = ask<RoomReject>(lobby, bob, RoomCreate{.requestId = 9});
+
+  ASSERT_TRUE(joined && reject);
+  EXPECT_EQ(joined->requestId, 42);
+  EXPECT_EQ(reject->requestId, 9);
+}
+
+TEST(Lobby, TellsAPlayerOnItsWayBackToTheLobbyThatItShutsDown) {
+  ServerNetwork network(0);
+  Lobby lobby(network);
+  TestClient client(network);
+  ASSERT_TRUE(create(lobby, client).has_value());
+  (void)collect(lobby, client);
+
+  // The party takes it out, but the Lobby does not see it before the end.
+  client.send(RoomLeave{});
+  std::this_thread::sleep_for(QUEUE_WAIT);
+  lobby.step();
+  std::this_thread::sleep_for(PARTY_WAIT);
+  const std::atomic<bool> stopRequested{true};
+  lobby.run(stopRequested);
+
+  std::optional<Disconnect> disconnect;
+  const auto deadline = std::chrono::steady_clock::now() + DEFAULT_WAIT;
+  while (!disconnect && std::chrono::steady_clock::now() < deadline) {
+    if (const auto packet = client.poll()) {
+      if (const auto* payload = std::get_if<Disconnect>(&packet->payload)) {
+        disconnect = *payload;
+      }
+    }
+  }
+  ASSERT_TRUE(disconnect.has_value());
+  EXPECT_EQ(disconnect->reason, DisconnectReason::ServerShutdown);
 }
 
 TEST(Lobby, StopsEveryPartyWhenItShutsDown) {

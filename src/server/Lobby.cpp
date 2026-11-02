@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <ampersand/net/UdpSocket.hpp>
 #include <atomic>
 #include <cstddef>
@@ -36,16 +37,17 @@ void Lobby::run(const std::atomic<bool>& stopRequested) {
   }
   // Each party tells its own clients, then its thread is joined.
   this->_parties.clear();
-  this->sayGoodbyeToVisitors();
+  this->sayGoodbye();
   this->_clients.clear();
   this->_codes.clear();
-  this->_players = 0;
 }
 
 void Lobby::step() { this->step(Clock::now()); }
 
 void Lobby::step(Clock::time_point now) {
   this->applyChanges(now);
+  // Before the requests: a party left empty no longer counts in the limit.
+  this->closeEmptyParties();
   for (IncomingMessage& message : this->_network.receive()) {
     this->route(std::move(message), now);
   }
@@ -55,10 +57,16 @@ void Lobby::step(Clock::time_point now) {
 
 std::size_t Lobby::partyCount() const noexcept { return this->_parties.size(); }
 
-std::size_t Lobby::playerCount() const noexcept { return this->_players; }
+std::size_t Lobby::playerCount() const noexcept {
+  return static_cast<std::size_t>(std::ranges::count_if(
+      this->_clients,
+      [](const auto& entry) { return entry.second.party.has_value(); }));
+}
 
 std::size_t Lobby::visitorCount() const noexcept {
-  return this->_clients.size() - this->_players;
+  return static_cast<std::size_t>(std::ranges::count_if(
+      this->_clients,
+      [](const auto& entry) { return !entry.second.party.has_value(); }));
 }
 
 std::optional<Lobby::PartyId> Lobby::partyOf(const Endpoint& endpoint) const {
@@ -132,6 +140,9 @@ void Lobby::route(IncomingMessage message, Clock::time_point now) {
   const PartyId partyId = *client->party;
   if (const auto* request =
           std::get_if<protocol::ConnectRequest>(&message.packet.payload)) {
+    if (now - client->connectedAt <= LATE_CONNECT_WINDOW) {
+      return;  // a late copy, sent before the client got CONNECT_ACCEPT
+    }
     // The client restarted with the same address: take it out of its party
     // as if it sent ROOM_LEAVE. Once back in the lobby, its next
     // CONNECT_REQUEST is accepted.
@@ -173,6 +184,7 @@ void Lobby::connect(const IncomingMessage& message, Clock::time_point now) {
                              .name = request->playerName,
                              .party = std::nullopt,
                              .lastSeen = now,
+                             .connectedAt = now,
                              .lastRoomList = std::nullopt,
                          });
   logLine(std::cout, "[server] ", request->playerName,
@@ -186,14 +198,29 @@ void Lobby::handleVisitor(Client& client, const protocol::Payload& payload,
   if (std::holds_alternative<protocol::RoomList>(payload)) {
     this->sendRoomList(client, now);
   } else if (const auto* create = std::get_if<protocol::RoomCreate>(&payload)) {
-    this->create(client, create->visibility);
+    this->create(client, *create);
   } else if (const auto* join = std::get_if<protocol::RoomJoin>(&payload)) {
     this->join(client, *join);
   } else if (const auto* ping = std::get_if<protocol::Ping>(&payload)) {
     this->_network.send(protocol::Pong{.timestampMs = ping->timestampMs},
                         client.endpoint);
-  } else if (std::holds_alternative<protocol::ConnectRequest>(payload)) {
-    // Sent again by a client whose CONNECT_ACCEPT was lost.
+  } else if (const auto* request =
+                 std::get_if<protocol::ConnectRequest>(&payload)) {
+    // Sent again by a client whose CONNECT_ACCEPT was lost, or by a client
+    // that restarted with the same address: check its name again.
+    if (!GameServer::isValidName(request->playerName)) {
+      this->_network.send(
+          protocol::ConnectReject{
+              .reason = protocol::RejectReason::InvalidName,
+          },
+          client.endpoint);
+      logLine(std::cout, "[server] ", client.name,
+              " left the lobby: invalid name");
+      this->_clients.erase(client.endpoint.toString());
+      return;
+    }
+    client.name = request->playerName;
+    client.connectedAt = now;
     this->_network.send(protocol::ConnectAccept{}, client.endpoint);
   } else if (std::holds_alternative<protocol::RoomLeave>(payload)) {
     // Sent again by a client whose ROOM_LEFT was lost.
@@ -224,21 +251,18 @@ void Lobby::sendRoomList(Client& client, Clock::time_point now) {
   this->_network.send(reply, client.endpoint);
 }
 
-void Lobby::create(Client& client, protocol::RoomVisibility visibility) {
-  if (this->_parties.size() >= this->_maxParties) {
-    this->_network.send(
-        protocol::RoomReject{.reason = protocol::RejectReason::ServerFull},
-        client.endpoint);
-    return;
+void Lobby::create(Client& client, const protocol::RoomCreate& request) {
+  Placement placed = protocol::RejectReason::ServerFull;
+  if (this->_parties.size() < this->_maxParties) {
+    placed = this->open(request.visibility == protocol::RoomVisibility::Private
+                            ? this->generateCode()
+                            : std::string{});
   }
-  const std::string code = visibility == protocol::RoomVisibility::Private
-                               ? this->generateCode()
-                               : std::string{};
-  this->admit(client, this->open(code));
+  this->answer(client, request.requestId, placed);
 }
 
 void Lobby::join(Client& client, const protocol::RoomJoin& request) {
-  std::variant<PartyId, protocol::RejectReason> placed;
+  Placement placed;
   if (!request.code.empty()) {
     if (!protocol::isValidPartyCode(request.code)) {
       placed = protocol::RejectReason::InvalidPartyCode;
@@ -250,28 +274,29 @@ void Lobby::join(Client& client, const protocol::RoomJoin& request) {
   } else {
     placed = this->place({});
   }
-  if (const auto* reason = std::get_if<protocol::RejectReason>(&placed)) {
-    this->_network.send(protocol::RoomReject{.reason = *reason},
-                        client.endpoint);
-    return;
-  }
-  this->admit(client, std::get<PartyId>(placed));
+  this->answer(client, request.requestId, placed);
 }
 
-void Lobby::admit(Client& client, PartyId party) {
+void Lobby::answer(Client& client, std::uint8_t requestId,
+                   const Placement& placed) {
+  if (const auto* reason = std::get_if<protocol::RejectReason>(&placed)) {
+    this->_network.send(
+        protocol::RoomReject{.requestId = requestId, .reason = *reason},
+        client.endpoint);
+    return;
+  }
+  const PartyId party = std::get<PartyId>(placed);
   Party& target = this->_parties.at(party);
   client.party = party;
   ++target.players;
-  ++this->_players;
-  if (!target.server->admit(client.endpoint, client.name)) {
+  if (!target.server->admit(client.endpoint, client.name, requestId)) {
     logLine(std::cerr, "[server] party ", party, " is overloaded, ",
             client.name, " stays in the lobby");
     this->unbind(client, party);
   }
 }
 
-std::variant<Lobby::PartyId, protocol::RejectReason> Lobby::place(
-    const std::string& code) {
+Lobby::Placement Lobby::place(const std::string& code) {
   if (code.empty()) {
     for (const auto& [partyId, party] : this->_parties) {
       if (party.code.empty() && party.players < protocol::MAX_PLAYERS) {
@@ -291,8 +316,7 @@ std::variant<Lobby::PartyId, protocol::RejectReason> Lobby::place(
   return this->open(code);
 }
 
-std::variant<Lobby::PartyId, protocol::RejectReason> Lobby::findPublic(
-    PartyId roomId) const {
+Lobby::Placement Lobby::findPublic(PartyId roomId) const {
   const auto found = this->_parties.find(roomId);
   if (found == this->_parties.end() || !found->second.code.empty()) {
     return protocol::RejectReason::RoomNotFound;
@@ -356,7 +380,7 @@ std::string Lobby::generateCode() {
 void Lobby::dropSilentVisitors(Clock::time_point now) {
   std::erase_if(this->_clients, [now](const auto& entry) {
     const Client& client = entry.second;
-    if (client.party || now - client.lastSeen <= CLIENT_TIMEOUT) {
+    if (client.party || now - client.lastSeen <= GameServer::CLIENT_TIMEOUT) {
       return false;
     }
     logLine(std::cout, "[server] ", client.name, " left the lobby: timeout");
@@ -378,18 +402,17 @@ void Lobby::closeEmptyParties() {
   }
 }
 
-void Lobby::sayGoodbyeToVisitors() {
+void Lobby::sayGoodbye() {
+  // A party tells Left for every client it said goodbye to (and for those
+  // that left before the end). Every other client is still waiting.
+  for (const Change& change : this->_changes.drain()) {
+    if (change.change == SessionChange::Left) {
+      this->_clients.erase(change.endpoint.toString());
+    }
+  }
   for (const auto& [key, client] : this->_clients) {
-    if (client.party) {
-      continue;  // told by its party
-    }
-    for (std::uint32_t attempt = 0; attempt < DISCONNECT_REPEAT; ++attempt) {
-      this->_network.send(
-          protocol::Disconnect{
-              .reason = protocol::DisconnectReason::ServerShutdown,
-          },
-          client.endpoint);
-    }
+    GameServer::sendDisconnect(this->_network, client.endpoint,
+                               protocol::DisconnectReason::ServerShutdown);
   }
 }
 
@@ -398,7 +421,6 @@ bool Lobby::unbind(Client& client, PartyId party) {
     return false;
   }
   client.party.reset();
-  --this->_players;
   --this->_parties.at(party).players;
   return true;
 }

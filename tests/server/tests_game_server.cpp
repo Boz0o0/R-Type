@@ -97,6 +97,7 @@ TEST(GameServer, AcceptsAClientAndGivesItAnId) {
 
   ASSERT_TRUE(accept.has_value());
   EXPECT_EQ(accept->playerId, 0);
+  EXPECT_EQ(accept->requestId, TestServer::REQUEST_ID);
   EXPECT_EQ(accept->roomId, TestServer::ROOM_ID);
   EXPECT_TRUE(accept->code.empty());
   EXPECT_EQ(game.playerCount(), 1U);
@@ -117,16 +118,25 @@ TEST(GameServer, GivesEachClientItsOwnId) {
   EXPECT_EQ(game.playerCount(), 2U);
 }
 
+// Admitted twice: still one player, whose ROOM_JOINED is sent again as it is.
 TEST(GameServer, SameAddressGetsTheSameIdAgain) {
   ServerNetwork network(0);
   TestServer game(network);
   TestClient client(network);
+  client.send(ConnectRequest{.playerName = "Player"});
+  const auto sent = collect(game, client, START);
 
-  const auto first = join(game, client);
-  const auto again = join(game, client);
+  client.send(ConnectRequest{.playerName = "Player"});
+  const auto again = collect(
+      game, client, START + rtype::server::ReliableOutbox::RESEND_INTERVAL);
 
-  ASSERT_TRUE(first && again);
-  EXPECT_EQ(first->playerId, again->playerId);
+  const auto first = payloadsOf<RoomJoined>(sent);
+  const auto resent = payloadsOf<RoomJoined>(again);
+  ASSERT_EQ(first.size(), 1U);
+  ASSERT_FALSE(resent.empty());
+  EXPECT_EQ(resent[0].playerId, first[0].playerId);
+  EXPECT_EQ(sequencesOf<RoomJoined>(again)[0],
+            sequencesOf<RoomJoined>(sent)[0]);
   EXPECT_EQ(game.playerCount(), 1U);
 }
 
@@ -145,6 +155,7 @@ TEST(GameServer, RejectsClientsWhenFull) {
 
   ASSERT_TRUE(reject.has_value());
   EXPECT_EQ(reject->reason, RejectReason::PartyFull);
+  EXPECT_EQ(reject->requestId, TestServer::REQUEST_ID);
   EXPECT_EQ(game.playerCount(), MAX_PLAYERS);
 }
 
@@ -481,20 +492,48 @@ TEST(GameServer, IgnoresConnectRequestsPushedByAnyoneButTheLobby) {
   EXPECT_EQ(game.playerCount(), 0U);
 }
 
-TEST(GameServer, SendsTheSameRoomJoinedToARepeatedRequest) {
+TEST(GameServer, IgnoresALateCopyOfTheRoomRequest) {
   ServerNetwork network(0);
   TestServer game(network);
   TestClient client(network);
-  const auto first = join(game, client);
-  ASSERT_TRUE(first.has_value());
+  ASSERT_TRUE(join(game, client).has_value());
+  acknowledge(client, collect(game, client, START));
 
-  // The client did not get ROOM_JOINED in time and asks again.
-  client.send(RoomJoin{});
-  const auto again = stepUntil<RoomJoined>(game, client, START);
+  // Copies sent before ROOM_JOINED arrived: same request, or an older one.
+  client.send(RoomJoin{.requestId = TestServer::REQUEST_ID});
+  client.send(RoomCreate{.requestId = TestServer::REQUEST_ID - 1});
+  client.send(Ping{});
+  ASSERT_TRUE(stepUntil<Pong>(game, client, START).has_value());
+  const auto after = collect(game, client, START);
 
-  ASSERT_TRUE(again.has_value());
-  EXPECT_EQ(again->playerId, first->playerId);
   EXPECT_EQ(game.playerCount(), 1U);
+  EXPECT_TRUE(payloadsOf<RoomJoined>(after).empty());
+}
+
+// It asks for another room: the server thought it was still here.
+TEST(GameServer, LetsAPlayerWhoAsksForAnotherRoomGo) {
+  ServerNetwork network(0);
+  std::vector<rtype::server::SessionChange> changes;
+  TestServer game(network,
+                  [&changes](const ampersand::net::Endpoint& /*endpoint*/,
+                             rtype::server::SessionChange change) {
+                    changes.push_back(change);
+                  });
+  TestClient client(network);
+  ASSERT_TRUE(join(game, client).has_value());
+
+  client.send(RoomJoin{.requestId = TestServer::REQUEST_ID + 1, .roomId = 7});
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(1);
+  while (game.playerCount() != 0 &&
+         std::chrono::steady_clock::now() < deadline) {
+    game.step(START);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  EXPECT_EQ(game.playerCount(), 0U);
+  EXPECT_EQ(changes, (std::vector{rtype::server::SessionChange::Joined,
+                                  rtype::server::SessionChange::Returned}));
 }
 
 TEST(GameServer, SendsAPlayerWhoLeavesTheRoomBackToTheLobby) {

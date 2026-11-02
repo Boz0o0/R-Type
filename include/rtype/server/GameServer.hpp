@@ -32,6 +32,8 @@ struct ClientSession {
   std::chrono::steady_clock::time_point lastSeen;
   /** @brief clientTick of the newest PLAYER_INPUT used. */
   std::optional<std::uint32_t> lastInputTick;
+  /** @brief requestId of the room request that brought it here. */
+  std::uint8_t requestId{};
   /** @brief Reliable packets sent to this client, waiting for their ACK. */
   ReliableOutbox outbox;
 };
@@ -73,6 +75,9 @@ struct Admission {
   ampersand::net::Endpoint endpoint;
   /** @brief Name it gave in CONNECT_REQUEST, already checked. */
   std::string name;
+  /** @brief requestId of its ROOM_CREATE or ROOM_JOIN, echoed in the answer.
+   */
+  std::uint8_t requestId{};
 };
 
 /** @brief What the Lobby gives a party: a packet, or a client to add. */
@@ -136,9 +141,22 @@ class GameServer {
    *
    * @param endpoint Address of the client.
    * @param name Name of the player, already checked by the Lobby.
+   * @param requestId requestId of the room request of the client.
    * @return false if the queue is full and the client was dropped.
    */
-  bool admit(const ampersand::net::Endpoint& endpoint, std::string name);
+  bool admit(const ampersand::net::Endpoint& endpoint, std::string name,
+             std::uint8_t requestId);
+
+  /**
+   * @brief Sends DISCONNECT DISCONNECT_REPEAT times, as it is not reliable.
+   *
+   * @param network Where to send it.
+   * @param target Address of the client.
+   * @param reason Why it is disconnected.
+   */
+  static void sendDisconnect(ServerNetwork& network,
+                             const ampersand::net::Endpoint& target,
+                             protocol::DisconnectReason reason);
 
   /**
    * @brief Runs a tick every TICK_DURATION until a stop is requested, then
@@ -180,11 +198,20 @@ class GameServer {
   void handleMessages(Clock::time_point now);
   void handleMessage(const IncomingMessage& message, Clock::time_point now);
   void handleInput(ClientSession& session, const protocol::PlayerInput& input);
+  /**
+   * @brief Handles a ROOM_CREATE or ROOM_JOIN of a client already here.
+   *
+   * A copy of the request that brought it here, or of an older one, is late:
+   * it is ignored, as ROOM_JOINED is sent again until acknowledged. A newer
+   * request means the client wants another room: it goes back to the lobby,
+   * which handles the next copy.
+   */
+  void handleRoomRequest(ClientSession& session, std::uint8_t requestId,
+                         Clock::time_point now);
   void acceptPlayer(const Admission& admission, Clock::time_point now);
   /** @brief Refuses a client with ROOM_REJECT and sends it back to the lobby.
    */
-  void refuse(const ampersand::net::Endpoint& endpoint,
-              protocol::RejectReason reason);
+  void refuse(const Admission& admission, protocol::RejectReason reason);
   /** @brief The ROOM_JOINED of a client. */
   [[nodiscard]] protocol::RoomJoined joinedPacket(
       const ClientSession& session) const;

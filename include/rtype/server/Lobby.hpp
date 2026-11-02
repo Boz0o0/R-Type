@@ -27,7 +27,8 @@ namespace rtype::server {
  * A CONNECT_REQUEST from a new address makes it a client of the lobby. A
  * client in no party (a visitor) talks to the Lobby itself: it asks for the
  * list of the public parties (ROOM_LIST), opens a party (ROOM_CREATE) or
- * joins one (ROOM_JOIN), and is dropped after CLIENT_TIMEOUT of silence.
+ * joins one (ROOM_JOIN), and is dropped after GameServer::CLIENT_TIMEOUT of
+ * silence.
  *
  * Every party is a GameServer with its own thread and its own tick loop. The
  * Lobby gives each packet of a client in a party to that party, which then
@@ -58,13 +59,26 @@ class Lobby {
   static constexpr std::size_t MAX_PARTIES = 16;
   /** @brief Clients at once, in the lobby or in a party. */
   static constexpr std::size_t MAX_CLIENTS = 256;
-  /** @brief Joins and leaves waiting between two step() calls. */
+  /**
+   * @brief Joins and leaves waiting between two step() calls.
+   *
+   * A client has at most one admission in progress, which gives at most two
+   * changes (Joined, then Left or Returned) before the Lobby reads them and
+   * can admit it again. So the queue never holds more than 2 * MAX_CLIENTS
+   * changes, and none is ever lost.
+   */
   static constexpr std::size_t MAX_QUEUED_CHANGES = 4096;
   /** @brief Wait between two steps in run(). */
   static constexpr std::chrono::milliseconds IDLE_DELAY =
       std::chrono::milliseconds(1);
-  /** @brief Silence after which a client in no party is dropped. */
-  static constexpr std::chrono::milliseconds CLIENT_TIMEOUT{
+  /**
+   * @brief How long after its CONNECT_ACCEPT a CONNECT_REQUEST of a client in
+   *        a party is a late copy, ignored, and not a client that restarted.
+   *
+   * Like the duplicates of reliable packets, a packet is not expected to
+   * arrive more than TIMEOUT_MS late.
+   */
+  static constexpr std::chrono::milliseconds LATE_CONNECT_WINDOW{
       protocol::TIMEOUT_MS};
   /**
    * @brief Shortest delay between two ROOM_LIST_REPLY to the same client.
@@ -75,8 +89,6 @@ class Lobby {
   static constexpr std::chrono::milliseconds ROOM_LIST_COOLDOWN{250};
   /** @brief Digits of the code given to a private party by ROOM_CREATE. */
   static constexpr std::size_t GENERATED_CODE_LENGTH = 6;
-  /** @brief DISCONNECT is not reliable, so it is sent this many times. */
-  static constexpr std::uint32_t DISCONNECT_REPEAT = 3;
 
   /**
    * @brief Creates a lobby without any client nor party.
@@ -97,7 +109,8 @@ class Lobby {
 
   /**
    * @brief Runs step() until stopRequested becomes true, then stops every
-   *        party and tells every client that the server is shutting down.
+   *        party and tells every client that the server is shutting down:
+   *        its party does for the clients it has, the Lobby for the others.
    *
    * @param stopRequested Set to true, from any thread, to stop the lobby.
    */
@@ -107,9 +120,9 @@ class Lobby {
   void step();
 
   /**
-   * @brief Takes the joins and leaves told by the parties, handles the
-   *        packets received since the last call, drops the silent visitors
-   *        and closes the empty parties.
+   * @brief Takes the joins and leaves told by the parties, closes the parties
+   *        they left empty, handles the packets received since the last
+   *        call, drops the silent visitors and closes the empty parties.
    *
    * @param now Current time, used for the timeouts of the visitors.
    */
@@ -172,6 +185,8 @@ class Lobby {
     std::optional<PartyId> party;
     /** @brief When it last sent a packet while in the lobby. */
     Clock::time_point lastSeen;
+    /** @brief When it was last sent CONNECT_ACCEPT. */
+    Clock::time_point connectedAt;
     /** @brief When it was last sent a ROOM_LIST_REPLY. */
     std::optional<Clock::time_point> lastRoomList;
   };
@@ -190,6 +205,9 @@ class Lobby {
      */
     std::jthread thread;
   };
+
+  /** @brief The party of a room request, or why it is refused. */
+  using Placement = std::variant<PartyId, protocol::RejectReason>;
 
   /** @brief A join or a leave told by a party. */
   struct Change {
@@ -238,32 +256,32 @@ class Lobby {
    */
   void sendRoomList(Client& client, Clock::time_point now);
   /** @brief Opens a party for a client in the lobby and puts it in. */
-  void create(Client& client, protocol::RoomVisibility visibility);
+  void create(Client& client, const protocol::RoomCreate& request);
   /** @brief Puts a client in the lobby in the party it asked for. */
   void join(Client& client, const protocol::RoomJoin& request);
   /**
-   * @brief Routes a client to a party and asks the party to add it.
+   * @brief Answers a room request: routes the client to its party and asks
+   *        the party to add it, or sends ROOM_REJECT.
    *
    * @param client A client in the lobby.
-   * @param party The party it joins.
+   * @param requestId requestId of its request, echoed in the answer.
+   * @param placed The party it joins, or why it cannot join any.
    */
-  void admit(Client& client, PartyId party);
+  void answer(Client& client, std::uint8_t requestId, const Placement& placed);
   /**
    * @brief The party for a code (empty: any public party), opened if needed.
    *
    * @param code Party code in upper case, or empty.
    * @return The party, or why the client cannot join any.
    */
-  [[nodiscard]] std::variant<PartyId, protocol::RejectReason> place(
-      const std::string& code);
+  [[nodiscard]] Placement place(const std::string& code);
   /**
    * @brief The public party of an id, if it has a free place.
    *
    * @param roomId Id sent in ROOM_JOIN.
    * @return The party, or why the client cannot join it.
    */
-  [[nodiscard]] std::variant<PartyId, protocol::RejectReason> findPublic(
-      PartyId roomId) const;
+  [[nodiscard]] Placement findPublic(PartyId roomId) const;
   /**
    * @brief Starts a new party in its own thread.
    *
@@ -273,12 +291,18 @@ class Lobby {
   [[nodiscard]] PartyId open(const std::string& code);
   /** @brief A code of GENERATED_CODE_LENGTH digits no running party has. */
   [[nodiscard]] std::string generateCode();
-  /** @brief Drops the clients in the lobby silent for CLIENT_TIMEOUT. */
+  /** @brief Drops the clients in the lobby silent for
+   * GameServer::CLIENT_TIMEOUT.
+   */
   void dropSilentVisitors(Clock::time_point now);
   /** @brief Stops the parties without any client and frees their codes. */
   void closeEmptyParties();
-  /** @brief Tells the clients in the lobby that the server shuts down. */
-  void sayGoodbyeToVisitors();
+  /**
+   * @brief Once every party is stopped: tells the server shuts down to the
+   *        clients that no party told (in the lobby, on their way back to
+   *        it, or never added by their party).
+   */
+  void sayGoodbye();
 
   /**
    * @brief Removes the route of a client, if it still goes to this party.
@@ -300,8 +324,6 @@ class Lobby {
   MessageQueue<Change> _changes{MAX_QUEUED_CHANGES};
   /** @brief Every client, keyed by Endpoint::toString(). */
   std::unordered_map<std::string, Client> _clients;
-  /** @brief Clients routed to a party. */
-  std::size_t _players{0};
   /** @brief Private party of each code, in upper case. */
   std::unordered_map<std::string, PartyId> _codes;
   /**
@@ -313,6 +335,9 @@ class Lobby {
   PartyId _nextPartyId{1};
   /** @brief Draws the codes of the private parties of ROOM_CREATE. */
   std::mt19937 _random{std::random_device{}()};
+
+  static_assert(MAX_QUEUED_CHANGES >= 2 * MAX_CLIENTS,
+                "a change of a party must never be lost");
 };
 
 }  // namespace rtype::server
