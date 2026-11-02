@@ -26,8 +26,8 @@ namespace rtype::client {
 // any.
 //
 // The engine gives keys by their QWERTY position, not the characters typed:
-// on AZERTY, the key marked Z is Key::W and M is no key at all. So a code is
-// typed with the digits only, which have the same keys on every layout; the
+// on AZERTY, the key marked Z is KeyCode::W and M is no key at all. So a code
+// is typed with the digits only, which have the same keys on every layout; the
 // codes the server makes are digits. A code with letters can still be given
 // on the command line.
 class LobbyMenu {
@@ -48,7 +48,7 @@ class LobbyMenu {
 
   // Up and Down choose a line, Enter confirms it. On the code line, the
   // digits type the code and Backspace erases.
-  [[nodiscard]] std::optional<RoomRequest> press(ampersand::input::Key key);
+  [[nodiscard]] std::optional<RoomRequest> press(ampersand::input::KeyCode key);
 
   // Index of the chosen line: the fixed lines first, then the rooms.
   [[nodiscard]] std::size_t selected() const noexcept;
@@ -86,7 +86,8 @@ class LobbyMenu {
       .r = 255, .g = 220, .b = 80};
 
   // The digit of a key.
-  [[nodiscard]] static std::optional<char> digitOf(ampersand::input::Key key);
+  [[nodiscard]] static std::optional<char> digitOf(
+      ampersand::input::KeyCode key);
   [[nodiscard]] std::optional<RoomRequest> confirm();
   [[nodiscard]] std::size_t lineCount() const noexcept;
   [[nodiscard]] std::string choiceText(Choice choice) const;

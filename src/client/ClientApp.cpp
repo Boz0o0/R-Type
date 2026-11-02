@@ -72,10 +72,8 @@ void ClientApp::run() {
     previous = now;
 
     this->_inputSystem.update(this->_world);
-    for (const input::Event& event : keys.events) {
-      if (const auto* pressed = std::get_if<input::KeyPressed>(&event)) {
-        this->onKey(pressed->key, menu, window.isOpen);
-      }
+    for (const input::KeyCode key : keys.keysPressed()) {
+      this->onKey(key, menu, window.isOpen);
     }
     this->_connection.update(now);
     const State state = this->_connection.state();
@@ -95,7 +93,7 @@ void ClientApp::run() {
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, hud, packet);
     }
-    this->_connection.sendInput(Controls::inputMask(keys.keysDown));
+    this->_connection.sendInput(Controls::inputMask(keys.keysDown()));
     this->_movementSystem.update(this->_world);
     this->_scrollingSystem.update(this->_world);
     this->_animationSystem.update(this->_world);
@@ -110,11 +108,11 @@ void ClientApp::run() {
   this->_connection.disconnect();
 }
 
-void ClientApp::onKey(input::Key key, LobbyMenu& menu, bool& windowOpen) {
+void ClientApp::onKey(input::KeyCode key, LobbyMenu& menu, bool& windowOpen) {
   const State state = this->_connection.state();
   if (this->_connection.hasEnded()) {
     windowOpen = false;
-  } else if (key == input::Key::Escape) {
+  } else if (key == input::KeyCode::Escape) {
     if (state == State::InRoom) {
       this->_connection.leaveRoom();
     } else {

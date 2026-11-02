@@ -15,7 +15,7 @@
 #include <vector>
 
 using ampersand::core::ecs::World;
-using ampersand::input::Key;
+using ampersand::input::KeyCode;
 using rtype::client::LobbyMenu;
 using rtype::client::RoomRequest;
 using rtype::protocol::RoomCreate;
@@ -42,7 +42,7 @@ RoomJoin joinOf(const std::optional<RoomRequest>& request) {
   return std::get<RoomJoin>(*request);
 }
 
-void pressTimes(LobbyMenu& menu, Key key, std::size_t times) {
+void pressTimes(LobbyMenu& menu, KeyCode key, std::size_t times) {
   for (std::size_t press = 0; press < times; ++press) {
     (void)menu.press(key);
   }
@@ -71,7 +71,7 @@ TEST(LobbyMenu, StartsOnQuickMatch) {
   World world;
   LobbyMenu menu(world, 0);
 
-  const RoomJoin join = joinOf(menu.press(Key::Enter));
+  const RoomJoin join = joinOf(menu.press(KeyCode::Return));
 
   EXPECT_EQ(join.roomId, 0U);
   EXPECT_TRUE(join.code.empty());
@@ -82,14 +82,14 @@ TEST(LobbyMenu, ChoosesWithTheArrows) {
   LobbyMenu menu(world, 0);
   menu.show(true);
 
-  (void)menu.press(Key::Up);  // already at the top
+  (void)menu.press(KeyCode::UpArrow);  // already at the top
   EXPECT_EQ(menu.selected(), 0U);
-  (void)menu.press(Key::Down);
+  (void)menu.press(KeyCode::DownArrow);
   EXPECT_TRUE(shows(menu, "> Create a public room"));
-  const auto publicRoom = menu.press(Key::Enter);
-  (void)menu.press(Key::Down);
-  const auto privateRoom = menu.press(Key::Enter);
-  pressTimes(menu, Key::Down, 5);  // past the last line: stays on it
+  const auto publicRoom = menu.press(KeyCode::Return);
+  (void)menu.press(KeyCode::DownArrow);
+  const auto privateRoom = menu.press(KeyCode::Return);
+  pressTimes(menu, KeyCode::DownArrow, 5);  // past the last line: stays on it
 
   ASSERT_TRUE(publicRoom && std::holds_alternative<RoomCreate>(*publicRoom));
   EXPECT_EQ(std::get<RoomCreate>(*publicRoom).visibility,
@@ -104,15 +104,16 @@ TEST(LobbyMenu, TypesTheCodeOnItsLine) {
   World world;
   LobbyMenu menu(world, 0);
   menu.show(true);
-  (void)menu.press(Key::Num1);  // not on the code line: ignored
-  pressTimes(menu, Key::Down, 3);
+  (void)menu.press(KeyCode::Alpha1);  // not on the code line: ignored
+  pressTimes(menu, KeyCode::DownArrow, 3);
 
-  for (const Key key : {Key::Num4, Key::Num0, Key::Num9, Key::Space}) {
+  for (const KeyCode key :
+       {KeyCode::Alpha4, KeyCode::Alpha0, KeyCode::Alpha9, KeyCode::Space}) {
     (void)menu.press(key);
   }
-  (void)menu.press(Key::Backspace);
+  (void)menu.press(KeyCode::Backspace);
   EXPECT_TRUE(shows(menu, "> Join with a code: 40_"));
-  const RoomJoin join = joinOf(menu.press(Key::Enter));
+  const RoomJoin join = joinOf(menu.press(KeyCode::Return));
 
   EXPECT_EQ(join.roomId, 0U);
   EXPECT_EQ(join.code, "40");
@@ -123,9 +124,10 @@ TEST(LobbyMenu, TypesTheCodeOnItsLine) {
 TEST(LobbyMenu, TypesOnlyDigits) {
   World world;
   LobbyMenu menu(world, 0);
-  pressTimes(menu, Key::Down, 3);
+  pressTimes(menu, KeyCode::DownArrow, 3);
 
-  for (const Key key : {Key::Z, Key::E, Key::Num1, Key::U, Key::S, Key::W}) {
+  for (const KeyCode key : {KeyCode::Z, KeyCode::E, KeyCode::Alpha1, KeyCode::U,
+                            KeyCode::S, KeyCode::W}) {
     (void)menu.press(key);
   }
 
@@ -135,9 +137,9 @@ TEST(LobbyMenu, TypesOnlyDigits) {
 TEST(LobbyMenu, StopsTheCodeAtItsLongestLength) {
   World world;
   LobbyMenu menu(world, 0);
-  pressTimes(menu, Key::Down, 3);
+  pressTimes(menu, KeyCode::DownArrow, 3);
 
-  pressTimes(menu, Key::Num7, rtype::protocol::MAX_PARTY_CODE_LENGTH + 3);
+  pressTimes(menu, KeyCode::Alpha7, rtype::protocol::MAX_PARTY_CODE_LENGTH + 3);
 
   EXPECT_EQ(menu.code(),
             std::string(rtype::protocol::MAX_PARTY_CODE_LENGTH, '7'));
@@ -147,12 +149,12 @@ TEST(LobbyMenu, AsksForACodeBeforeJoiningWithIt) {
   World world;
   LobbyMenu menu(world, 0);
   menu.show(true);
-  pressTimes(menu, Key::Down, 3);
+  pressTimes(menu, KeyCode::DownArrow, 3);
 
-  EXPECT_FALSE(menu.press(Key::Enter).has_value());
+  EXPECT_FALSE(menu.press(KeyCode::Return).has_value());
   EXPECT_TRUE(shows(menu, "Type the code of the room first"));
 
-  (void)menu.press(Key::Num1);  // the hint goes away with the next key
+  (void)menu.press(KeyCode::Alpha1);  // the hint goes away with the next key
   EXPECT_FALSE(shows(menu, "Type the code of the room first"));
 }
 
@@ -162,8 +164,8 @@ TEST(LobbyMenu, ListsTheRoomsAndJoinsTheChosenOne) {
   menu.show(true);
 
   menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 4, .players = 4}});
-  pressTimes(menu, Key::Down, FIRST_ROOM + 1);
-  const RoomJoin join = joinOf(menu.press(Key::Enter));
+  pressTimes(menu, KeyCode::DownArrow, FIRST_ROOM + 1);
+  const RoomJoin join = joinOf(menu.press(KeyCode::Return));
 
   EXPECT_TRUE(shows(menu, "Public rooms"));
   EXPECT_TRUE(shows(menu, "  Room 1   2/4 players"));
@@ -176,11 +178,11 @@ TEST(LobbyMenu, KeepsTheChosenRoomWhenTheListChanges) {
   World world;
   LobbyMenu menu(world, 0);
   menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 4, .players = 1}});
-  pressTimes(menu, Key::Down, FIRST_ROOM + 1);
+  pressTimes(menu, KeyCode::DownArrow, FIRST_ROOM + 1);
 
   menu.setRooms({{.roomId = 4, .players = 2}});  // room 1 was closed
   EXPECT_EQ(menu.selected(), FIRST_ROOM);
-  EXPECT_EQ(joinOf(menu.press(Key::Enter)).roomId, 4U);
+  EXPECT_EQ(joinOf(menu.press(KeyCode::Return)).roomId, 4U);
 
   menu.setRooms({});  // room 4 was closed too
   EXPECT_EQ(menu.selected(), 0U);
@@ -192,7 +194,7 @@ TEST(LobbyMenu, GoesBackToQuickMatchWhenTheChosenRoomCloses) {
   LobbyMenu menu(world, 0);
   menu.show(true);
   menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 4, .players = 1}});
-  pressTimes(menu, Key::Down, FIRST_ROOM + 1);  // room 4
+  pressTimes(menu, KeyCode::DownArrow, FIRST_ROOM + 1);  // room 4
 
   menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 7, .players = 1}});
 
@@ -214,7 +216,7 @@ TEST(LobbyMenu, ScrollsToTheChosenRoom) {
   EXPECT_FALSE(shows(menu, "  Room 10   1/4 players"));
   EXPECT_TRUE(shows(menu, "Public rooms (10)"));
 
-  pressTimes(menu, Key::Down, FIRST_ROOM + 9);
+  pressTimes(menu, KeyCode::DownArrow, FIRST_ROOM + 9);
 
   EXPECT_TRUE(shows(menu, "> Room 10   1/4 players"));
   EXPECT_FALSE(shows(menu, "  Room 1   1/4 players"));

@@ -5,11 +5,12 @@
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/render/Color.hpp>
 #include <ampersand/render/FontId.hpp>
+#include <cstdint>
 
 namespace rtype::client {
 
 // Layer of the HUD and the menus, over the game.
-inline constexpr float TEXT_LAYER = 10.0F;
+inline constexpr std::int32_t TEXT_LAYER = 10;
 
 // Creates an entity that draws a text, empty for now, over the game.
 ampersand::core::ecs::Entity createText(

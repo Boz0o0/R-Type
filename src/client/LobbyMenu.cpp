@@ -80,18 +80,18 @@ void LobbyMenu::setMessage(std::string message) {
   }
 }
 
-std::optional<RoomRequest> LobbyMenu::press(input::Key key) {
+std::optional<RoomRequest> LobbyMenu::press(input::KeyCode key) {
   std::optional<RoomRequest> request;
   this->_hint.clear();
   const bool typing =
       this->_selected == static_cast<std::size_t>(Choice::JoinCode);
-  if (key == input::Key::Up) {
+  if (key == input::KeyCode::UpArrow) {
     this->_selected = this->_selected == 0 ? 0 : this->_selected - 1;
-  } else if (key == input::Key::Down) {
+  } else if (key == input::KeyCode::DownArrow) {
     this->_selected = std::min(this->_selected + 1, this->lineCount() - 1);
-  } else if (key == input::Key::Enter) {
+  } else if (key == input::KeyCode::Return) {
     request = this->confirm();
-  } else if (typing && key == input::Key::Backspace) {
+  } else if (typing && key == input::KeyCode::Backspace) {
     if (!this->_code.empty()) {
       this->_code.pop_back();
     }
@@ -123,10 +123,10 @@ std::vector<std::string> LobbyMenu::lines() const {
   return texts;
 }
 
-std::optional<char> LobbyMenu::digitOf(input::Key key) {
+std::optional<char> LobbyMenu::digitOf(input::KeyCode key) {
   const auto value = static_cast<int>(key);
-  const auto first = static_cast<int>(input::Key::Num0);
-  if (value >= first && value <= static_cast<int>(input::Key::Num9)) {
+  const auto first = static_cast<int>(input::KeyCode::Alpha0);
+  if (value >= first && value <= static_cast<int>(input::KeyCode::Alpha9)) {
     return static_cast<char>('0' + (value - first));
   }
   return std::nullopt;

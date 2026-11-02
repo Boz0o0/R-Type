@@ -6,7 +6,7 @@
 namespace rtype::client {
 
 std::uint8_t Controls::inputMask(
-    const std::set<ampersand::input::Key>& keysDown) {
+    const std::set<ampersand::input::KeyCode>& keysDown) {
   std::uint8_t mask = 0;
   for (const Binding& binding : BINDINGS) {
     if (keysDown.contains(binding.key)) {

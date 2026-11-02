@@ -17,13 +17,14 @@ core::ecs::Entity createText(core::ecs::World& world, render::FontId font,
                              render::Color color) {
   const core::ecs::Entity entity = world.create();
   world.add(entity, core::Transform{
-                        .position = {position.x, position.y, TEXT_LAYER},
+                        .position = {position.x, position.y, 0.0F},
                     });
   world.add(entity, render::Text{
                         .font = font,
                         .value = {},
                         .size = size,
                         .color = color,
+                        .layer = TEXT_LAYER,
                     });
   return entity;
 }

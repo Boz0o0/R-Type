@@ -309,7 +309,7 @@ TEST(WorldMirror, KilledEnemyExplodesOnItsCenter) {
   const auto& position = world.get<Transform>(explosion).position;
   EXPECT_FLOAT_EQ(position.x, 125.0F);
   EXPECT_FLOAT_EQ(position.y, 225.0F);
-  EXPECT_GT(position.z, 0.0F);
+  EXPECT_GT(world.get<Sprite>(explosion).layer, 0);
   EXPECT_EQ(world.get<Sprite>(explosion).texture, 15U);
   EXPECT_FALSE(world.get<Animation>(explosion).loop);
   EXPECT_EQ(std::get<SoundRef>(world.get<AudioSource>(explosion).source).id,
