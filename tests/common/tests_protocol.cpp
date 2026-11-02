@@ -123,11 +123,14 @@ TEST(protocol, round_trip_game_packets) {
 
 TEST(protocol, round_trip_lobby_packets) {
   (void)roundTrip(RoomList{});
-  EXPECT_EQ(
-      roundTrip(RoomCreate{.visibility = RoomVisibility::Private}).visibility,
-      RoomVisibility::Private);
+  const auto create = roundTrip(
+      RoomCreate{.requestId = 200, .visibility = RoomVisibility::Private});
+  EXPECT_EQ(create.requestId, 200);
+  EXPECT_EQ(create.visibility, RoomVisibility::Private);
 
-  const auto byId = roundTrip(RoomJoin{.roomId = 12, .code = ""});
+  const auto byId =
+      roundTrip(RoomJoin{.requestId = 7, .roomId = 12, .code = ""});
+  EXPECT_EQ(byId.requestId, 7);
   EXPECT_EQ(byId.roomId, 12U);
   EXPECT_TRUE(byId.code.empty());
   const auto byCode = roundTrip(RoomJoin{.roomId = 0, .code = "AB12"});
@@ -144,14 +147,30 @@ TEST(protocol, round_trip_lobby_packets) {
   EXPECT_EQ(list.rooms[1].roomId, 7U);
   EXPECT_TRUE(roundTrip(RoomListReply{}).rooms.empty());
 
-  const auto joined =
-      roundTrip(RoomJoined{.roomId = 3, .playerId = 2, .code = "123456"});
+  const auto joined = roundTrip(
+      RoomJoined{.requestId = 9, .roomId = 3, .playerId = 2, .code = "123456"});
+  EXPECT_EQ(joined.requestId, 9);
   EXPECT_EQ(joined.roomId, 3U);
   EXPECT_EQ(joined.playerId, 2);
   EXPECT_EQ(joined.code, "123456");
-  EXPECT_EQ(roundTrip(RoomReject{.reason = RejectReason::RoomNotFound}).reason,
-            RejectReason::RoomNotFound);
+  const auto reject = roundTrip(
+      RoomReject{.requestId = 255, .reason = RejectReason::RoomNotFound});
+  EXPECT_EQ(reject.requestId, 255);
+  EXPECT_EQ(reject.reason, RejectReason::RoomNotFound);
   (void)roundTrip(RoomLeft{});
+}
+
+TEST(protocol, counters_wrap_around) {
+  EXPECT_TRUE(isNewerSequence(11, 10));
+  EXPECT_FALSE(isNewerSequence(10, 10));
+  EXPECT_FALSE(isNewerSequence(9, 10));
+  EXPECT_TRUE(isNewerSequence(2, 0xFFFFFFFE));  // past the wrap
+  EXPECT_FALSE(isNewerSequence(0xFFFFFFFE, 2));
+  EXPECT_TRUE(isNewerRequest(6, 5));
+  EXPECT_FALSE(isNewerRequest(5, 5));
+  EXPECT_FALSE(isNewerRequest(4, 5));
+  EXPECT_TRUE(isNewerRequest(1, 255));  // past the wrap
+  EXPECT_FALSE(isNewerRequest(255, 1));
 }
 
 TEST(protocol, room_list_fits_in_a_datagram) {
@@ -230,14 +249,14 @@ TEST(protocol, encode_rejects_invalid_lobby_payloads) {
 }
 
 TEST(protocol, decode_rejects_malformed_lobby_payloads) {
-  // Visibility out of range.
+  // Visibility out of range (after the request id).
   auto badVisibility = encode(RoomCreate{}, 0);
-  badVisibility[HEADER_SIZE] = std::byte{2};
+  badVisibility[HEADER_SIZE + 1] = std::byte{2};
   EXPECT_EQ(decodeBytes(badVisibility), DecodeError::MalformedPayload);
 
-  // Both a room id and a code.
+  // Both a room id and a code (room id after the request id).
   auto both = encode(RoomJoin{.roomId = 0, .code = "AB"}, 0);
-  both[HEADER_SIZE + 3] = std::byte{1};
+  both[HEADER_SIZE + 4] = std::byte{1};
   EXPECT_EQ(decodeBytes(both), DecodeError::MalformedPayload);
 
   // Room list announcing more rooms than it carries.
@@ -256,14 +275,17 @@ TEST(protocol, decode_rejects_malformed_lobby_payloads) {
   crowded[HEADER_SIZE + 5] = std::byte{MAX_PLAYERS + 1};
   EXPECT_EQ(decodeBytes(crowded), DecodeError::MalformedPayload);
 
-  // Player id out of range in ROOM_JOINED.
+  // Room 0, and a player id out of range, in ROOM_JOINED.
+  auto joinedRoomZero = encode(RoomJoined{.roomId = 1, .playerId = 0}, 0);
+  joinedRoomZero[HEADER_SIZE + 4] = std::byte{0};
+  EXPECT_EQ(decodeBytes(joinedRoomZero), DecodeError::MalformedPayload);
   auto badPlayer = encode(RoomJoined{.roomId = 1, .playerId = 0}, 0);
-  badPlayer[HEADER_SIZE + 4] = std::byte{MAX_PLAYERS};
+  badPlayer[HEADER_SIZE + 5] = std::byte{MAX_PLAYERS};
   EXPECT_EQ(decodeBytes(badPlayer), DecodeError::MalformedPayload);
 
-  // Reject reason past the last one.
+  // Reject reason past the last one (after the request id).
   auto badReason = encode(RoomReject{.reason = RejectReason::RoomNotFound}, 0);
-  badReason[HEADER_SIZE] = std::byte{7};
+  badReason[HEADER_SIZE + 1] = std::byte{7};
   EXPECT_EQ(decodeBytes(badReason), DecodeError::MalformedPayload);
 
   // An empty packet with a byte in it.

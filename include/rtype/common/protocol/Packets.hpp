@@ -165,15 +165,20 @@ struct RoomList {
   static constexpr PacketType TYPE = PacketType::RoomList;
 };
 
-/** @brief C->S, unreliable, 1 byte. Opens a new room and joins it. */
+/** @brief C->S, unreliable, 2 bytes. Opens a new room and joins it. */
 struct RoomCreate {
   static constexpr PacketType TYPE = PacketType::RoomCreate;
+  /**
+   * @brief Number of the request, echoed in ROOM_JOINED or ROOM_REJECT. The
+   *        client adds 1 for each new room request; its copies keep it.
+   */
+  std::uint8_t requestId{};
   /** @brief A private room gets a code chosen by the server. */
   RoomVisibility visibility{};
 };
 
 /**
- * @brief C->S, unreliable, 5 + n bytes. Joins a room.
+ * @brief C->S, unreliable, 6 + n bytes. Joins a room.
  *
  * With a code: the private room of this code, opened if there is none.
  * Otherwise with a room id: this public room. With neither: any public room
@@ -181,6 +186,8 @@ struct RoomCreate {
  */
 struct RoomJoin {
   static constexpr PacketType TYPE = PacketType::RoomJoin;
+  /** @brief Number of the request, as in RoomCreate::requestId. */
+  std::uint8_t requestId{};
   /** @brief Public room to join, or 0. Must be 0 when code is set. */
   std::uint32_t roomId{};
   /** @brief 0 to MAX_PARTY_CODE_LENGTH bytes. */
@@ -198,6 +205,8 @@ struct RoomInfo {
   std::uint32_t roomId{};
   /** @brief Players in it, from 0 to MAX_PLAYERS. */
   std::uint8_t players{};
+
+  [[nodiscard]] bool operator==(const RoomInfo&) const = default;
 };
 
 /** @brief Size of one RoomInfo on the wire. */
@@ -210,9 +219,16 @@ struct RoomListReply {
   std::vector<RoomInfo> rooms;
 };
 
-/** @brief S->C, reliable, 6 + n bytes. The client is now in a room. */
+/**
+ * @brief S->C, reliable, 7 + n bytes. The client is now in a room.
+ *
+ * Sent by the room before any other packet to this client, so the game
+ * packets of the room all have a bigger header sequence.
+ */
 struct RoomJoined {
   static constexpr PacketType TYPE = PacketType::RoomJoined;
+  /** @brief requestId of the ROOM_CREATE or ROOM_JOIN answered. */
+  std::uint8_t requestId{};
   /** @brief Id of the room, never 0. */
   std::uint32_t roomId{};
   /** @brief Id given to this client, from 0 to MAX_PLAYERS - 1. */
@@ -221,9 +237,11 @@ struct RoomJoined {
   std::string code;
 };
 
-/** @brief S->C, unreliable, 1 byte. The client may not join this room. */
+/** @brief S->C, unreliable, 2 bytes. The client may not join this room. */
 struct RoomReject {
   static constexpr PacketType TYPE = PacketType::RoomReject;
+  /** @brief requestId of the ROOM_CREATE or ROOM_JOIN answered. */
+  std::uint8_t requestId{};
   RejectReason reason{};
 };
 

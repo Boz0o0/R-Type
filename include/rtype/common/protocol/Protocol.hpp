@@ -191,6 +191,33 @@ enum class GameResult : std::uint8_t {
 }
 
 /**
+ * @brief Whether a header sequence comes after another, the counter wrapping
+ *        around after 2^32 packets.
+ *
+ * @param sequence Sequence of a packet.
+ * @param other Sequence it is compared with.
+ * @return true if sequence was sent after other, by the same sender.
+ */
+[[nodiscard]] constexpr bool isNewerSequence(std::uint32_t sequence,
+                                             std::uint32_t other) noexcept {
+  return static_cast<std::int32_t>(sequence - other) > 0;
+}
+
+/**
+ * @brief Whether a room request id comes after another, the counter wrapping
+ *        around after 256 requests.
+ *
+ * @param requestId requestId of a ROOM_CREATE or ROOM_JOIN.
+ * @param other requestId it is compared with.
+ * @return true if requestId was given after other, by the same client.
+ */
+[[nodiscard]] constexpr bool isNewerRequest(std::uint8_t requestId,
+                                            std::uint8_t other) noexcept {
+  return static_cast<std::int8_t>(
+             static_cast<std::uint8_t>(requestId - other)) > 0;
+}
+
+/**
  * @brief Whether a text can be used as a party code: 1 to
  *        MAX_PARTY_CODE_LENGTH ASCII letters and digits.
  *

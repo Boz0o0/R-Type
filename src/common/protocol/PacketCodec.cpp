@@ -158,6 +158,7 @@ void writePayload(BinaryWriter& writer, const GameOver& payload) {
 void writePayload(BinaryWriter& /*writer*/, const RoomList& /*payload*/) {}
 
 void writePayload(BinaryWriter& writer, const RoomCreate& payload) {
+  writer.write(payload.requestId);
   writer.writeEnum(payload.visibility);
 }
 
@@ -166,6 +167,7 @@ void writePayload(BinaryWriter& writer, const RoomJoin& payload) {
   if (payload.roomId != 0 && !payload.code.empty()) {
     throw ProtocolError("join a room by id or by code, not both");
   }
+  writer.write(payload.requestId);
   writer.write(payload.roomId);
   writer.writeString(payload.code);
 }
@@ -191,12 +193,14 @@ void writePayload(BinaryWriter& writer, const RoomJoined& payload) {
   checkRoomId(payload.roomId);
   checkPlayerId(payload.playerId);
   checkPartyCode(payload.code);
+  writer.write(payload.requestId);
   writer.write(payload.roomId);
   writer.write(payload.playerId);
   writer.writeString(payload.code);
 }
 
 void writePayload(BinaryWriter& writer, const RoomReject& payload) {
+  writer.write(payload.requestId);
   writer.writeEnum(payload.reason);
 }
 
@@ -312,11 +316,12 @@ bool readPayload(BinaryReader& /*reader*/, RoomList& /*payload*/) {
 }
 
 bool readPayload(BinaryReader& reader, RoomCreate& payload) {
-  return reader.readEnum(payload.visibility, RoomVisibility::Private);
+  return reader.read(payload.requestId) &&
+         reader.readEnum(payload.visibility, RoomVisibility::Private);
 }
 
 bool readPayload(BinaryReader& reader, RoomJoin& payload) {
-  return reader.read(payload.roomId) &&
+  return reader.read(payload.requestId) && reader.read(payload.roomId) &&
          reader.readString(payload.code, MAX_PARTY_CODE_LENGTH) &&
          (payload.roomId == 0 || payload.code.empty());
 }
@@ -342,13 +347,14 @@ bool readPayload(BinaryReader& reader, RoomListReply& payload) {
 }
 
 bool readPayload(BinaryReader& reader, RoomJoined& payload) {
-  return reader.read(payload.roomId) && payload.roomId != 0 &&
-         readPlayerId(reader, payload.playerId) &&
+  return reader.read(payload.requestId) && reader.read(payload.roomId) &&
+         payload.roomId != 0 && readPlayerId(reader, payload.playerId) &&
          reader.readString(payload.code, MAX_PARTY_CODE_LENGTH);
 }
 
 bool readPayload(BinaryReader& reader, RoomReject& payload) {
-  return readRejectReason(reader, payload.reason);
+  return reader.read(payload.requestId) &&
+         readRejectReason(reader, payload.reason);
 }
 
 bool readPayload(BinaryReader& /*reader*/, RoomLeft& /*payload*/) {
