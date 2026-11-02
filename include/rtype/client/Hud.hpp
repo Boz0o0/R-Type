@@ -47,7 +47,6 @@ class Hud {
  private:
   static constexpr unsigned int TEXT_SIZE = 36;
   static constexpr unsigned int BANNER_SIZE = 80;
-  static constexpr float HUD_LAYER = 10.0F;
   static constexpr float MARGIN = 30.0F;
   static constexpr float STATS_X = 1300.0F;
   static constexpr float EVENT_Y = 1020.0F;
@@ -62,12 +61,12 @@ class Hud {
   [[nodiscard]] static std::string roomLabel(const protocol::RoomJoined& room);
   [[nodiscard]] static std::string leftText(protocol::DisconnectReason reason);
 
+  // The lobby menu takes the screen.
+  [[nodiscard]] static bool isLobby(ServerConnection::State state);
+
   // Empties every text, for the lobby.
   void clear();
 
-  ampersand::core::ecs::Entity addText(ampersand::render::FontId font,
-                                       ampersand::core::math::Vec2f position,
-                                       unsigned int size);
   void setText(ampersand::core::ecs::Entity entity, std::string value);
   void setBanner(std::string value);
 
@@ -78,6 +77,9 @@ class Hud {
   ampersand::core::ecs::Entity _banner;
   std::optional<std::uint8_t> _playerId;
   bool _gameOver{false};
+  // State of the last showConnection(), to clear the HUD once on the way to
+  // the lobby: the packets of the next room may already come while Joining.
+  std::optional<ServerConnection::State> _shownState;
 };
 
 }  // namespace rtype::client

@@ -106,12 +106,12 @@ internet. One UDP datagram = one packet.
 | `0x26` | [PLAYER_STATE](#player_state-0x26) | server | yes | 7 |
 | `0x27` | [GAME_OVER](#game_over-0x27) | server | yes | 5 |
 | `0x40` | [ROOM_LIST](#room_list-0x40) | client | no | 0 |
-| `0x41` | [ROOM_CREATE](#room_create-0x41) | client | no | 1 |
-| `0x42` | [ROOM_JOIN](#room_join-0x42) | client | no | 5 + n |
+| `0x41` | [ROOM_CREATE](#room_create-0x41) | client | no | 2 |
+| `0x42` | [ROOM_JOIN](#room_join-0x42) | client | no | 6 + n |
 | `0x43` | [ROOM_LEAVE](#room_leave-0x43) | client | no | 0 |
 | `0x50` | [ROOM_LIST_REPLY](#room_list_reply-0x50) | server | no | 1 + 5 x n |
-| `0x51` | [ROOM_JOINED](#room_joined-0x51) | server | yes | 6 + n |
-| `0x52` | [ROOM_REJECT](#room_reject-0x52) | server | no | 1 |
+| `0x51` | [ROOM_JOINED](#room_joined-0x51) | server | yes | 7 + n |
+| `0x52` | [ROOM_REJECT](#room_reject-0x52) | server | no | 2 |
 | `0x53` | [ROOM_LEFT](#room_left-0x53) | server | no | 0 |
 
 `0x00` and every value not in this list are invalid. The reliable flag is set
@@ -326,8 +326,14 @@ End of the game.
 
 The client sends them only once it got CONNECT_ACCEPT. None of them is
 reliable: the client sends a request again every 500 ms until the server
-answers it, and the server answers every copy (see [Lobby and
-rooms](#lobby-and-rooms)).
+answers it (see [Lobby and rooms](#lobby-and-rooms)).
+
+`requestId` (in ROOM_CREATE and ROOM_JOIN) is a counter of the client: it
+adds 1 for each new room request, and the copies of a request keep its
+`requestId`. The server sends it back in ROOM_JOINED or ROOM_REJECT, so the
+client can tell the answer to its request from a late answer to an older
+one. It goes from 255 back to 0: `a` is newer than `b` when `(a - b) mod 256`
+is between 1 and 127.
 
 #### ROOM_LIST (0x40)
 
@@ -341,7 +347,8 @@ From the lobby: opens a new room and joins it.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
-| 0 | `visibility` | `RoomVisibility` | a private room gets a code of 6 digits, chosen by the server |
+| 0 | `requestId` | `u8` | see above |
+| 1 | `visibility` | `RoomVisibility` | a private room gets a code of 6 digits, chosen by the server |
 
 Refused with `server full` when the server already runs as many rooms as it
 can (16 for ours).
@@ -352,8 +359,9 @@ From the lobby: joins a room.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
-| 0 | `roomId` | `u32` | a public room of the list, or 0 |
-| 4 | `code` | `string` | 0 to 8 bytes |
+| 0 | `requestId` | `u8` | see above |
+| 1 | `roomId` | `u32` | a public room of the list, or 0 |
+| 5 | `code` | `string` | 0 to 8 bytes |
 
 `roomId` and `code` can't both be set (the packet is dropped).
 
@@ -395,14 +403,16 @@ Each entry:
 
 #### ROOM_JOINED (0x51)
 
-The client is now in a room. Sent by the room itself, then come the
-PLAYER_JOINED, ENTITY_SPAWN... of the game (see [Connection](#connection)).
+The client is now in a room. Sent by the room itself, before any other packet
+to this client: then come the PLAYER_JOINED, ENTITY_SPAWN... of the game (see
+[Lobby and rooms](#lobby-and-rooms)).
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
-| 0 | `roomId` | `u32` | never 0 |
-| 4 | `playerId` | `u8` | id of this player in the room (0 to 3) |
-| 5 | `code` | `string` | 0 to 8 bytes: the code of a private room, to give to friends; empty for a public one |
+| 0 | `requestId` | `u8` | of the ROOM_CREATE or ROOM_JOIN answered |
+| 1 | `roomId` | `u32` | never 0 |
+| 5 | `playerId` | `u8` | id of this player in the room (0 to 3) |
+| 6 | `code` | `string` | 0 to 8 bytes: the code of a private room, to give to friends; empty for a public one |
 
 #### ROOM_REJECT (0x52)
 
@@ -410,12 +420,13 @@ The room request was refused. The client stays in the lobby.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
-| 0 | `reason` | `RejectReason` | |
+| 0 | `requestId` | `u8` | of the ROOM_CREATE or ROOM_JOIN answered |
+| 1 | `reason` | `RejectReason` | |
 
 #### ROOM_LEFT (0x53)
 
-The client is back in the lobby: after ROOM_LEAVE, or after a room refused it.
-No data.
+The client is back in the lobby: after ROOM_LEAVE, after a room refused it,
+or because the server took it out of its room. No data.
 
 ## Reliable packets
 
@@ -476,10 +487,13 @@ sequenceDiagram
 - The client sends CONNECT_REQUEST every 500 ms until it gets an answer. It
   gives up after 10 tries.
 - The server knows a client by its **IP + port**. If the same IP + port sends
-  CONNECT_REQUEST again from the lobby, the server sends CONNECT_ACCEPT
-  again, it doesn't create a new client. If it is in a room, the server
-  thinks the client restarted: it takes it out of its room, and accepts its
-  next CONNECT_REQUEST.
+  CONNECT_REQUEST again from the lobby, the server checks the name again,
+  keeps the new one and sends CONNECT_ACCEPT again (or CONNECT_REJECT if the
+  name is invalid, and forgets the client); it doesn't create a new client.
+- If the client is in a room, a CONNECT_REQUEST that comes less than 5
+  seconds after its CONNECT_ACCEPT is a late copy (sent before the accept
+  arrived): it is ignored. Later, the server thinks the client restarted: it
+  takes it out of its room, and accepts its next CONNECT_REQUEST.
 - The server refuses when it already has 256 clients (`server full`), when
   the name is not valid UTF-8 or holds control characters (`invalid name`).
   If the version is different, it answers "wrong version".
@@ -508,12 +522,31 @@ sequenceDiagram
   create a room or join one, and must keep talking (PING every second) or it
   is dropped after 5 seconds.
 - A client in a **room** plays: every packet it sends goes to its room.
-- Every request is sent again every 500 ms until it is answered, and the
-  server answers every copy: a ROOM_CREATE or ROOM_JOIN that arrives once the
-  client is in a room gets the same ROOM_JOINED again (no second room is
-  opened), and a ROOM_LEAVE from the lobby gets ROOM_LEFT again.
-- A client that gets ROOM_JOINED for a room it did not ask for anymore (late
-  answer) sends ROOM_LEAVE.
+- Every request is sent again every 500 ms until it is answered. From the
+  lobby, the server answers every copy (a ROOM_LEAVE from the lobby gets
+  ROOM_LEFT again).
+- A ROOM_CREATE or ROOM_JOIN that reaches a room the client is already in:
+  - with its `requestId` or an older one, it is a late copy and is ignored
+    (no second room is opened; ROOM_JOINED is reliable, so it is sent again
+    until the client acknowledges it);
+  - with a newer `requestId`, the client wants another room: the room lets
+    it go back to the lobby (the others get PLAYER_LEFT), and the next copy
+    of the request is handled by the lobby.
+- The client only takes the ROOM_JOINED or ROOM_REJECT that carries the
+  `requestId` of the request it is sending. It ignores the others, except a
+  ROOM_JOINED that comes while it is in the lobby (answer to a request it
+  stopped sending): then it sends ROOM_LEAVE.
+- The server sequence counter is shared by all its rooms, and ROOM_JOINED is
+  the first packet a room sends to the client. So the game packets and
+  ROOM_LEFT that have a smaller `sequence` than the ROOM_JOINED of the room
+  come from an older room: the client drops them. The game packets that come
+  before ROOM_JOINED (the network can swap them) are kept until it arrives.
+  Sequences go from 2^32 - 1 back to 0: `a` is newer than `b` when
+  `(a - b) mod 2^32` is between 1 and 2^31 - 1.
+- A ROOM_LEFT newer than the ROOM_JOINED of its room brings the client back
+  to the lobby, even if it did not ask (the server took it out). While it
+  waits for a ROOM_JOINED, the client ignores ROOM_LEFT: it keeps sending its
+  request, which the lobby answers.
 - After ROOM_JOINED, the room sends the new client everything it needs: a
   PLAYER_JOINED per player (him included), an ENTITY_SPAWN per entity, a
   PLAYER_STATE per other player, and GAME_START if a game is running. The
@@ -521,7 +554,8 @@ sequenceDiagram
   the PLAYER_STATE of the new ship on the next tick. Our server lets players
   join a running game.
 - A room is closed as soon as it has no player left (they all left with
-  ROOM_LEAVE, quit or timed out).
+  ROOM_LEAVE, quit or timed out), before the server handles the next
+  requests: its place counts for a new room right away.
 - Each room has its own game: entity ids and server ticks start again from
   the beginning in every room. A client that changes room forgets the
   entities of the old one, and drops its game packets that still arrive.
@@ -547,7 +581,8 @@ sequenceDiagram
 
 - A client that quits sends DISCONNECT(quit) a few times (it's not reliable),
   then closes.
-- The server sends DISCONNECT(server shutdown) when it stops, or
+- The server sends DISCONNECT(server shutdown) to every client when it stops
+  (in the lobby, in a room, or on the way between them), or
   DISCONNECT(kicked) to remove a player.
 - Both sides send a PING every second, and answer a PING with a PONG.
 - Every valid packet counts as "still alive". If nothing comes from someone for

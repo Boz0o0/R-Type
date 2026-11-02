@@ -143,15 +143,21 @@ flowchart LR
   itself: `PING`, `ROOM_LIST` (at most every 250 ms per client),
   `ROOM_CREATE` (always a new party; a private one gets a code of 6 digits)
   and `ROOM_JOIN` (by room id, by code, or the first public party with a free
-  place), and drops them after 5 s of silence. To put a client in a party, it
-  routes the client there and calls `GameServer::admit()`. Then it gives
-  every packet of that client to its party. 16 parties at most, then
-  `ROOM_REJECT(server full)`. A party is closed as soon as it is empty, and
-  its code is freed.
+  place), and drops them after 5 s of silence. A `CONNECT_REQUEST` from the
+  lobby has its name checked (and kept) again; one from a client in a party
+  is ignored for `LATE_CONNECT_WINDOW` (5 s) after its `CONNECT_ACCEPT`, as
+  a late copy, and later means the client restarted. To put a client in a
+  party, it routes the client there and calls `GameServer::admit()` with the
+  `requestId` of its request. Then it gives every packet of that client to
+  its party. 16 parties at most, then `ROOM_REJECT(server full)`. A party is
+  closed as soon as it is empty (checked right after reading the changes, so
+  before the next requests), and its code is freed.
 - **Party threads** (`GameServer::run`): one per party, each with its own
   `Game` and `World`. 60 times per second, even when no client sends
   anything, it takes the clients and packets the Lobby gave it (it answers
-  an admission with `ROOM_JOINED`, or `ROOM_REJECT` when it is full), runs one tick of its
+  an admission with `ROOM_JOINED`, or `ROOM_REJECT` when it is full, both
+  with the `requestId`; a `ROOM_CREATE` or `ROOM_JOIN` of one of its players
+  with a newer `requestId` sends that player back to the lobby), runs one tick of its
   `Game`, sends its events to its clients, and sends a `WORLD_SNAPSHOT` every
   2 ticks (30 per second, split when there are more than 59 entities).
 - Only the Lobby touches its table of clients. A party tells it who joined,
@@ -159,11 +165,16 @@ flowchart LR
   (`ROOM_LEAVE`) with a `SessionChange` through a `MessageQueue`, which the
   Lobby reads before routing new packets. For a client back in the lobby, the
   Lobby sends `ROOM_LEFT` itself, so the client never asks the Lobby
-  something before the Lobby knows it is back.
+  something before the Lobby knows it is back. A client has at most one
+  admission in progress, so at most 2 changes wait in the queue for it: the
+  queue (4096) holds more than 2 x 256, and no change is ever lost
+  (`static_assert` in `Lobby.hpp`).
 - The socket is shared by every thread, so every use of it locks a mutex.
   Logs go through `logLine()`, so lines of two threads never get mixed.
-- `Ctrl+C` stops the loop: every party, and the Lobby for the clients in no
-  party, sends `DISCONNECT(server shutdown)` and the server exits.
+- `Ctrl+C` stops the loop: every party sends `DISCONNECT(server shutdown)` to
+  its players and tells the Lobby (`Left`); then the Lobby sends it to every
+  other client (in the lobby, on its way back to it, or not yet added by its
+  party), and the server exits.
 
 | File | What's inside |
 | --- | --- |
@@ -225,18 +236,25 @@ stateDiagram-v2
     Connecting --> Rejected: CONNECT_REJECT
     Connecting --> Unreachable: 10 requests without answer
     InLobby --> Joining: enterRoom()
-    Joining --> InRoom: ROOM_JOINED
-    Joining --> InLobby: ROOM_REJECT
+    Joining --> InRoom: ROOM_JOINED (same requestId)
+    Joining --> InLobby: ROOM_REJECT (same requestId)
     InRoom --> Leaving: leaveRoom()
+    InRoom --> InLobby: ROOM_LEFT (taken out by the server)
     Leaving --> InLobby: ROOM_LEFT
 ```
 
 From any state but `Connecting`, `DISCONNECT` or 5 s without any packet from
 the server leads to `Disconnected`. In the lobby it sends `ROOM_LIST` every
 second (`rooms()`); in `Joining` and `Leaving` it sends its request every
-500 ms until the answer comes. It only hands out the game packets
-(`0x20`-`0x3F`) while `Joining` or `InRoom`: those of a room it left are
-acknowledged and dropped.
+500 ms until the answer comes. Each `enterRoom()` gets a new `requestId`;
+answers with another one are late and ignored. It only hands out the game
+packets (`0x20`-`0x3F`) of its room: in `InRoom`, those newer (header
+sequence) than the `ROOM_JOINED` of the room. Those that come while `Joining`
+are kept, and the ones newer than the `ROOM_JOINED` are handed out when it
+arrives. The others, of a room it left, are acknowledged and dropped; a
+`ROOM_LEFT` older than the `ROOM_JOINED` is ignored too. `roomGeneration()`
+changes when it enters or leaves a room: `ClientApp` then empties the
+`WorldMirror`.
 
 ## TODO
 

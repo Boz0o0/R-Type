@@ -76,9 +76,13 @@ One loop, once per frame:
    are answered, acknowledges the reliable packets and drops their copies,
    then hands out the game packets of the room.
 3. `LobbyMenu`, in the lobby: the menu (quick match, create a public or a
-   private room, join with a code typed with the letters and digits) and the
-   public rooms, chosen with the arrows and Enter. With a party code on the
-   command line, the client joins that room at once instead.
+   private room, join with a code typed with the digits) and the public
+   rooms, chosen with the arrows and Enter. The engine gives the keys by their
+   QWERTY position, not the character typed (on AZERTY, Z is `Key::W` and M
+   is no key), so only the digits, which are the same on every layout, can
+   be typed; the server makes codes of digits. With a party code on the
+   command line (letters allowed), the client joins that room at once
+   instead.
 4. `Hud`, in a room: our player and the room (or its code, to give to
    friends), our health, lives and score, who joined or left, and the result
    of the game.
@@ -86,7 +90,8 @@ One loop, once per frame:
    entity per server entity, with the sprite, animation and size of its kind
    (each ship has the colour of its player), plays the sound of our shots,
    and leaves an explosion where a ship or an enemy is killed. It is emptied
-   when we leave a room: each room numbers its entities from the start.
+   each time `ServerConnection::roomGeneration()` changes (we enter or leave
+   a room): each room numbers its entities from the start.
 6. `Controls`: turns the keys held into a `PLAYER_INPUT`, sent to the server.
 7. `MovementSystem` (engine): moves the entities with their speed between two
    snapshots, and the star-field layers.

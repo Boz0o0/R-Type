@@ -11,6 +11,7 @@
 #include <optional>
 #include <rtype/client/LobbyMenu.hpp>
 #include <rtype/client/ServerConnection.hpp>
+#include <rtype/client/TextEntity.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <string>
@@ -24,21 +25,24 @@ namespace input = ampersand::input;
 namespace render = ampersand::render;
 
 LobbyMenu::LobbyMenu(core::ecs::World& world, render::FontId font)
-    : _world(world), _font(font) {
-  this->_title = this->addText({LEFT, TITLE_Y}, TITLE_SIZE, MESSAGE_COLOR);
+    : _world(world),
+      _title(
+          createText(world, font, {LEFT, TITLE_Y}, TITLE_SIZE, MESSAGE_COLOR)),
+      _header(createText(world, font, {LEFT, HEADER_Y}, LINE_SIZE, DIM_COLOR)),
+      _message(
+          createText(world, font, {LEFT, MESSAGE_Y}, LINE_SIZE, MESSAGE_COLOR)),
+      _help(createText(world, font, {LEFT, HELP_Y}, HELP_SIZE, DIM_COLOR)) {
   for (std::size_t index = 0; index < CHOICES; ++index) {
-    this->_choices.at(index) = this->addText(
-        {LEFT, CHOICES_Y + (static_cast<float>(index) * LINE_STEP)}, LINE_SIZE,
-        TEXT_COLOR);
+    this->_choices.at(index) =
+        createText(world, font,
+                   {LEFT, CHOICES_Y + (static_cast<float>(index) * LINE_STEP)},
+                   LINE_SIZE, TEXT_COLOR);
   }
-  this->_header = this->addText({LEFT, HEADER_Y}, LINE_SIZE, DIM_COLOR);
   for (std::size_t index = 0; index < VISIBLE_ROOMS; ++index) {
-    this->_roomLines.at(index) =
-        this->addText({LEFT, ROOMS_Y + (static_cast<float>(index) * LINE_STEP)},
-                      LINE_SIZE, TEXT_COLOR);
+    this->_roomLines.at(index) = createText(
+        world, font, {LEFT, ROOMS_Y + (static_cast<float>(index) * LINE_STEP)},
+        LINE_SIZE, TEXT_COLOR);
   }
-  this->_message = this->addText({LEFT, MESSAGE_Y}, LINE_SIZE, MESSAGE_COLOR);
-  this->_help = this->addText({LEFT, HELP_Y}, HELP_SIZE, DIM_COLOR);
 }
 
 void LobbyMenu::show(bool visible) {
@@ -49,6 +53,9 @@ void LobbyMenu::show(bool visible) {
 }
 
 void LobbyMenu::setRooms(const std::vector<protocol::RoomInfo>& rooms) {
+  if (rooms == this->_rooms) {
+    return;
+  }
   std::optional<std::uint32_t> chosenRoom;
   if (this->_selected >= CHOICES) {
     chosenRoom = this->_rooms[this->_selected - CHOICES].roomId;
@@ -57,12 +64,12 @@ void LobbyMenu::setRooms(const std::vector<protocol::RoomInfo>& rooms) {
   if (chosenRoom) {
     const auto found = std::ranges::find(this->_rooms, *chosenRoom,
                                          &protocol::RoomInfo::roomId);
-    if (found != this->_rooms.end()) {
-      this->_selected =
-          CHOICES + static_cast<std::size_t>(found - this->_rooms.begin());
-    }
+    // A room that closed: back to a choice that does not depend on it.
+    this->_selected =
+        found == this->_rooms.end()
+            ? static_cast<std::size_t>(Choice::QuickMatch)
+            : CHOICES + static_cast<std::size_t>(found - this->_rooms.begin());
   }
-  this->_selected = std::min(this->_selected, this->lineCount() - 1);
   this->refresh();
 }
 
@@ -88,7 +95,7 @@ std::optional<RoomRequest> LobbyMenu::press(input::Key key) {
     if (!this->_code.empty()) {
       this->_code.pop_back();
     }
-  } else if (const auto character = characterOf(key);
+  } else if (const auto character = digitOf(key);
              typing && character &&
              this->_code.size() < protocol::MAX_PARTY_CODE_LENGTH) {
     this->_code.push_back(*character);
@@ -116,15 +123,11 @@ std::vector<std::string> LobbyMenu::lines() const {
   return texts;
 }
 
-std::optional<char> LobbyMenu::characterOf(input::Key key) {
+std::optional<char> LobbyMenu::digitOf(input::Key key) {
   const auto value = static_cast<int>(key);
-  const auto first = static_cast<int>(input::Key::A);
-  const auto firstDigit = static_cast<int>(input::Key::Num0);
-  if (value >= first && value <= static_cast<int>(input::Key::Z)) {
-    return static_cast<char>('A' + (value - first));
-  }
-  if (value >= firstDigit && value <= static_cast<int>(input::Key::Num9)) {
-    return static_cast<char>('0' + (value - firstDigit));
+  const auto first = static_cast<int>(input::Key::Num0);
+  if (value >= first && value <= static_cast<int>(input::Key::Num9)) {
+    return static_cast<char>('0' + (value - first));
   }
   return std::nullopt;
 }
@@ -192,21 +195,6 @@ std::size_t LobbyMenu::firstVisibleRoom() const noexcept {
     return 0;
   }
   return this->_selected - CHOICES - VISIBLE_ROOMS + 1;
-}
-
-core::ecs::Entity LobbyMenu::addText(core::math::Vec2f position,
-                                     unsigned int size, render::Color color) {
-  const core::ecs::Entity entity = this->_world.create();
-  this->_world.add(entity, core::Transform{
-                               .position = {position.x, position.y, LAYER},
-                           });
-  this->_world.add(entity, render::Text{
-                               .font = this->_font,
-                               .value = {},
-                               .size = size,
-                               .color = color,
-                           });
-  return entity;
 }
 
 void LobbyMenu::setLine(core::ecs::Entity entity, std::string value,

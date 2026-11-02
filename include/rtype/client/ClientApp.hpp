@@ -46,8 +46,7 @@ class ClientApp {
   // Escape leaves the room, or quits from anywhere else. Once the
   // connection has ended, any key quits. In the lobby, the keys go to the
   // menu.
-  void onKey(ampersand::input::Key key, LobbyMenu& menu,
-             WorldMirror& worldMirror, bool& windowOpen);
+  void onKey(ampersand::input::Key key, LobbyMenu& menu, bool& windowOpen);
   // Shows the lobby menu while in the lobby, with what is going on.
   void showLobby(LobbyMenu& menu) const;
   static std::optional<ampersand::input::Event> pollWindow(

@@ -104,18 +104,32 @@ TEST(LobbyMenu, TypesTheCodeOnItsLine) {
   World world;
   LobbyMenu menu(world, 0);
   menu.show(true);
-  (void)menu.press(Key::A);  // not on the code line: ignored
+  (void)menu.press(Key::Num1);  // not on the code line: ignored
   pressTimes(menu, Key::Down, 3);
 
-  for (const Key key : {Key::A, Key::B, Key::Num1, Key::Num2, Key::Space}) {
+  for (const Key key : {Key::Num4, Key::Num0, Key::Num9, Key::Space}) {
     (void)menu.press(key);
   }
   (void)menu.press(Key::Backspace);
-  EXPECT_TRUE(shows(menu, "> Join with a code: AB1_"));
+  EXPECT_TRUE(shows(menu, "> Join with a code: 40_"));
   const RoomJoin join = joinOf(menu.press(Key::Enter));
 
   EXPECT_EQ(join.roomId, 0U);
-  EXPECT_EQ(join.code, "AB1");
+  EXPECT_EQ(join.code, "40");
+}
+
+// Keys are QWERTY positions: on AZERTY, typing ZEUS would send WEUS, and M
+// cannot be typed. Letters are ignored; digits are the same on every layout.
+TEST(LobbyMenu, TypesOnlyDigits) {
+  World world;
+  LobbyMenu menu(world, 0);
+  pressTimes(menu, Key::Down, 3);
+
+  for (const Key key : {Key::Z, Key::E, Key::Num1, Key::U, Key::S, Key::W}) {
+    (void)menu.press(key);
+  }
+
+  EXPECT_EQ(menu.code(), "1");
 }
 
 TEST(LobbyMenu, StopsTheCodeAtItsLongestLength) {
@@ -169,7 +183,22 @@ TEST(LobbyMenu, KeepsTheChosenRoomWhenTheListChanges) {
   EXPECT_EQ(joinOf(menu.press(Key::Enter)).roomId, 4U);
 
   menu.setRooms({});  // room 4 was closed too
-  EXPECT_EQ(menu.selected(), FIRST_ROOM - 1);
+  EXPECT_EQ(menu.selected(), 0U);
+}
+
+// The chosen room closed: Enter must not join another room by surprise.
+TEST(LobbyMenu, GoesBackToQuickMatchWhenTheChosenRoomCloses) {
+  World world;
+  LobbyMenu menu(world, 0);
+  menu.show(true);
+  menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 4, .players = 1}});
+  pressTimes(menu, Key::Down, FIRST_ROOM + 1);  // room 4
+
+  menu.setRooms({{.roomId = 1, .players = 2}, {.roomId = 7, .players = 1}});
+
+  EXPECT_EQ(menu.selected(), 0U);
+  EXPECT_TRUE(shows(menu, "> Quick match"));
+  EXPECT_TRUE(shows(menu, "  Room 7   1/4 players"));
 }
 
 TEST(LobbyMenu, ScrollsToTheChosenRoom) {

@@ -5,6 +5,7 @@
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <rtype/client/AssetLoader.hpp>
 #include <rtype/client/ClientApp.hpp>
@@ -62,7 +63,7 @@ void ClientApp::run() {
   LobbyMenu menu(this->_world, assets.font);
 
   auto previous = std::chrono::steady_clock::now();
-  bool inGame = false;
+  std::uint32_t mirroredRoom = this->_connection.roomGeneration();
   while (window.isOpen) {
     const auto now = std::chrono::steady_clock::now();
     clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
@@ -73,7 +74,7 @@ void ClientApp::run() {
     this->_inputSystem.update(this->_world);
     for (const input::Event& event : keys.events) {
       if (const auto* pressed = std::get_if<input::KeyPressed>(&event)) {
-        this->onKey(pressed->key, menu, worldMirror, window.isOpen);
+        this->onKey(pressed->key, menu, window.isOpen);
       }
     }
     this->_connection.update(now);
@@ -83,11 +84,10 @@ void ClientApp::run() {
           protocol::RoomJoin{.roomId = 0, .code = this->_config.partyCode()});
       this->_joinedPartyCode = true;
     }
-    if (state == State::Joining || state == State::InRoom) {
-      inGame = true;
-    } else if (inGame && (state == State::InLobby || state == State::Leaving)) {
+    if (this->_connection.roomGeneration() != mirroredRoom) {
+      // Entered or left a room: each room numbers its entities from the start.
       worldMirror.clear();
-      inGame = false;
+      mirroredRoom = this->_connection.roomGeneration();
     }
     hud.showConnection(state, this->_connection.room(),
                        this->_connection.rejectReason());
@@ -110,15 +110,13 @@ void ClientApp::run() {
   this->_connection.disconnect();
 }
 
-void ClientApp::onKey(input::Key key, LobbyMenu& menu, WorldMirror& worldMirror,
-                      bool& windowOpen) {
+void ClientApp::onKey(input::Key key, LobbyMenu& menu, bool& windowOpen) {
   const State state = this->_connection.state();
   if (this->_connection.hasEnded()) {
     windowOpen = false;
   } else if (key == input::Key::Escape) {
     if (state == State::InRoom) {
       this->_connection.leaveRoom();
-      worldMirror.clear();
     } else {
       windowOpen = false;
     }

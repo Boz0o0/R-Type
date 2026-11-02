@@ -55,8 +55,9 @@ arrows and press Enter.
 - **Create a public room**: a new room, shown to everyone in the list.
 - **Create a private room**: a new hidden room; its code (6 digits) is shown
   at the top of the screen, give it to your friends.
-- **Join with a code**: type the code with the letters and digits, then
-  Enter.
+- **Join with a code**: type the code with the digits, then Enter. Only
+  digits can be typed in the menu (they are the same keys on every keyboard
+  layout); a code with letters works on the command line.
 - **The public rooms**: the list of the server, with their players.
 
 In a room, Escape brings you back to the lobby; in the lobby, Escape quits.

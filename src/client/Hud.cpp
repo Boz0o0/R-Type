@@ -8,6 +8,7 @@
 #include <optional>
 #include <rtype/client/Hud.hpp>
 #include <rtype/client/ServerConnection.hpp>
+#include <rtype/client/TextEntity.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
@@ -24,16 +25,19 @@ using State = ServerConnection::State;
 
 Hud::Hud(core::ecs::World& world, render::FontId font)
     : _world(world),
-      _status(this->addText(font, {MARGIN, MARGIN}, TEXT_SIZE)),
-      _stats(this->addText(font, {STATS_X, MARGIN}, TEXT_SIZE)),
-      _event(this->addText(font, {MARGIN, EVENT_Y}, TEXT_SIZE)),
-      _banner(this->addText(font, {0.0F, BANNER_Y}, BANNER_SIZE)) {
+      _status(createText(world, font, {MARGIN, MARGIN}, TEXT_SIZE)),
+      _stats(createText(world, font, {STATS_X, MARGIN}, TEXT_SIZE)),
+      _event(createText(world, font, {MARGIN, EVENT_Y}, TEXT_SIZE)),
+      _banner(createText(world, font, {0.0F, BANNER_Y}, BANNER_SIZE)) {
   this->_world.get<render::Text>(this->_banner).color = BANNER_COLOR;
 }
 
 void Hud::showConnection(State state,
                          const std::optional<protocol::RoomJoined>& room,
                          std::optional<protocol::RejectReason> rejectReason) {
+  const bool enteringLobby =
+      isLobby(state) && (!this->_shownState || !isLobby(*this->_shownState));
+  this->_shownState = state;
   switch (state) {
     case State::Connecting:
       this->setText(this->_status, "Connecting...");
@@ -41,7 +45,9 @@ void Hud::showConnection(State state,
     case State::InLobby:
     case State::Joining:
     case State::Leaving:
-      this->clear();
+      if (enteringLobby) {
+        this->clear();
+      }
       break;
     case State::InRoom: {
       const std::uint8_t player = room ? room->playerId : 0;
@@ -158,14 +164,9 @@ std::string Hud::leftText(protocol::DisconnectReason reason) {
   return " left";
 }
 
-core::ecs::Entity Hud::addText(render::FontId font, core::math::Vec2f position,
-                               unsigned int size) {
-  const core::ecs::Entity entity = this->_world.create();
-  this->_world.add(entity, core::Transform{
-                               .position = {position.x, position.y, HUD_LAYER},
-                           });
-  this->_world.add(entity, render::Text{.font = font, .size = size});
-  return entity;
+bool Hud::isLobby(State state) {
+  return state == State::InLobby || state == State::Joining ||
+         state == State::Leaving;
 }
 
 void Hud::clear() {

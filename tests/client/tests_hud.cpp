@@ -44,6 +44,27 @@ TEST(Hud, ShowsTheCodeOfAPrivateRoom) {
   EXPECT_EQ(hud.status(), "You: P1   Code 123456");
 }
 
+// While Joining, the room may already send its packets: what they show stays,
+// the HUD is only emptied on the way to the lobby.
+TEST(Hud, IsEmptiedOnceOnTheWayToTheLobby) {
+  World world;
+  Hud hud(world, 0);
+  hud.showConnection(State::InLobby, std::nullopt, std::nullopt);
+  hud.showConnection(State::Joining, std::nullopt, std::nullopt);
+
+  hud.apply(PlayerJoined{.playerId = 1, .playerName = "Bob"});
+  hud.showConnection(State::Joining, std::nullopt, std::nullopt);
+  EXPECT_EQ(hud.event(), "P2 Bob joined");
+
+  hud.showConnection(State::InRoom, RoomJoined{.roomId = 1, .playerId = 0},
+                     std::nullopt);
+  hud.apply(PlayerState{.playerId = 0, .health = 3, .lives = 3, .score = 0});
+  hud.showConnection(State::InRoom, RoomJoined{.roomId = 1, .playerId = 0},
+                     std::nullopt);
+  EXPECT_EQ(hud.stats(), "HP 3   Lives 3   Score 0");
+  EXPECT_EQ(hud.event(), "P2 Bob joined");
+}
+
 // The lobby menu takes the screen: nothing of the old room stays.
 TEST(Hud, IsEmptyInTheLobby) {
   World world;

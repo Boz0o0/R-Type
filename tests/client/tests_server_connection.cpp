@@ -111,18 +111,26 @@ void connectToLobby(FakeServer& server, ServerConnection& connection) {
   ASSERT_EQ(connection.state(), State::InLobby);
 }
 
-/** @brief Brings the client into room 3, then reads its ACK of ROOM_JOINED.
+/** @brief Header sequence of the ROOM_JOINED sent by enterRoom(). */
+constexpr std::uint32_t JOINED_SEQUENCE = 100;
+
+/**
+ * @brief Brings the client into room 3 (ROOM_JOINED with JOINED_SEQUENCE),
+ *        then reads its ACK.
  */
 void enterRoom(FakeServer& server, ServerConnection& connection,
                std::uint8_t playerId = 0) {
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{});
   connection.update(START);
-  server.receive<RoomJoin>();
-  server.send(RoomJoined{.roomId = 3, .playerId = playerId}, 1);
+  const auto request = server.receive<RoomJoin>();
+  server.send(
+      RoomJoined{
+          .requestId = request.requestId, .roomId = 3, .playerId = playerId},
+      JOINED_SEQUENCE);
   updateUntilStateChanges(connection, START);
   ASSERT_EQ(connection.state(), State::InRoom);
-  EXPECT_EQ(server.receive<Ack>().sequence, 1U);
+  EXPECT_EQ(server.receive<Ack>().sequence, JOINED_SEQUENCE);
 }
 
 /** @brief Calls update() until count game packets came, or a second passed. */
@@ -295,11 +303,16 @@ TEST(ServerConnection, AsksForTheRoomUntilTheServerAnswers) {
   connection.enterRoom(RoomJoin{.roomId = 3});
   EXPECT_EQ(connection.state(), State::Joining);
   connection.update(START);
-  EXPECT_EQ(server.receive<RoomJoin>().roomId, 3U);
+  const auto request = server.receive<RoomJoin>();
+  EXPECT_EQ(request.roomId, 3U);
   connection.update(START + ServerConnection::REQUEST_RETRY_DELAY);
-  EXPECT_EQ(server.receive<RoomJoin>().roomId, 3U);
+  const auto copy = server.receive<RoomJoin>();
+  EXPECT_EQ(copy.roomId, 3U);
+  EXPECT_EQ(copy.requestId, request.requestId);  // same request, same id
 
-  server.send(RoomJoined{.roomId = 3, .playerId = 2}, 77);
+  server.send(
+      RoomJoined{.requestId = request.requestId, .roomId = 3, .playerId = 2},
+      77);
   updateUntilStateChanges(connection, START);
 
   EXPECT_EQ(connection.state(), State::InRoom);
@@ -308,6 +321,23 @@ TEST(ServerConnection, AsksForTheRoomUntilTheServerAnswers) {
   EXPECT_EQ(connection.room()->roomId, 3U);
   // ROOM_JOINED is reliable, so the client acknowledges it.
   EXPECT_EQ(server.receive<Ack>().sequence, 77U);
+}
+
+TEST(ServerConnection, GivesEachRoomRequestANewId) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{.roomId = 3});
+  connection.update(START);
+  const auto first = server.receive<RoomJoin>();
+  server.send(RoomReject{.requestId = first.requestId,
+                         .reason = RejectReason::PartyFull});
+  updateUntilStateChanges(connection, START);
+
+  connection.enterRoom(RoomCreate{});
+  connection.update(START);
+
+  EXPECT_NE(server.receive<RoomCreate>().requestId, first.requestId);
 }
 
 TEST(ServerConnection, SendsTheRoomToCreate) {
@@ -327,9 +357,10 @@ TEST(ServerConnection, StaysInTheLobbyWhenARoomIsRefused) {
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{.roomId = 3});
   connection.update(START);
-  server.receive<RoomJoin>();
+  const auto request = server.receive<RoomJoin>();
 
-  server.send(RoomReject{.reason = RejectReason::PartyFull});
+  server.send(RoomReject{.requestId = request.requestId,
+                         .reason = RejectReason::PartyFull});
   updateUntilStateChanges(connection, START);
 
   EXPECT_EQ(connection.state(), State::InLobby);
@@ -339,17 +370,44 @@ TEST(ServerConnection, StaysInTheLobbyWhenARoomIsRefused) {
   EXPECT_FALSE(connection.roomRejectReason().has_value());
 }
 
+// Answers to an older request come late: the room chosen now is another one.
+TEST(ServerConnection, IgnoresTheAnswersToAnotherRequest) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{.roomId = 7});
+  connection.update(START);
+  const auto request = server.receive<RoomJoin>();
+  const auto older = static_cast<std::uint8_t>(request.requestId - 1);
+
+  server.send(
+      RoomReject{.requestId = older, .reason = RejectReason::PartyFull});
+  server.send(RoomJoined{.requestId = older, .roomId = 5, .playerId = 0}, 40);
+  updateFor(connection, START);
+  EXPECT_EQ(connection.state(), State::Joining);
+
+  server.send(
+      RoomJoined{.requestId = request.requestId, .roomId = 7, .playerId = 1},
+      41);
+  updateUntilStateChanges(connection, START);
+  EXPECT_EQ(connection.state(), State::InRoom);
+  ASSERT_TRUE(connection.room().has_value());
+  EXPECT_EQ(connection.room()->roomId, 7U);
+}
+
 TEST(ServerConnection, LeavesTheRoomForTheLobby) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
   enterRoom(server, connection);
+  const auto generation = connection.roomGeneration();
 
   connection.leaveRoom();
   EXPECT_EQ(connection.state(), State::Leaving);
+  EXPECT_NE(connection.roomGeneration(), generation);
   connection.update(START);
   EXPECT_NO_THROW(server.receive<RoomLeave>());
 
-  server.send(RoomLeft{});
+  server.send(RoomLeft{}, JOINED_SEQUENCE + 1);
   updateUntilStateChanges(connection, START);
 
   EXPECT_EQ(connection.state(), State::InLobby);
@@ -358,26 +416,110 @@ TEST(ServerConnection, LeavesTheRoomForTheLobby) {
   EXPECT_NO_THROW(server.receive<RoomList>());
 }
 
+// The server moved us back to the lobby on its own: we must follow, or the
+// world stays frozen while the lobby answers our PINGs forever.
+TEST(ServerConnection, GoesBackToTheLobbyWhenTheServerSaysSo) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  enterRoom(server, connection);
+  const auto generation = connection.roomGeneration();
+
+  server.send(RoomLeft{}, JOINED_SEQUENCE + 5);
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::InLobby);
+  EXPECT_FALSE(connection.room().has_value());
+  EXPECT_NE(connection.roomGeneration(), generation);
+  EXPECT_NO_THROW(server.receive<RoomList>());
+}
+
+TEST(ServerConnection, IgnoresARoomLeftOlderThanItsRoom) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  enterRoom(server, connection);
+
+  // Sent before we joined this room: about the one we left before.
+  server.send(RoomLeft{}, JOINED_SEQUENCE - 1);
+  updateFor(connection, START);
+
+  EXPECT_EQ(connection.state(), State::InRoom);
+}
+
+// While Joining, the request is sent again, and answered by the lobby.
+TEST(ServerConnection, KeepsAskingForItsRoomAfterARoomLeft) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{.roomId = 3});
+  connection.update(START);
+  server.receive<RoomJoin>();
+
+  server.send(RoomLeft{}, 50);
+  updateFor(connection, START);
+  connection.update(START + ServerConnection::REQUEST_RETRY_DELAY);
+
+  EXPECT_EQ(connection.state(), State::Joining);
+  EXPECT_EQ(server.receive<RoomJoin>().roomId, 3U);
+}
+
 TEST(ServerConnection, DropsTheGamePacketsOfARoomItLeft) {
   FakeServer server;
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
   enterRoom(server, connection);
-  server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy}, 5);
+  server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy},
+              JOINED_SEQUENCE + 1);
   ASSERT_EQ(takeGamePackets(connection, 1).size(), 1U);
-  EXPECT_EQ(server.receive<Ack>().sequence, 5U);
+  EXPECT_EQ(server.receive<Ack>().sequence, JOINED_SEQUENCE + 1);
 
   connection.leaveRoom();
-  server.send(EntitySpawn{.entityId = 8, .entityType = EntityKind::Enemy}, 6);
+  server.send(EntitySpawn{.entityId = 8, .entityType = EntityKind::Enemy},
+              JOINED_SEQUENCE + 2);
   updateFor(connection, START);
   EXPECT_TRUE(connection.takePackets().empty());
-  EXPECT_EQ(server.receive<Ack>().sequence, 6U);  // still acknowledged
+  // Still acknowledged.
+  EXPECT_EQ(server.receive<Ack>().sequence, JOINED_SEQUENCE + 2);
 
-  server.send(RoomLeft{});
-  server.send(WorldSnapshot{.serverTick = 9}, 7);
+  server.send(RoomLeft{}, JOINED_SEQUENCE + 3);
+  server.send(WorldSnapshot{.serverTick = 9}, JOINED_SEQUENCE + 4);
   updateFor(connection, START);
   EXPECT_EQ(connection.state(), State::InLobby);
   EXPECT_TRUE(connection.takePackets().empty());
   EXPECT_EQ(connection.lastServerTick(), 0U);
+}
+
+// Packets of the old room still on their way while we join the next one: the
+// old snapshot would hide the new ones, the old spawn would be a ghost.
+TEST(ServerConnection, KeepsOnlyTheGamePacketsOfTheRoomItJoins) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  connectToLobby(server, connection);
+  connection.enterRoom(RoomJoin{});
+  connection.update(START);
+  const auto request = server.receive<RoomJoin>();
+
+  server.send(WorldSnapshot{.serverTick = 900}, 10);  // old room
+  server.send(EntitySpawn{.entityId = 1, .entityType = EntityKind::Enemy},
+              11);  // old room
+  server.send(EntitySpawn{.entityId = 2, .entityType = EntityKind::Ship},
+              21);  // new room, before its ROOM_JOINED
+  updateFor(connection, START);
+  EXPECT_TRUE(connection.takePackets().empty());  // not in the room yet
+  server.send(
+      RoomJoined{.requestId = request.requestId, .roomId = 4, .playerId = 0},
+      20);
+  updateUntilStateChanges(connection, START);
+  server.send(WorldSnapshot{.serverTick = 12}, 9);  // old room, very late
+  server.send(WorldSnapshot{.serverTick = 3}, 22);  // new room
+  const std::vector<Payload> packets = takeGamePackets(connection, 2);
+
+  ASSERT_EQ(packets.size(), 2U);
+  ASSERT_TRUE(std::holds_alternative<EntitySpawn>(packets[0]));
+  EXPECT_EQ(std::get<EntitySpawn>(packets[0]).entityId, 2U);
+  ASSERT_TRUE(std::holds_alternative<WorldSnapshot>(packets[1]));
+  EXPECT_EQ(std::get<WorldSnapshot>(packets[1]).serverTick, 3U);
+  EXPECT_EQ(connection.lastServerTick(), 3U);
+  updateFor(connection, START);
+  EXPECT_TRUE(connection.takePackets().empty());
 }
 
 TEST(ServerConnection, LeavesARoomItNoLongerWants) {
@@ -400,8 +542,9 @@ TEST(ServerConnection, HandsGamePacketsToTheApp) {
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
   enterRoom(server, connection);
 
-  server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy}, 5);
-  server.send(WorldSnapshot{.serverTick = 3}, 6);
+  server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy},
+              JOINED_SEQUENCE + 1);
+  server.send(WorldSnapshot{.serverTick = 3}, JOINED_SEQUENCE + 2);
   const std::vector<Payload> packets = takeGamePackets(connection, 2);
 
   ASSERT_EQ(packets.size(), 2U);
@@ -418,16 +561,16 @@ TEST(ServerConnection, HandlesAReliablePacketOnceButAcksEveryCopy) {
   enterRoom(server, connection);
 
   const EntitySpawn spawn{.entityId = 7, .entityType = EntityKind::Enemy};
-  server.send(spawn, 5);
-  server.send(spawn, 5);
-  server.send(WorldSnapshot{.serverTick = 3}, 6);
+  server.send(spawn, JOINED_SEQUENCE + 1);
+  server.send(spawn, JOINED_SEQUENCE + 1);
+  server.send(WorldSnapshot{.serverTick = 3}, JOINED_SEQUENCE + 2);
   const std::vector<Payload> packets = takeGamePackets(connection, 2);
 
   ASSERT_EQ(packets.size(), 2U);
   EXPECT_TRUE(std::holds_alternative<EntitySpawn>(packets[0]));
   EXPECT_TRUE(std::holds_alternative<WorldSnapshot>(packets[1]));
   for (int copy = 0; copy < 2; ++copy) {
-    EXPECT_EQ(server.receive<Ack>().sequence, 5U);
+    EXPECT_EQ(server.receive<Ack>().sequence, JOINED_SEQUENCE + 1);
   }
 }
 
@@ -438,8 +581,10 @@ TEST(ServerConnection, SendsInputOnlyInARoom) {
   connection.sendInput(InputFlag::SHOOT);  // in the lobby: not sent
   connection.enterRoom(RoomJoin{});
   connection.update(START);
-  server.receive<RoomJoin>();
-  server.send(RoomJoined{.roomId = 3, .playerId = 0}, 1);
+  const auto request = server.receive<RoomJoin>();
+  server.send(
+      RoomJoined{.requestId = request.requestId, .roomId = 3, .playerId = 0},
+      1);
   updateUntilStateChanges(connection, START);
 
   connection.sendInput(InputFlag::MOVE_UP);

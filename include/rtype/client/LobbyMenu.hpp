@@ -20,10 +20,16 @@ namespace rtype::client {
 // The lobby screen: a menu chosen with the arrows and Enter.
 //
 // The first lines are always there: quick match, create a public room,
-// create a private room, and join with a code (typed with the letters and
-// digits while that line is chosen). Then come the public rooms of the
-// server, VISIBLE_ROOMS at a time. press() turns a key into the request to
-// send, if any.
+// create a private room, and join with a code (typed with the digits while
+// that line is chosen). Then come the public rooms of the server,
+// VISIBLE_ROOMS at a time. press() turns a key into the request to send, if
+// any.
+//
+// The engine gives keys by their QWERTY position, not the characters typed:
+// on AZERTY, the key marked Z is Key::W and M is no key at all. So a code is
+// typed with the digits only, which have the same keys on every layout; the
+// codes the server makes are digits. A code with letters can still be given
+// on the command line.
 class LobbyMenu {
  public:
   // Rooms shown at once; the list scrolls with the choice.
@@ -33,14 +39,15 @@ class LobbyMenu {
 
   // Hidden, every text is empty.
   void show(bool visible);
-  // Keeps the same room chosen if it is still in the list.
+  // Keeps the same room chosen if it is still in the list; if it is gone,
+  // goes back to quick match. Does nothing if the list did not change.
   void setRooms(const std::vector<protocol::RoomInfo>& rooms);
   // A line under the menu ("Joining...", why a room was refused...); empty
   // to show the hints of the menu instead.
   void setMessage(std::string message);
 
-  // Up and Down choose a line, Enter confirms it. On the code line, letters
-  // and digits type the code and Backspace erases.
+  // Up and Down choose a line, Enter confirms it. On the code line, the
+  // digits type the code and Backspace erases.
   [[nodiscard]] std::optional<RoomRequest> press(ampersand::input::Key key);
 
   // Index of the chosen line: the fixed lines first, then the rooms.
@@ -61,7 +68,6 @@ class LobbyMenu {
   static constexpr unsigned int TITLE_SIZE = 80;
   static constexpr unsigned int LINE_SIZE = 40;
   static constexpr unsigned int HELP_SIZE = 28;
-  static constexpr float LAYER = 10.0F;
   static constexpr float LEFT = 560.0F;
   static constexpr float TITLE_Y = 80.0F;
   static constexpr float CHOICES_Y = 240.0F;
@@ -79,9 +85,8 @@ class LobbyMenu {
   static constexpr ampersand::render::Color MESSAGE_COLOR{
       .r = 255, .g = 220, .b = 80};
 
-  // The letter or digit of a key, in upper case.
-  [[nodiscard]] static std::optional<char> characterOf(
-      ampersand::input::Key key);
+  // The digit of a key.
+  [[nodiscard]] static std::optional<char> digitOf(ampersand::input::Key key);
   [[nodiscard]] std::optional<RoomRequest> confirm();
   [[nodiscard]] std::size_t lineCount() const noexcept;
   [[nodiscard]] std::string choiceText(Choice choice) const;
@@ -89,16 +94,12 @@ class LobbyMenu {
   // First room shown, so that the chosen one is on screen.
   [[nodiscard]] std::size_t firstVisibleRoom() const noexcept;
 
-  ampersand::core::ecs::Entity addText(ampersand::core::math::Vec2f position,
-                                       unsigned int size,
-                                       ampersand::render::Color color);
   void setLine(ampersand::core::ecs::Entity entity, std::string value,
                ampersand::render::Color color);
   // Writes every text from the state of the menu.
   void refresh();
 
   ampersand::core::ecs::World& _world;
-  ampersand::render::FontId _font;
   ampersand::core::ecs::Entity _title;
   std::array<ampersand::core::ecs::Entity, CHOICES> _choices{};
   ampersand::core::ecs::Entity _header;

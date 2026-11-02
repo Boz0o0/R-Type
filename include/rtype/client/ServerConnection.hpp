@@ -9,6 +9,7 @@
 #include <rtype/common/protocol/Protocol.hpp>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -26,6 +27,12 @@ using RoomRequest = std::variant<protocol::RoomCreate, protocol::RoomJoin>;
  * send their request until the server answers it. update() never waits for
  * the network, so it is called once per frame. The game packets of the room
  * are handed out by takePackets().
+ *
+ * Packets can come late, so every answer is checked: ROOM_JOINED and
+ * ROOM_REJECT must carry the requestId of the request being sent, and the
+ * game packets and ROOM_LEFT of a room must be newer (header sequence) than
+ * its ROOM_JOINED. The game packets that come while Joining are kept until
+ * ROOM_JOINED tells which ones belong to the room.
  */
 class ServerConnection {
  public:
@@ -99,7 +106,8 @@ class ServerConnection {
    */
   void enterRoom(const RoomRequest& request);
 
-  /** @brief Asks to go back to the lobby, if in a room. */
+  /** @brief Asks to go back to the lobby, if in a room. The room is left at
+   *         once for roomGeneration(), and its packets are dropped. */
   void leaveRoom();
 
   /** @brief Tells the server the player quits, if connected. */
@@ -130,15 +138,32 @@ class ServerConnection {
   [[nodiscard]] const std::vector<protocol::RoomInfo>& rooms() const noexcept;
   /** @brief serverTick of the newest WORLD_SNAPSHOT of the room. */
   [[nodiscard]] std::uint32_t lastServerTick() const noexcept;
+  /**
+   * @brief Changes each time we enter a room or leave one: what the app shows
+   *        of the old room must then go away.
+   */
+  [[nodiscard]] std::uint32_t roomGeneration() const noexcept;
 
  private:
   /** @brief CONNECT_ACCEPT received or not, the server talks to us. */
   [[nodiscard]] bool isConnected() const noexcept;
   void receivePackets(Clock::time_point now);
   void handlePacket(const protocol::Packet& packet);
+  /** @brief Keeps a game packet of the room, or drops a late one. */
+  void handleGamePacket(const protocol::Packet& packet);
   /** @brief Handles ROOM_LIST_REPLY, ROOM_JOINED, ROOM_REJECT and ROOM_LEFT.
    */
-  void handleLobbyPacket(const protocol::Payload& payload);
+  void handleLobbyPacket(const protocol::Packet& packet);
+  /**
+   * @brief Enters the room if it answers the request being sent.
+   *
+   * @param joined The packet.
+   * @param sequence Its header sequence.
+   */
+  void handleRoomJoined(const protocol::RoomJoined& joined,
+                        std::uint32_t sequence);
+  /** @brief Hands a game packet of the room to the app. */
+  void deliver(const protocol::Payload& payload);
   /** @brief Sends the CONNECT_REQUEST, or gives up. */
   void sendConnectRequest(Clock::time_point now);
   /** @brief Sends the pending room request, ROOM_LIST and PING when due. */
@@ -157,6 +182,12 @@ class ServerConnection {
   std::vector<protocol::RoomInfo> _rooms;
   /** @brief ROOM_CREATE, ROOM_JOIN or ROOM_LEAVE, sent until answered. */
   std::optional<protocol::Payload> _request;
+  /** @brief requestId of the last ROOM_CREATE or ROOM_JOIN. */
+  std::uint8_t _requestId{0};
+  /** @brief Header sequence of the ROOM_JOINED of the room. */
+  std::uint32_t _roomSequence{0};
+  /** @brief See roomGeneration(). */
+  std::uint32_t _roomGeneration{0};
   std::optional<Clock::time_point> _lastRequest;
   std::optional<Clock::time_point> _lastRoomList;
   std::uint32_t _lastServerTick{0};
@@ -167,6 +198,8 @@ class ServerConnection {
   Clock::time_point _lastReceived;
   std::unordered_map<std::uint32_t, Clock::time_point> _handledSequences;
   std::vector<protocol::Payload> _gamePackets;
+  /** @brief Game packets received while Joining, with their sequence. */
+  std::vector<std::pair<std::uint32_t, protocol::Payload>> _earlyPackets;
 };
 
 }  // namespace rtype::client
