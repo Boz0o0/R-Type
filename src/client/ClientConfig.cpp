@@ -13,8 +13,11 @@ std::optional<ClientConfig> ClientConfig::fromArguments(
     return std::nullopt;
   }
   if (!args.empty()) {
-    config._assetsDirectory =
-        std::filesystem::path(args[0]).parent_path() / "assets";
+    const std::filesystem::path folder =
+        std::filesystem::path(args[0]).parent_path();
+    if (!folder.empty()) {
+      config._binaryDirectory = folder;
+    }
   }
   if (args.size() > 1) {
     config._host = args[1];
@@ -49,8 +52,8 @@ const std::string& ClientConfig::host() const { return this->_host; }
 std::uint16_t ClientConfig::port() const { return this->_port; }
 const std::string& ClientConfig::name() const { return this->_name; }
 const std::string& ClientConfig::partyCode() const { return this->_partyCode; }
-const std::filesystem::path& ClientConfig::assetsDirectory() const {
-  return this->_assetsDirectory;
+const std::filesystem::path& ClientConfig::binaryDirectory() const {
+  return this->_binaryDirectory;
 }
 
 std::optional<std::uint16_t> ClientConfig::parsePort(const std::string& text) {

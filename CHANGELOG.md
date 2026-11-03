@@ -30,6 +30,9 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: controllers: the left stick moves, A shoots and Start quits.
 - **Client**: smooth movement. Our own ship is predicted: it moves as soon as a key is pressed, then slides to the server's position once both have stopped. The other entities slide toward each snapshot instead of jumping to it.
 - **Common**: `ShipMovement`, the speed, diagonals and screen edges of a ship, shared by the server and the client's prediction.
+- **Client**: the look of the game is data, in `game/` (read by the engine scene module): `world/config.json` (window, sound, camera, input actions), `world/scenes/game.json` (the star field) and `world/prefabs/` (ships, enemy, missiles, explosion, star-field layers). Changing a sprite, a sound or a key only means editing JSON.
+- **Client**: Lua scripting: the star field scrolls with `game/scripts/scroll.lua`. A broken script is printed and turned off, the game goes on.
+- **Tests**: every file of `game/` is loaded in the CI with fake window and sound backends, so a missing field, file or key fails there.
 
 ### Changed
 
@@ -42,6 +45,7 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 ### Removed
 
 - The `ampersand-engine/` git subtree.
+- **Client**: `AssetLoader`, `EntityLooks`, `Starfield`, `ScrollingSystem` and the `Scrolling` component, replaced by the `game/` files. `assets/` moved to `game/assets/`.
 
 ## [1.0.0] - 2026-10-18
 

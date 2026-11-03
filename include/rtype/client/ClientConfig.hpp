@@ -29,8 +29,11 @@ class ClientConfig {
   [[nodiscard]] const std::string& name() const;
   /** @brief Code of the private party to join; empty for any public party. */
   [[nodiscard]] const std::string& partyCode() const;
-  /** @brief assets/ next to the binary, found from the first argument. */
-  [[nodiscard]] const std::filesystem::path& assetsDirectory() const;
+  /**
+   * @brief Folder of the binary, found from the first argument. The client
+   * runs from it, since the engine reads game/ from the working directory.
+   */
+  [[nodiscard]] const std::filesystem::path& binaryDirectory() const;
 
  private:
   /**
@@ -50,8 +53,8 @@ class ClientConfig {
   std::string _name{"Player"};
   /** @brief See partyCode(). */
   std::string _partyCode;
-  /** @brief See assetsDirectory(). */
-  std::filesystem::path _assetsDirectory{"assets"};
+  /** @brief See binaryDirectory(). */
+  std::filesystem::path _binaryDirectory{"."};
 };
 
 }  // namespace rtype::client

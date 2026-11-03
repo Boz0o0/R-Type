@@ -4,8 +4,6 @@
 #include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <chrono>
-#include <rtype/client/Controls.hpp>
-#include <rtype/client/EntityLooks.hpp>
 #include <rtype/client/Hud.hpp>
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/WorldMirror.hpp>
@@ -16,20 +14,22 @@
 #include <thread>
 #include <variant>
 
+#include "FakeEntityFactory.hpp"
 #include "FakeServer.hpp"
+#include "GameFiles.hpp"
 
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
 using ampersand::input::KeyCode;
 using ampersand::input::KeyPressed;
-using rtype::client::Controls;
-using rtype::client::EntityLooks;
 using rtype::client::Hud;
 using rtype::client::NetworkSystem;
 using rtype::client::ServerConnection;
 using rtype::client::WorldMirror;
 using rtype::client::test::connectToServer;
+using rtype::client::test::FakeEntityFactory;
 using rtype::client::test::FakeServer;
+using rtype::client::test::gameInput;
 using rtype::common::EntityKind;
 namespace protocol = rtype::protocol;
 
@@ -38,11 +38,10 @@ TEST(NetworkSystem, MirrorsTheServerAndSendsTheInput) {
   ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
   connectToServer(server, connection);
   World world;
-  auto& manager = world.addResource<InputManager>();
-  Controls::bind(manager);
-  manager.beginFrame();
+  auto& manager = world.addResource<InputManager>(gameInput());
   manager.apply(KeyPressed{.key = KeyCode::Space});
-  WorldMirror worldMirror(world, EntityLooks{});
+  FakeEntityFactory factory(world);
+  WorldMirror worldMirror(world, factory);
   Hud hud(world, 0);
   NetworkSystem system(connection, worldMirror, hud);
 

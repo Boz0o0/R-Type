@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "name": "game",
+  "entities": [
+    {
+      "name": "Back stars, left copy",
+      "prefab": "world/prefabs/starfield-back.json"
+    },
+    {
+      "name": "Back stars, right copy",
+      "prefab": "world/prefabs/starfield-back.json",
+      "components": { "Transform": { "position": { "x": 1920 } } }
+    },
+    {
+      "name": "Front stars, left copy",
+      "prefab": "world/prefabs/starfield-front.json"
+    },
+    {
+      "name": "Front stars, right copy",
+      "prefab": "world/prefabs/starfield-front.json",
+      "components": { "Transform": { "position": { "x": 1920 } } }
+    }
+  ]
+}

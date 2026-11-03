@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ampersand/audio/SoundId.hpp>
 #include <ampersand/core/components/Transform.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
@@ -9,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <rtype/client/EntityLooks.hpp>
+#include <rtype/client/IEntityFactory.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <unordered_map>
@@ -20,7 +19,7 @@ namespace rtype::client {
 // Keeps one local entity for each entity the server told us about.
 class WorldMirror {
  public:
-  WorldMirror(ampersand::core::ecs::World& world, EntityLooks looks);
+  WorldMirror(ampersand::core::ecs::World& world, IEntityFactory& factory);
 
   // Our own ship is then predicted instead of following the snapshots.
   void setLocalPlayer(std::uint8_t playerId);
@@ -33,10 +32,6 @@ class WorldMirror {
   [[nodiscard]] std::size_t size() const noexcept;
 
  private:
-  static constexpr float SHOOT_VOLUME = 40.0F;
-  static constexpr float EXPLOSION_VOLUME = 70.0F;
-  // Drawn over the ships and the missiles.
-  static constexpr std::int32_t EXPLOSION_LAYER = 1;
   // A bigger error is a jump (several lost snapshots): smoothing it would
   // show the entity flying across the screen.
   static constexpr float SNAP_DISTANCE = 128.0F;
@@ -46,19 +41,14 @@ class WorldMirror {
     common::EntityKind kind;
   };
 
-  [[nodiscard]] const Look& lookFor(const protocol::EntitySpawn& packet) const;
   [[nodiscard]] bool isLocalShip(const protocol::EntitySpawn& packet) const;
   void correct(ampersand::core::ecs::Entity entity,
                ampersand::core::math::Vec2f serverPosition);
-  std::optional<ampersand::core::ecs::Entity> create(
-      const Look& look, ampersand::core::math::Vec2f position);
   void explode(const ampersand::core::Transform& transform,
                const ampersand::render::Sprite& sprite);
-  void play(ampersand::core::ecs::Entity entity,
-            ampersand::audio::SoundId sound, float volume);
 
   ampersand::core::ecs::World& _world;
-  EntityLooks _looks;
+  IEntityFactory& _factory;
   std::unordered_map<std::uint32_t, Mirrored> _entities;
   // Ids are never reused, so a spawn arriving after its destroy is dropped.
   std::unordered_set<std::uint32_t> _destroyed;

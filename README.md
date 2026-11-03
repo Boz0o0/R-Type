@@ -54,7 +54,8 @@ digits, e.g. `./build/bin/r-type_client 127.0.0.1 4242 Alice FRIENDS`): you
 all join the same private party.
 
 Controls: the arrow keys move and Space shoots, Escape quits. A controller
-works too: left stick, A to shoot, Start to quit.
+works too: left stick, A to shoot, Start to quit. The keys are in
+`game/world/config.json`.
 
 Stop the server with `Ctrl+C`: it tells every client before closing.
 
@@ -62,11 +63,11 @@ Stop the server with `Ctrl+C`: it tells every client before closing.
 
 ```
 .
-├── assets/             # Client sprites, star-field, font and sounds (sources in CREDITS.md)
 ├── cmake/              # CMake helpers (CPM, also used to fetch Ampersand Engine)
 ├── docs/
 │   ├── doxygen/        # Doxygen output (generated, not committed)
 │   └── mkdocs/         # MkDocs documentation
+├── game/               # Client data: assets (sources in CREDITS.md), Lua scripts, JSON config, scene and prefabs
 ├── include/rtype/      # Headers (client, common, server)
 ├── src/
 │   ├── client/         # Game client
