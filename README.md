@@ -67,6 +67,9 @@ With a party code (1 to 8 letters and digits, e.g.
 menu and joins the private room of this code at once (opened if there is
 none yet): give everyone the same code to play together.
 
+Controls: the arrow keys move and Space shoots, Escape quits. A controller
+works too: left stick, A to shoot, Start to quit.
+
 Stop the server with `Ctrl+C`: it tells every client before closing.
 
 ## Project structure

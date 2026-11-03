@@ -1,57 +1,47 @@
 #pragma once
 
 #include <ampersand/input/Event.hpp>
-#include <array>
+#include <ampersand/input/resources/InputManager.hpp>
 #include <cstdint>
-#include <rtype/common/protocol/Protocol.hpp>
-#include <set>
+#include <string_view>
 
 namespace rtype::client {
 
-/** @brief The keys of the game: the arrows move the ship, Space shoots. */
+/** @brief The input actions of the player, and the input they send. */
 class Controls {
  public:
+  /** @brief Axis: right arrow or stick right is 1, left is -1. */
+  static constexpr std::string_view HORIZONTAL = "Horizontal";
+  /** @brief Axis: up arrow or stick up is 1, down is -1. */
+  static constexpr std::string_view VERTICAL = "Vertical";
+  /** @brief Button: Space or the A button. */
+  static constexpr std::string_view FIRE = "Fire";
+  /** @brief Button: Escape or the Start button. */
+  static constexpr std::string_view QUIT = "Quit";
+
   /**
-   * @brief Turns the keys held into the input sent to the server.
+   * @brief Declares the actions and their keys and controller buttons.
    *
-   * @param keysDown The keys held this frame.
+   * @param manager InputManager to set up, once before the loop.
+   */
+  static void bind(ampersand::input::InputManager& manager);
+
+  /**
+   * @brief Turns the actions held into the input sent to the server. Two
+   *        opposite directions cancel out.
+   *
+   * @param manager InputManager set up by bind().
    * @return A mask of protocol::InputFlag.
    */
   [[nodiscard]] static std::uint8_t inputMask(
-      const std::set<ampersand::input::KeyCode>& keysDown);
+      const ampersand::input::InputManager& manager);
 
  private:
-  /** @brief A key and the input it gives. */
-  struct Binding {
-    /** @brief The key. */
-    ampersand::input::KeyCode key;
-    /** @brief Its protocol::InputFlag. */
-    std::uint8_t flag;
-  };
-
-  /** @brief Every key of the game. */
-  static constexpr std::array BINDINGS{
-      Binding{
-          .key = ampersand::input::KeyCode::UpArrow,
-          .flag = protocol::InputFlag::MOVE_UP,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::DownArrow,
-          .flag = protocol::InputFlag::MOVE_DOWN,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::LeftArrow,
-          .flag = protocol::InputFlag::MOVE_LEFT,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::RightArrow,
-          .flag = protocol::InputFlag::MOVE_RIGHT,
-      },
-      Binding{
-          .key = ampersand::input::KeyCode::Space,
-          .flag = protocol::InputFlag::SHOOT,
-      },
-  };
+  /** @brief SFML numbers an Xbox pad's A button 0 and its Start button 7. */
+  static constexpr ampersand::input::JoystickButton FIRE_BUTTON =
+      ampersand::input::JoystickButton::Button0;
+  static constexpr ampersand::input::JoystickButton START_BUTTON =
+      ampersand::input::JoystickButton::Button7;
 };
 
 }  // namespace rtype::client

@@ -1,37 +1,25 @@
 #pragma once
 
 #include <ampersand/audio/SfmlAudioEngine.hpp>
-#include <ampersand/audio/systems/AudioSystem.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
-#include <ampersand/input/systems/InputSystem.hpp>
-#include <ampersand/physics/systems/MovementSystem.hpp>
 #include <ampersand/render/Color.hpp>
 #include <ampersand/render/SfmlRenderer.hpp>
-#include <ampersand/render/systems/AnimationSystem.hpp>
-#include <ampersand/render/systems/RenderSystem.hpp>
 #include <cstdint>
 #include <optional>
 #include <rtype/client/ClientConfig.hpp>
-#include <rtype/client/Hud.hpp>
-#include <rtype/client/LobbyMenu.hpp>
 #include <rtype/client/ServerConnection.hpp>
-#include <rtype/client/WorldMirror.hpp>
-#include <rtype/client/systems/ExplosionSystem.hpp>
-#include <rtype/client/systems/ScrollingSystem.hpp>
-#include <rtype/common/protocol/PacketCodec.hpp>
 
 namespace rtype::client {
 
 /**
  * @brief The client program: the window, the connection to the server and
- *        the frame loop.
+ *        the systems run each frame by the engine Scheduler.
  *
- * Each frame reads the keys, updates the ServerConnection, shows the lobby
- * menu or the HUD for its state, mirrors the game packets of the room in the
- * local world, sends the keys held, then runs the systems that move, animate,
- * play and draw the entities.
+ * Each frame reads the inputs, handles quitting, talks to the server (lobby,
+ * room, game packets, our input), then moves, animates, plays and draws the
+ * entities.
  */
 class ClientApp {
  public:
@@ -48,9 +36,9 @@ class ClientApp {
   explicit ClientApp(ClientConfig config);
 
   /**
-   * @brief Opens the window and runs the frame loop until it is closed, then
-   *        tells the server the player quits. If a party code was given, it
-   *        is joined as soon as the lobby is reached.
+   * @brief Opens the window and runs the Scheduler until the window is
+   *        closed, then tells the server the player quits. If a party code
+   *        was given, it is joined as soon as the lobby is reached.
    *
    * @throws std::runtime_error If the window cannot be opened, or if the
    *         connection to the server ended.
@@ -71,80 +59,28 @@ class ClientApp {
       .b = 14,
   };
 
-  /** @brief Longest frame time given to the systems, in seconds, so that a
-   *         frozen window does not make the entities jump. */
-  static constexpr float MAX_FRAME_TIME = 0.1F;
-
-  /**
-   * @brief Handles a key pressed this frame.
-   *
-   * Escape leaves the room, or quits from anywhere else. Once the connection
-   * has ended, any key quits. In the lobby, the keys go to the menu and the
-   * room it asks for is sent.
-   *
-   * @param key The key pressed.
-   * @param menu The lobby menu.
-   * @param windowOpen Set to false to quit.
-   */
-  void onKey(ampersand::input::KeyCode key, LobbyMenu& menu, bool& windowOpen);
-
-  /**
-   * @brief Shows the lobby menu while in the lobby, with the public rooms and
-   *        what is going on (joining, leaving, why a room was refused).
-   *
-   * @param menu The lobby menu.
-   */
-  void showLobby(LobbyMenu& menu) const;
-
   /**
    * @brief Reads the events of the window for the InputSystem.
    *
-   * Closing the window sets Renderer::isOpen to false; the other events the
-   * engine does not use are skipped.
+   * Closing the window sets Renderer::isOpen to false; the other events go
+   * to the InputManager if it knows them (keys, mouse, controllers).
    *
    * @param world The world holding the Renderer resource.
-   * @return The next keyboard, mouse or focus event, if any.
+   * @return The next input event, if any.
    */
   static std::optional<ampersand::input::Event> pollWindow(
       ampersand::core::ecs::World& world);
-
-  /**
-   * @brief Gives a game packet of the room to the HUD and to the mirror of
-   *        the world.
-   *
-   * @param worldMirror The local copy of the entities of the server.
-   * @param hud The HUD.
-   * @param packet A game packet from ServerConnection::takePackets().
-   */
-  static void applyPacket(WorldMirror& worldMirror, Hud& hud,
-                          const protocol::Payload& packet);
 
   /** @brief Options of the command line. */
   ClientConfig _config;
   /** @brief The link with the server. */
   ServerConnection _connection;
-  /** @brief Set once the party code of the command line was sent. */
-  bool _joinedPartyCode{false};
   /** @brief Window and drawing, through SFML. */
   ampersand::render::SfmlRenderer _backend;
   /** @brief Sounds, through SFML. */
   ampersand::audio::SfmlAudioEngine _audioEngine;
   /** @brief Every local entity: starfield, mirrored entities and texts. */
   ampersand::core::ecs::World _world;
-  /** @brief Fills the InputManager from pollWindow(). */
-  ampersand::input::InputSystem _inputSystem;
-  /** @brief Moves the entities by their velocity. */
-  ampersand::physics::MovementSystem _movementSystem;
-  /** @brief Loops the starfield. */
-  ScrollingSystem _scrollingSystem;
-  /** @brief Plays the sprite animations. */
-  ampersand::render::AnimationSystem _animationSystem;
-  /** @brief Removes the explosions once played. */
-  ExplosionSystem _explosionSystem;
-  /** @brief Plays the sounds. */
-  ampersand::audio::AudioSystem _audioSystem;
-  /** @brief Draws the sprites and the texts. */
-  ampersand::render::RenderSystem _renderSystem;
 };
 
 }  // namespace rtype::client
