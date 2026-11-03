@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <rtype/common/Factories.hpp>
+#include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
@@ -25,6 +26,7 @@ using ampersand::core::ecs::Entity;
 using ampersand::physics::Velocity;
 using rtype::common::DeathReason;
 using rtype::common::EntityKind;
+using rtype::common::ShipMovement;
 using namespace rtype::server;
 namespace InputFlag = rtype::protocol::InputFlag;
 
@@ -152,6 +154,21 @@ TEST(Game, KeepsShipsOnTheScreen) {
   EXPECT_FLOAT_EQ(position.x, 0.0F);
   EXPECT_FLOAT_EQ(position.y, 0.0F);
   EXPECT_FLOAT_EQ(game.world().get<Velocity>(ship).value.x, 0.0F);
+}
+
+TEST(Game, StopsShipsAtTheSameEdgesAsThePrediction) {
+  Game game(SEED);
+  game.addPlayer(0);
+  game.setInput(0, InputFlag::MOVE_RIGHT | InputFlag::MOVE_DOWN);
+
+  (void)runFor(game, 6.0F);
+
+  const Entity ship = shipOf(game, 0);
+  const auto& position = game.world().get<Transform>(ship).position;
+  const auto kept = ShipMovement::keepOnScreen({5000.0F, 5000.0F});
+  EXPECT_FLOAT_EQ(position.x, kept.x);
+  EXPECT_FLOAT_EQ(position.y, kept.y);
+  EXPECT_FLOAT_EQ(game.world().get<Velocity>(ship).value.y, 0.0F);
 }
 
 TEST(Game, ShipFiresWhileShootIsHeld) {
