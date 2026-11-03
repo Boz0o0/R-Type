@@ -8,6 +8,7 @@
 #include <ampersand/physics/components/Velocity.hpp>
 #include <optional>
 #include <rtype/common/Factories.hpp>
+#include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Damage.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
@@ -38,7 +39,8 @@ std::optional<Entity> createShip(World& world,
                   });
   world.add(ship, Kind{.kind = EntityKind::Ship});
   world.add(ship, Velocity{});
-  world.add(ship, BoxCollider{.bounds = {0.0F, 0.0F, 64.0F, 32.0F}});
+  world.add(ship, BoxCollider{.bounds = {0.0F, 0.0F, ShipMovement::SIZE.x,
+                                         ShipMovement::SIZE.y}});
   world.add(ship, Health{.current = 3, .max = 3});
   world.add(ship, Team{.side = Side::Players});
   world.add(ship,

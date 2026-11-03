@@ -17,9 +17,11 @@
 #include <rtype/client/LobbyMenu.hpp>
 #include <rtype/client/Starfield.hpp>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/client/systems/CorrectionSystem.hpp>
 #include <rtype/client/systems/ExplosionSystem.hpp>
 #include <rtype/client/systems/LobbySystem.hpp>
 #include <rtype/client/systems/NetworkSystem.hpp>
+#include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
 #include <rtype/client/systems/ScrollingSystem.hpp>
 #include <stdexcept>
@@ -69,7 +71,9 @@ void ClientApp::run() {
   scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
   scheduler.add<LobbySystem>(this->_connection, menu,
                              this->_config.partyCode());
+  scheduler.add<PredictionSystem>();
   scheduler.add<physics::MovementSystem>();
+  scheduler.add<CorrectionSystem>();
   scheduler.add<ScrollingSystem>();
   scheduler.add<render::AnimationSystem>();
   scheduler.add<ExplosionSystem>();

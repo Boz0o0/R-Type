@@ -8,9 +8,12 @@
 #include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <cstdint>
+#include <optional>
 #include <rtype/client/EntityLooks.hpp>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/client/components/Correction.hpp>
 #include <rtype/client/components/Explosion.hpp>
+#include <rtype/client/components/Predicted.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
@@ -26,8 +29,10 @@ using ampersand::core::ecs::World;
 using ampersand::physics::Velocity;
 using ampersand::render::Animation;
 using ampersand::render::Sprite;
+using rtype::client::Correction;
 using rtype::client::EntityLooks;
 using rtype::client::Explosion;
+using rtype::client::Predicted;
 using rtype::client::WorldMirror;
 using rtype::common::DeathReason;
 using rtype::common::EntityKind;
@@ -174,6 +179,83 @@ TEST(WorldMirror, SnapshotMovesKnownEntities) {
   EXPECT_FLOAT_EQ(world.get<Transform>(entity).position.y, 400.0F);
   EXPECT_FLOAT_EQ(world.get<Velocity>(entity).value.x, 0.0F);
   EXPECT_FLOAT_EQ(world.get<Velocity>(entity).value.y, 25.0F);
+}
+
+TEST(WorldMirror, SnapshotSmoothsASmallError) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(7, EntityKind::Enemy));
+
+  mirror.applySnapshot(WorldSnapshot{
+      .serverTick = 10,
+      .entities = {EntityState{.entityId = 7, .x = 110.0F, .y = 195.0F}},
+  });
+
+  const Entity entity = entityOf(mirror, 7);
+  EXPECT_FLOAT_EQ(world.get<Transform>(entity).position.x, 100.0F);
+  EXPECT_FLOAT_EQ(world.get<Correction>(entity).offset.x, 10.0F);
+  EXPECT_FLOAT_EQ(world.get<Correction>(entity).offset.y, -5.0F);
+}
+
+TEST(WorldMirror, PredictsOnlyOurOwnShip) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(2);
+
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+  mirror.spawn(spawnPacket(2, EntityKind::Ship, 3));
+
+  const Entity ours = entityOf(mirror, 1);
+  const Entity theirs = entityOf(mirror, 2);
+  EXPECT_TRUE(world.has<Predicted>(ours));
+  EXPECT_FALSE(world.has<Velocity>(ours));
+  EXPECT_FALSE(world.has<Predicted>(theirs));
+  EXPECT_TRUE(world.has<Velocity>(theirs));
+}
+
+// Each room gives its own player id: in the next room, our old id is someone
+// else's ship.
+TEST(WorldMirror, PredictsTheShipOfOurIdInTheNewRoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(2);
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+
+  mirror.clear();
+  mirror.setLocalPlayer(0);
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+  mirror.spawn(spawnPacket(2, EntityKind::Ship, 0));
+
+  EXPECT_FALSE(world.has<Predicted>(entityOf(mirror, 1)));
+  EXPECT_TRUE(world.has<Predicted>(entityOf(mirror, 2)));
+}
+
+TEST(WorldMirror, PredictsNoShipOutOfARoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(std::nullopt);
+
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 0));
+
+  EXPECT_FALSE(world.has<Predicted>(entityOf(mirror, 1)));
+}
+
+TEST(WorldMirror, SnapshotOnlyRemembersWhereTheServerHasOurShip) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(2);
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+
+  mirror.applySnapshot(WorldSnapshot{
+      .serverTick = 10,
+      .entities = {EntityState{
+          .entityId = 1, .x = 900.0F, .y = 300.0F, .velocityX = 450.0F}},
+  });
+
+  const Entity ship = entityOf(mirror, 1);
+  EXPECT_FLOAT_EQ(world.get<Transform>(ship).position.x, 100.0F);
+  EXPECT_FLOAT_EQ(world.get<Predicted>(ship).serverPosition.x, 900.0F);
+  EXPECT_FLOAT_EQ(world.get<Predicted>(ship).serverVelocity.x, 450.0F);
 }
 
 TEST(WorldMirror, SnapshotSkipsUnknownEntities) {

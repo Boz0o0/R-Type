@@ -35,6 +35,14 @@ class WorldMirror {
   WorldMirror(ampersand::core::ecs::World& world, EntityLooks looks);
 
   /**
+   * @brief Tells which ship is ours: it is predicted (moved from our input)
+   *        instead of following the snapshots. Each room gives its own id.
+   *
+   * @param playerId Our id in the room, or std::nullopt out of a room.
+   */
+  void setLocalPlayer(std::optional<std::uint8_t> playerId);
+
+  /**
    * @brief Creates the local entity of a server entity. Ignored if it
    *        already exists, was already destroyed, or the world is full.
    *
@@ -43,8 +51,10 @@ class WorldMirror {
   void spawn(const protocol::EntitySpawn& packet);
 
   /**
-   * @brief Moves the known entities to their position and velocity in the
-   *        snapshot. Ignored if it is older than the last one applied.
+   * @brief Gives the known entities their velocity in the snapshot, and the
+   *        gap to their position as a Correction, or moves them there if the
+   *        gap is over SNAP_DISTANCE. Our predicted ship only keeps the server
+   *        state. Ignored if it is older than the last one applied.
    *
    * @param packet The WORLD_SNAPSHOT received.
    */
@@ -82,6 +92,9 @@ class WorldMirror {
   /** @brief Layer of the explosions: drawn over the ships and the missiles.
    */
   static constexpr std::int32_t EXPLOSION_LAYER = 1;
+  /** @brief Bigger gaps are jumped (several lost snapshots): smoothing them
+   *         would show the entity flying across the screen. */
+  static constexpr float SNAP_DISTANCE = 128.0F;
 
   /** @brief A server entity and its local copy. */
   struct Mirrored {
@@ -98,6 +111,19 @@ class WorldMirror {
    * @return The sprite and animation to give it.
    */
   [[nodiscard]] const Look& lookFor(const protocol::EntitySpawn& packet) const;
+
+  /** @brief Whether the ENTITY_SPAWN is our own ship. */
+  [[nodiscard]] bool isLocalShip(const protocol::EntitySpawn& packet) const;
+
+  /**
+   * @brief Sets the Correction of an entity toward the server position, or
+   *        moves it there at once if the gap is over SNAP_DISTANCE.
+   *
+   * @param entity A mirrored entity, not predicted.
+   * @param serverPosition Its position in the snapshot.
+   */
+  void correct(ampersand::core::ecs::Entity entity,
+               ampersand::core::math::Vec2f serverPosition);
 
   /**
    * @brief Creates a local entity with a look.
@@ -141,6 +167,8 @@ class WorldMirror {
   std::unordered_set<std::uint32_t> _destroyed;
   /** @brief Server tick of the last snapshot applied. */
   std::uint32_t _lastSnapshotTick{0};
+  /** @brief Our id in the room: its ship is the predicted one. */
+  std::optional<std::uint8_t> _localPlayer;
 };
 
 }  // namespace rtype::client

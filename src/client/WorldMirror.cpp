@@ -8,12 +8,15 @@
 #include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <rtype/client/EntityLooks.hpp>
 #include <rtype/client/WorldMirror.hpp>
+#include <rtype/client/components/Correction.hpp>
 #include <rtype/client/components/Explosion.hpp>
+#include <rtype/client/components/Predicted.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
@@ -30,6 +33,10 @@ namespace render = ampersand::render;
 WorldMirror::WorldMirror(core::ecs::World& world, EntityLooks looks)
     : _world(world), _looks(std::move(looks)) {}
 
+void WorldMirror::setLocalPlayer(std::optional<std::uint8_t> playerId) {
+  this->_localPlayer = playerId;
+}
+
 void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
   if (this->_entities.contains(packet.entityId) ||
       this->_destroyed.contains(packet.entityId)) {
@@ -41,9 +48,18 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
     return;
   }
   const core::ecs::Entity entity = *created;
-  this->_world.add(entity, physics::Velocity{
-                               .value = {packet.velocityX, packet.velocityY},
-                           });
+  this->_world.add(entity, Correction{});
+  if (this->isLocalShip(packet)) {
+    this->_world.add(entity,
+                     Predicted{
+                         .serverPosition = {packet.x, packet.y},
+                         .serverVelocity = {packet.velocityX, packet.velocityY},
+                     });
+  } else {
+    this->_world.add(entity, physics::Velocity{
+                                 .value = {packet.velocityX, packet.velocityY},
+                             });
+  }
   if (packet.entityType == common::EntityKind::PlayerMissile) {
     this->play(entity, this->_looks.shootSound, SHOOT_VOLUME);
   }
@@ -62,9 +78,14 @@ void WorldMirror::applySnapshot(const protocol::WorldSnapshot& packet) {
       continue;
     }
     const core::ecs::Entity entity = found->second.entity;
-    auto& position = this->_world.get<core::Transform>(entity).position;
-    position.x = state.x;
-    position.y = state.y;
+    if (this->_world.has<Predicted>(entity)) {
+      this->_world.get<Predicted>(entity) = Predicted{
+          .serverPosition = {state.x, state.y},
+          .serverVelocity = {state.velocityX, state.velocityY},
+      };
+      continue;
+    }
+    this->correct(entity, {state.x, state.y});
     this->_world.get<physics::Velocity>(entity).value = {state.velocityX,
                                                          state.velocityY};
   }
@@ -127,6 +148,24 @@ const Look& WorldMirror::lookFor(const protocol::EntitySpawn& packet) const {
       break;
   }
   return this->_looks.ships[packet.ownerId % protocol::MAX_PLAYERS];
+}
+
+bool WorldMirror::isLocalShip(const protocol::EntitySpawn& packet) const {
+  return packet.entityType == common::EntityKind::Ship &&
+         this->_localPlayer == packet.ownerId;
+}
+
+// Small errors are smoothed by the CorrectionSystem, big ones are jumped.
+void WorldMirror::correct(core::ecs::Entity entity,
+                          core::math::Vec2f serverPosition) {
+  auto& position = this->_world.get<core::Transform>(entity).position;
+  auto& offset = this->_world.get<Correction>(entity).offset;
+  offset = {serverPosition.x - position.x, serverPosition.y - position.y};
+  if (std::hypot(offset.x, offset.y) > SNAP_DISTANCE) {
+    position.x = serverPosition.x;
+    position.y = serverPosition.y;
+    offset = {};
+  }
 }
 
 std::optional<core::ecs::Entity> WorldMirror::create(

@@ -4,13 +4,13 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/core/resources/Clock.hpp>
-#include <ampersand/physics/components/BoxCollider.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/physics/resources/Collisions.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <rtype/common/Factories.hpp>
+#include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/components/Owner.hpp>
@@ -27,7 +27,7 @@ namespace rtype::server {
 using ampersand::core::Transform;
 using ampersand::core::ecs::Entity;
 using ampersand::core::ecs::World;
-using ampersand::physics::BoxCollider;
+using ampersand::core::math::Vec2f;
 using ampersand::physics::Velocity;
 using common::DeathReason;
 using common::EntityKind;
@@ -207,12 +207,8 @@ void Game::updatePlayers(float deltaTime) {
 }
 
 void Game::steer(Entity ship, std::uint8_t inputMask) {
-  const ampersand::core::math::Vec2f arrows = direction(inputMask);
-  float speed = SHIP_SPEED;
-  if (arrows.x != 0.0F && arrows.y != 0.0F) {
-    speed *= DIAGONAL_FACTOR;
-  }
-  this->_world.get<Velocity>(ship).value = {arrows.x * speed, arrows.y * speed};
+  this->_world.get<Velocity>(ship).value =
+      common::ShipMovement::velocity(inputMask);
   this->_world.get<common::Weapon>(ship).firing =
       (inputMask & InputFlag::SHOOT) != 0;
 }
@@ -237,15 +233,14 @@ void Game::keepShipsOnScreen() {
     const Entity ship = *player->ship;
     auto& position = this->_world.get<Transform>(ship).position;
     auto& velocity = this->_world.get<Velocity>(ship).value;
-    const auto& bounds = this->_world.get<BoxCollider>(ship).bounds;
-    const float maxX = SCREEN_WIDTH - bounds.width;
-    const float maxY = SCREEN_HEIGHT - bounds.height;
-    if (position.x < 0.0F || position.x > maxX) {
-      position.x = std::clamp(position.x, 0.0F, maxX);
+    const Vec2f kept =
+        common::ShipMovement::keepOnScreen({position.x, position.y});
+    if (kept.x != position.x) {
+      position.x = kept.x;
       velocity.x = 0.0F;
     }
-    if (position.y < 0.0F || position.y > maxY) {
-      position.y = std::clamp(position.y, 0.0F, maxY);
+    if (kept.y != position.y) {
+      position.y = kept.y;
       velocity.y = 0.0F;
     }
   }
@@ -350,14 +345,6 @@ bool Game::isDying(Entity entity) {
   return std::ranges::any_of(
       this->_world.getResource<common::Deaths>().entities,
       [entity](const common::Death& death) { return death.entity == entity; });
-}
-
-ampersand::core::math::Vec2f Game::direction(std::uint8_t inputMask) {
-  const auto held = [inputMask](std::uint8_t key) {
-    return (inputMask & key) != 0 ? 1.0F : 0.0F;
-  };
-  return {held(InputFlag::MOVE_RIGHT) - held(InputFlag::MOVE_LEFT),
-          held(InputFlag::MOVE_DOWN) - held(InputFlag::MOVE_UP)};
 }
 
 bool Game::hasPlayers() const noexcept {
