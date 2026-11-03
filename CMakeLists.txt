@@ -37,6 +37,20 @@ CPMAddPackage(
     GITHUB_REPOSITORY Boz0o0/Ampersand-Engine
     GIT_TAG v${AMPERSAND_ENGINE_VERSION}
 )
+CPMAddPackage(
+    NAME sqlite3
+    URL https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip
+    DOWNLOAD_ONLY YES
+)
+add_library(sqlite3 STATIC ${sqlite3_SOURCE_DIR}/sqlite3.c)
+target_include_directories(sqlite3 SYSTEM PUBLIC ${sqlite3_SOURCE_DIR})
+
+CPMAddPackage(NAME monocypher
+  GITHUB_REPOSITORY LoupVaillant/Monocypher
+  GIT_TAG 4.0.2
+  DOWNLOAD_ONLY YES)
+add_library(monocypher STATIC ${monocypher_SOURCE_DIR}/src/monocypher.c)
+target_include_directories(monocypher SYSTEM PUBLIC ${monocypher_SOURCE_DIR}/src)
 
 add_subdirectory(src)
 
