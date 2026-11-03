@@ -32,7 +32,8 @@ We also looked at one game thread plus one thread per client. With UDP it does n
 | Entities and components         | sparse set ECS, one row per entity                            | see the [engine decisions](https://boz0o0.github.io/Ampersand-Engine/decisions/) |
 | Deaths during a tick            | a `Deaths` list, destroyed at the end of the tick             | no system destroys an entity another one is using            |
 | Packets between threads         | a list behind a mutex, swapped once per tick, 4096 max        | the lock is held only for a push or a swap; a flood cannot fill the memory |
-| Party of each client            | a hash map (IP + port -> party), only touched by the lobby    | no lock needed; the parties send their changes through a queue |
+| Clients and their party         | a hash map (IP + port -> name, party), only touched by the lobby | no lock needed; the parties send their changes through a queue |
+| Code of a private room          | a hash map (code -> party); `ROOM_CREATE` draws 6 digits until one is free | digits can be typed the same way on every keyboard layout |
 | Time                            | fixed tick of 1/60 s, at most 10 late ticks caught up         | same game on every CPU; no burst of ticks after a pause      |
 | Collisions                      | every pair is tested (engine)                                 | simplest, and fast enough for a few hundred entities         |
 | Players                         | an array of 4 sessions, the index is the player id            | a free id is an empty slot                                   |
@@ -48,6 +49,8 @@ Nothing is saved for now: no score, no save.
 | Datagram too big               | yes     | more than 1200 bytes: dropped                        |
 | Flood of packets               | yes     | at most 4096 packets wait for the game, more are dropped |
 | Packet from an unknown address | yes     | only `CONNECT_REQUEST` is accepted                   |
+| Too many clients or rooms      | yes     | 256 clients and 16 rooms at most, silent clients of the lobby dropped after 5 s |
+| Room list used to flood someone | yes    | at most one `ROOM_LIST_REPLY` every 250 ms per client |
 | Bug in one tick                | yes     | logged, and the server keeps running                 |
 | Someone reads the packets      | no      | nothing is encrypted                                 |
 | Fake sender address            | no      | UDP does not check who sends a packet                |

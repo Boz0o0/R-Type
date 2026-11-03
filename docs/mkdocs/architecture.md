@@ -43,7 +43,7 @@ Several parties run at once, each on its own thread (details in
 | Thread             | Class           | Does                                                               |
 | ------------------ | --------------- | ------------------------------------------------------------------ |
 | Network            | `ServerNetwork` | reads every datagram, decodes it, queues the valid packets         |
-| Lobby (main)       | `Lobby`         | gives each packet to the party of its sender, opens and closes the parties |
+| Lobby (main)       | `Lobby`         | answers the clients in no party (room list, create, join), gives each other packet to the party of its sender, opens and closes the parties |
 | One per party      | `GameServer`    | 60 ticks per second: handles its packets, updates its `World`, sends a snapshot 30 times per second |
 
 The threads only share the socket (behind a mutex) and bounded
@@ -96,35 +96,49 @@ animation uses the `Clock`, so the game runs at the same speed on any
 computer, whatever its frame rate.
 
 1. `InputSystem` (engine): reads the keyboard, the mouse and the controllers.
-2. `QuitSystem`: closes the window on `Quit`, or on any key or button once the
-   connection has ended.
+2. `QuitSystem`: on `Quit` (Escape or Start), goes back to the lobby when in
+   a room, and quits anywhere else. Once the connection has ended, any key or
+   button quits.
 3. `NetworkSystem`:
     - `ServerConnection` connects to the server, sends a `PING` every second,
-      acknowledges the reliable packets and drops their copies, then hands
-      out the game packets it received;
-    - `Hud` shows the connection state, our health, lives and score, who
-      joined or left, and the result of the game;
+      asks for the room list in the lobby, sends the room requests until they
+      are answered, acknowledges the reliable packets and drops their copies,
+      then hands out the game packets of the room;
+    - `Hud`, in a room, shows our player and the room (or its code, to give
+      to friends), our health, lives and score, who joined or left, and the
+      result of the game;
     - `WorldMirror` applies the game packets to the local `World`. It keeps
       one entity per server entity, created from the prefab of its kind (each
-      ship has the colour of its player), and leaves an explosion where a ship
-      or an enemy is killed;
+      ship has the colour of its player, our shots have their sound), and
+      leaves an explosion where a ship or an enemy is killed. It is emptied
+      each time `ServerConnection::roomGeneration()` changes (we enter or
+      leave a room): each room numbers its entities from the start;
     - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server.
-4. `PredictionSystem`: moves our own ship from our input right away (see
+4. `LobbySystem`, out of a room: shows the `LobbyMenu` (quick match, create a
+   public or a private room, join with a code typed with the digits) and the
+   public rooms, chosen with the arrows and Enter, and sends the room asked
+   for. The engine gives the keys by their QWERTY position, not the character
+   typed (on AZERTY, Z is `KeyCode::W` and M is no key), so only the digits,
+   which are the same on every layout, can be typed; the server makes codes of
+   digits. With a party code on the command line (letters allowed), the
+   client joins that room at once instead.
+5. `PredictionSystem`: moves our own ship from our input right away (see
    below).
-5. `MovementSystem` (engine): moves the other entities with their speed
+6. `MovementSystem` (engine): moves the other entities with their speed
    between two snapshots, and the star-field layers.
-6. `CorrectionSystem`: slides each entity a bit toward where the server says
+7. `CorrectionSystem`: slides each entity a bit toward where the server says
    it is (see below).
-7. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
+8. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
    star field has one, `scroll.lua`: once a copy has fully left the screen on
    the left, it goes back behind the other copy, so the background never ends.
-8. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
+9. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
    that script off, and the game goes on.
-9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
-   remove an explosion once its animation and its sound are over.
-10. `AudioSystem` (engine): plays the sounds.
-11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
-    the HUD on top. The game area is 1920x1080, scaled to fit the window.
+10. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+    remove an explosion once its animation and its sound are over.
+11. `AudioSystem` (engine): plays the sounds.
+12. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+    the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
+    fit the window.
 
 Lua only drives what is seen: the server stays the only one to decide where
 the entities are, so nothing of the game itself is in a script.
@@ -145,7 +159,9 @@ not exactly every 33 ms. Drawing them as they come makes everything jump, so:
   same rule as the server (`common::ShipMovement`: speed, diagonals, screen
   edges). While it moves, the server's position is always a bit behind, so it
   is ignored. Once both our input and the server's ship have stopped, the ship
-  slides to the server's position, which fixes any small drift.
+  slides to the server's position, which fixes any small drift. Our ship is the
+  one with our player id, which each room gives on `ROOM_JOINED`: out of a
+  room, no ship is ours.
 
 If the server refuses the client, does not answer, or goes silent for 5
 seconds, the HUD shows why and waits: the next key or button pressed stops the
