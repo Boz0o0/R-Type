@@ -52,9 +52,9 @@ class Game {
     Over,
   };
 
-  /** @brief Size of the screen, in world units. */
-  static constexpr float SCREEN_WIDTH = 1920.0F;
-  static constexpr float SCREEN_HEIGHT = 1080.0F;
+  /** @brief Size of the screen, in world units (shared with the client). */
+  static constexpr float SCREEN_WIDTH = common::ShipMovement::SCREEN.x;
+  static constexpr float SCREEN_HEIGHT = common::ShipMovement::SCREEN.y;
   /** @brief World units per second of a ship. */
   static constexpr float SHIP_SPEED = common::ShipMovement::SPEED;
   /** @brief x of a ship when it appears. */

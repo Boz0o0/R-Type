@@ -4,7 +4,6 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/core/resources/Clock.hpp>
-#include <ampersand/physics/components/BoxCollider.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/physics/resources/Collisions.hpp>
 #include <cstddef>
@@ -28,7 +27,7 @@ namespace rtype::server {
 using ampersand::core::Transform;
 using ampersand::core::ecs::Entity;
 using ampersand::core::ecs::World;
-using ampersand::physics::BoxCollider;
+using ampersand::core::math::Vec2f;
 using ampersand::physics::Velocity;
 using common::DeathReason;
 using common::EntityKind;
@@ -234,15 +233,14 @@ void Game::keepShipsOnScreen() {
     const Entity ship = *player->ship;
     auto& position = this->_world.get<Transform>(ship).position;
     auto& velocity = this->_world.get<Velocity>(ship).value;
-    const auto& bounds = this->_world.get<BoxCollider>(ship).bounds;
-    const float maxX = SCREEN_WIDTH - bounds.width;
-    const float maxY = SCREEN_HEIGHT - bounds.height;
-    if (position.x < 0.0F || position.x > maxX) {
-      position.x = std::clamp(position.x, 0.0F, maxX);
+    const Vec2f kept =
+        common::ShipMovement::keepOnScreen({position.x, position.y});
+    if (kept.x != position.x) {
+      position.x = kept.x;
       velocity.x = 0.0F;
     }
-    if (position.y < 0.0F || position.y > maxY) {
-      position.y = std::clamp(position.y, 0.0F, maxY);
+    if (kept.y != position.y) {
+      position.y = kept.y;
       velocity.y = 0.0F;
     }
   }
