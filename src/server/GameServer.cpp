@@ -27,12 +27,30 @@ using ampersand::net::Endpoint;
 GameServer::GameServer(ServerNetwork& network, std::uint32_t seed,
                        PartyLink link)
     : _network(network),
+      _partyId(link.id),
+      _code(std::move(link.code)),
       _logPrefix("[party " + std::to_string(link.id) + "] "),
       _listener(std::move(link.listener)),
       _game(seed) {}
 
 bool GameServer::push(IncomingMessage message) {
   return this->_inbox.push(std::move(message));
+}
+
+bool GameServer::admit(const Endpoint& endpoint, std::string name,
+                       std::uint8_t requestId) {
+  return this->_inbox.push(Admission{
+      .endpoint = endpoint,
+      .name = std::move(name),
+      .requestId = requestId,
+  });
+}
+
+void GameServer::sendDisconnect(ServerNetwork& network, const Endpoint& target,
+                                protocol::DisconnectReason reason) {
+  for (std::uint32_t attempt = 0; attempt < DISCONNECT_REPEAT; ++attempt) {
+    network.send(protocol::Disconnect{.reason = reason}, target);
+  }
 }
 
 void GameServer::run(const std::stop_token& stopToken) {
@@ -77,25 +95,24 @@ std::size_t GameServer::playerCount() const noexcept {
 Game& GameServer::game() noexcept { return this->_game; }
 
 void GameServer::handleMessages(Clock::time_point now) {
-  for (const IncomingMessage& message : this->_inbox.drain()) {
-    this->handleMessage(message, now);
+  for (const PartyMessage& message : this->_inbox.drain()) {
+    if (const auto* admission = std::get_if<Admission>(&message)) {
+      this->acceptPlayer(*admission, now);
+    } else {
+      this->handleMessage(std::get<IncomingMessage>(message), now);
+    }
   }
 }
 
 void GameServer::handleMessage(const IncomingMessage& message,
                                Clock::time_point now) {
-  const protocol::Payload& payload = message.packet.payload;
-  if (const auto* request = std::get_if<protocol::ConnectRequest>(&payload)) {
-    this->acceptPlayer(message.from, request->playerName, now);
-    return;
-  }
-
   ClientSession* const session = this->findSession(message.from);
   if (session == nullptr) {
-    return;  // only CONNECT_REQUEST is accepted from an unknown address
+    return;  // only the Lobby adds clients, with admit()
   }
   session->lastSeen = now;
 
+  const protocol::Payload& payload = message.packet.payload;
   if (const auto* input = std::get_if<protocol::PlayerInput>(&payload)) {
     this->handleInput(*session, *input);
   } else if (const auto* ack = std::get_if<protocol::Ack>(&payload)) {
@@ -106,6 +123,22 @@ void GameServer::handleMessage(const IncomingMessage& message,
   } else if (std::holds_alternative<protocol::Disconnect>(payload)) {
     this->removePlayer(session->playerId, protocol::DisconnectReason::Quit,
                        now);
+  } else if (std::holds_alternative<protocol::RoomLeave>(payload)) {
+    this->removePlayer(session->playerId, protocol::DisconnectReason::Quit, now,
+                       SessionChange::Returned);
+  } else if (const auto* join = std::get_if<protocol::RoomJoin>(&payload)) {
+    this->handleRoomRequest(*session, join->requestId, now);
+  } else if (const auto* create = std::get_if<protocol::RoomCreate>(&payload)) {
+    this->handleRoomRequest(*session, create->requestId, now);
+  }
+}
+
+void GameServer::handleRoomRequest(ClientSession& session,
+                                   std::uint8_t requestId,
+                                   Clock::time_point now) {
+  if (protocol::isNewerRequest(requestId, session.requestId)) {
+    this->removePlayer(session.playerId, protocol::DisconnectReason::Quit, now,
+                       SessionChange::Returned);
   }
 }
 
@@ -118,19 +151,17 @@ void GameServer::handleInput(ClientSession& session,
   this->_game.setInput(session.playerId, input.inputMask);
 }
 
-void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
+void GameServer::acceptPlayer(const Admission& admission,
                               Clock::time_point now) {
+  const Endpoint& from = admission.endpoint;
+  const std::string& name = admission.name;
   if (ClientSession* const known = this->findSession(from)) {
+    // Already here: its ROOM_JOINED is sent again until acknowledged.
     known->lastSeen = now;
-    this->sendTo(*known, protocol::ConnectAccept{.playerId = known->playerId},
-                 now);
     return;
   }
   if (!isValidName(name)) {
-    this->_network.send(
-        protocol::ConnectReject{.reason = protocol::RejectReason::InvalidName},
-        from);
-    this->notify(from, SessionChange::Left);
+    this->refuse(admission, protocol::RejectReason::InvalidName);
     return;
   }
 
@@ -145,11 +176,12 @@ void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
         .endpoint = from,
         .name = name,
         .lastSeen = now,
+        .requestId = admission.requestId,
     };
     logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
             " (", name, ") joined from ", from.toString());
     this->notify(from, SessionChange::Joined);
-    this->sendTo(*session, protocol::ConnectAccept{.playerId = playerId}, now);
+    this->sendTo(*session, this->joinedPacket(*session), now);
     this->welcome(*session, now);
     for (auto& other : this->_sessions) {
       if (other && other->playerId != playerId) {
@@ -162,10 +194,25 @@ void GameServer::acceptPlayer(const Endpoint& from, const std::string& name,
     this->_game.addPlayer(playerId);
     return;
   }
+  this->refuse(admission, protocol::RejectReason::PartyFull);
+}
+
+void GameServer::refuse(const Admission& admission,
+                        protocol::RejectReason reason) {
   this->_network.send(
-      protocol::ConnectReject{.reason = protocol::RejectReason::ServerFull},
-      from);
-  this->notify(from, SessionChange::Left);
+      protocol::RoomReject{.requestId = admission.requestId, .reason = reason},
+      admission.endpoint);
+  this->notify(admission.endpoint, SessionChange::Returned);
+}
+
+protocol::RoomJoined GameServer::joinedPacket(
+    const ClientSession& session) const {
+  return protocol::RoomJoined{
+      .requestId = session.requestId,
+      .roomId = this->_partyId,
+      .playerId = session.playerId,
+      .code = this->_code,
+  };
 }
 
 void GameServer::welcome(ClientSession& session, Clock::time_point now) {
@@ -192,16 +239,17 @@ void GameServer::welcome(ClientSession& session, Clock::time_point now) {
 
 void GameServer::removePlayer(std::uint8_t playerId,
                               protocol::DisconnectReason reason,
-                              Clock::time_point now) {
+                              Clock::time_point now, SessionChange change) {
   auto& session = this->_sessions[playerId];
   if (!session) {
     return;
   }
   logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
-          " (", session->name, ") left: ", toString(reason));
+          " (", session->name, ") left: ", toString(reason),
+          change == SessionChange::Returned ? ", back to the lobby" : "");
   const Endpoint endpoint = session->endpoint;
   session.reset();
-  this->notify(endpoint, SessionChange::Left);
+  this->notify(endpoint, change);
   this->_game.removePlayer(playerId);
   this->broadcast(protocol::PlayerLeft{.playerId = playerId, .reason = reason},
                   now);
@@ -284,13 +332,8 @@ void GameServer::shutdown() {
     if (!session) {
       continue;
     }
-    for (std::uint32_t attempt = 0; attempt < DISCONNECT_REPEAT; ++attempt) {
-      this->_network.send(
-          protocol::Disconnect{
-              .reason = protocol::DisconnectReason::ServerShutdown,
-          },
-          session->endpoint);
-    }
+    sendDisconnect(this->_network, session->endpoint,
+                   protocol::DisconnectReason::ServerShutdown);
     logLine(std::cout, this->_logPrefix, "player ", static_cast<int>(playerId),
             " (", session->name,
             ") left: ", toString(protocol::DisconnectReason::ServerShutdown));

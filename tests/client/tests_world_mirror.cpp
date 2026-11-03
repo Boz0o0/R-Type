@@ -353,3 +353,26 @@ TEST(WorldMirror, KilledEnemyInAFullWorldJustDisappears) {
   EXPECT_TRUE(world.owners<Explosion>().empty());
   EXPECT_EQ(mirror.size(), 0U);
 }
+
+// Each room numbers its entities and ticks from the start: after clear(), the
+// ids and ticks of the old room do not get in the way.
+TEST(WorldMirror, ClearForgetsTheOldRoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(1, EntityKind::Enemy));
+  const Entity old = entityOf(mirror, 1);
+  mirror.destroy(EntityDestroy{.entityId = 2, .reason = DeathReason::Killed});
+  mirror.applySnapshot(WorldSnapshot{.serverTick = 500, .entities = {}});
+
+  mirror.clear();
+
+  EXPECT_EQ(mirror.size(), 0U);
+  EXPECT_FALSE(world.alive(old));
+  mirror.spawn(spawnPacket(2, EntityKind::Enemy));
+  ASSERT_TRUE(mirror.find(2).has_value());
+  mirror.applySnapshot(WorldSnapshot{
+      .serverTick = 3,
+      .entities = {EntityState{.entityId = 2, .x = 300.0F}},
+  });
+  EXPECT_FLOAT_EQ(positionX(world, mirror, 2), 300.0F);
+}
