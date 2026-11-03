@@ -5,16 +5,20 @@
 #include <ampersand/render/resources/ClearColor.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <rtype/client/AssetLoader.hpp>
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Controls.hpp>
 #include <rtype/client/Hud.hpp>
+#include <rtype/client/LobbyMenu.hpp>
+#include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/Starfield.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <variant>
 
@@ -25,10 +29,13 @@ namespace core = ampersand::core;
 namespace input = ampersand::input;
 namespace render = ampersand::render;
 
+using State = ServerConnection::State;
+
 ClientApp::ClientApp(ClientConfig config)
     : _config(std::move(config)),
       _connection(this->_config.host(), this->_config.port(),
-                  this->_config.name(), this->_config.partyCode()),
+                  this->_config.name()),
+      _joinedPartyCode(this->_config.partyCode().empty()),
       _inputSystem(pollWindow) {}
 
 void ClientApp::run() {
@@ -53,9 +60,10 @@ void ClientApp::run() {
   Starfield::spawn(this->_world, assets.starfield);
   WorldMirror worldMirror(this->_world, assets.looks);
   Hud hud(this->_world, assets.font);
+  LobbyMenu menu(this->_world, assets.font);
 
   auto previous = std::chrono::steady_clock::now();
-  bool ended = false;
+  std::uint32_t mirroredRoom = this->_connection.roomGeneration();
   while (window.isOpen) {
     const auto now = std::chrono::steady_clock::now();
     clock.dt = std::min(std::chrono::duration<float>(now - previous).count(),
@@ -64,13 +72,24 @@ void ClientApp::run() {
     previous = now;
 
     this->_inputSystem.update(this->_world);
-    if (keys.getKey(input::KeyCode::Escape) || (ended && pressedAKey(keys))) {
-      window.isOpen = false;
+    for (const input::KeyCode key : keys.keysPressed()) {
+      this->onKey(key, menu, window.isOpen);
     }
     this->_connection.update(now);
-    hud.showConnection(this->_connection.state(), this->_connection.playerId(),
+    const State state = this->_connection.state();
+    if (!this->_joinedPartyCode && state == State::InLobby) {
+      this->_connection.enterRoom(
+          protocol::RoomJoin{.roomId = 0, .code = this->_config.partyCode()});
+      this->_joinedPartyCode = true;
+    }
+    if (this->_connection.roomGeneration() != mirroredRoom) {
+      // Entered or left a room: each room numbers its entities from the start.
+      worldMirror.clear();
+      mirroredRoom = this->_connection.roomGeneration();
+    }
+    hud.showConnection(state, this->_connection.room(),
                        this->_connection.rejectReason());
-    ended = this->_connection.hasEnded();
+    this->showLobby(menu);
     for (const protocol::Payload& packet : this->_connection.takePackets()) {
       applyPacket(worldMirror, hud, packet);
     }
@@ -89,8 +108,37 @@ void ClientApp::run() {
   this->_connection.disconnect();
 }
 
-bool ClientApp::pressedAKey(const input::InputManager& keys) {
-  return !keys.keysPressed().empty();
+void ClientApp::onKey(input::KeyCode key, LobbyMenu& menu, bool& windowOpen) {
+  const State state = this->_connection.state();
+  if (this->_connection.hasEnded()) {
+    windowOpen = false;
+  } else if (key == input::KeyCode::Escape) {
+    if (state == State::InRoom) {
+      this->_connection.leaveRoom();
+    } else {
+      windowOpen = false;
+    }
+  } else if (state == State::InLobby) {
+    if (const auto request = menu.press(key)) {
+      this->_connection.enterRoom(*request);
+    }
+  }
+}
+
+void ClientApp::showLobby(LobbyMenu& menu) const {
+  const State state = this->_connection.state();
+  menu.show(state == State::InLobby || state == State::Joining ||
+            state == State::Leaving);
+  menu.setRooms(this->_connection.rooms());
+  if (state == State::Joining) {
+    menu.setMessage("Joining...");
+  } else if (state == State::Leaving) {
+    menu.setMessage("Leaving the room...");
+  } else if (const auto reason = this->_connection.roomRejectReason()) {
+    menu.setMessage(Hud::rejectText(reason));
+  } else {
+    menu.setMessage({});
+  }
 }
 
 void ClientApp::applyPacket(WorldMirror& worldMirror, Hud& hud,
