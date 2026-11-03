@@ -27,7 +27,10 @@ class ClientConfig {
   [[nodiscard]] std::uint16_t port() const;
   /** @brief Name of the player. */
   [[nodiscard]] const std::string& name() const;
-  /** @brief Code of the private party to join; empty for any public party. */
+  /**
+   * @brief Code of the private room to join as soon as the client is in the
+   *        lobby; empty to choose a room in the lobby menu.
+   */
   [[nodiscard]] const std::string& partyCode() const;
   /** @brief assets/ next to the binary, found from the first argument. */
   [[nodiscard]] const std::filesystem::path& assetsDirectory() const;

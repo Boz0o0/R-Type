@@ -13,16 +13,20 @@ namespace rtype::client {
 
 NetworkSystem::NetworkSystem(ServerConnection& connection,
                              WorldMirror& worldMirror, Hud& hud)
-    : _connection(connection), _worldMirror(worldMirror), _hud(hud) {}
+    : _connection(connection),
+      _worldMirror(worldMirror),
+      _hud(hud),
+      _mirroredRoom(connection.roomGeneration()) {}
 
 void NetworkSystem::update(ampersand::core::ecs::World& world) {
   this->_connection.update(ServerConnection::Clock::now());
-  this->_hud.showConnection(this->_connection.state(),
-                            this->_connection.playerId(),
-                            this->_connection.rejectReason());
-  if (const auto playerId = this->_connection.playerId()) {
-    this->_worldMirror.setLocalPlayer(*playerId);
+  if (this->_connection.roomGeneration() != this->_mirroredRoom) {
+    this->_worldMirror.clear();
+    this->_mirroredRoom = this->_connection.roomGeneration();
   }
+  this->_hud.showConnection(this->_connection.state(), this->_connection.room(),
+                            this->_connection.rejectReason());
+  this->_worldMirror.setLocalPlayer(this->_connection.playerId());
   for (const protocol::Payload& packet : this->_connection.takePackets()) {
     applyPacket(this->_worldMirror, this->_hud, packet);
   }

@@ -14,7 +14,6 @@
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <thread>
-#include <variant>
 
 #include "FakeServer.hpp"
 
@@ -28,42 +27,59 @@ using rtype::client::Hud;
 using rtype::client::NetworkSystem;
 using rtype::client::ServerConnection;
 using rtype::client::WorldMirror;
-using rtype::client::test::connectToServer;
+using rtype::client::test::enterRoom;
 using rtype::client::test::FakeServer;
+using rtype::client::test::JOINED_SEQUENCE;
 using rtype::common::EntityKind;
 namespace protocol = rtype::protocol;
 
-TEST(NetworkSystem, MirrorsTheServerAndSendsTheInput) {
-  FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
-  connectToServer(server, connection);
-  World world;
-  auto& manager = world.addResource<InputManager>();
-  Controls::bind(manager);
-  manager.beginFrame();
-  manager.apply(KeyPressed{.key = KeyCode::Space});
-  WorldMirror worldMirror(world, EntityLooks{});
-  Hud hud(world, 0);
-  NetworkSystem system(connection, worldMirror, hud);
-
-  server.send(
-      protocol::EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy}, 5);
-  const auto deadline =
-      std::chrono::steady_clock::now() + std::chrono::seconds(1);
-  while (worldMirror.size() == 0 &&
-         std::chrono::steady_clock::now() < deadline) {
-    system.update(world);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+// Our client in room 3, holding Space, with an enemy sent by the room.
+class NetworkSystemTest : public testing::Test {
+ protected:
+  void SetUp() override {
+    enterRoom(this->server, this->connection);
+    auto& manager = this->world.addResource<InputManager>();
+    Controls::bind(manager);
+    manager.beginFrame();
+    manager.apply(KeyPressed{.key = KeyCode::Space});
+    this->server.send(
+        protocol::EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy},
+        JOINED_SEQUENCE + 1);
   }
 
-  EXPECT_TRUE(worldMirror.find(7).has_value());
-  bool sentShoot = false;
-  for (int packets = 0; packets < 10 && !sentShoot; ++packets) {
-    const protocol::Packet packet = server.receive();
-    if (const auto* input =
-            std::get_if<protocol::PlayerInput>(&packet.payload)) {
-      sentShoot = input->inputMask == protocol::InputFlag::SHOOT;
+  void updateUntilMirrored() {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (this->worldMirror.size() == 0 &&
+           std::chrono::steady_clock::now() < deadline) {
+      this->system.update(this->world);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
-  EXPECT_TRUE(sentShoot);
+
+  FakeServer server;
+  ServerConnection connection{"127.0.0.1", this->server.socket.localPort(),
+                              "Bob"};
+  World world;
+  WorldMirror worldMirror{this->world, EntityLooks{}};
+  Hud hud{this->world, 0};
+  NetworkSystem system{this->connection, this->worldMirror, this->hud};
+};
+
+TEST_F(NetworkSystemTest, MirrorsTheRoomAndSendsTheInput) {
+  this->updateUntilMirrored();
+
+  EXPECT_TRUE(this->worldMirror.find(7).has_value());
+  EXPECT_EQ(this->server.receive<protocol::PlayerInput>().inputMask,
+            protocol::InputFlag::SHOOT);
+}
+
+TEST_F(NetworkSystemTest, StartsANewMirrorWhenWeLeaveTheRoom) {
+  this->updateUntilMirrored();
+  ASSERT_EQ(this->worldMirror.size(), 1U);
+
+  this->connection.leaveRoom();
+  this->system.update(this->world);
+
+  EXPECT_EQ(this->worldMirror.size(), 0U);
 }

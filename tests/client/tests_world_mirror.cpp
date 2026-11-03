@@ -8,6 +8,7 @@
 #include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <cstdint>
+#include <optional>
 #include <rtype/client/EntityLooks.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/components/Correction.hpp>
@@ -212,6 +213,33 @@ TEST(WorldMirror, PredictsOnlyOurOwnShip) {
   EXPECT_TRUE(world.has<Velocity>(theirs));
 }
 
+// Each room gives its own player id: in the next room, our old id is someone
+// else's ship.
+TEST(WorldMirror, PredictsTheShipOfOurIdInTheNewRoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(2);
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+
+  mirror.clear();
+  mirror.setLocalPlayer(0);
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 2));
+  mirror.spawn(spawnPacket(2, EntityKind::Ship, 0));
+
+  EXPECT_FALSE(world.has<Predicted>(entityOf(mirror, 1)));
+  EXPECT_TRUE(world.has<Predicted>(entityOf(mirror, 2)));
+}
+
+TEST(WorldMirror, PredictsNoShipOutOfARoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.setLocalPlayer(std::nullopt);
+
+  mirror.spawn(spawnPacket(1, EntityKind::Ship, 0));
+
+  EXPECT_FALSE(world.has<Predicted>(entityOf(mirror, 1)));
+}
+
 TEST(WorldMirror, SnapshotOnlyRemembersWhereTheServerHasOurShip) {
   World world;
   WorldMirror mirror(world, testLooks());
@@ -406,4 +434,27 @@ TEST(WorldMirror, KilledEnemyInAFullWorldJustDisappears) {
 
   EXPECT_TRUE(world.owners<Explosion>().empty());
   EXPECT_EQ(mirror.size(), 0U);
+}
+
+// Each room numbers its entities and ticks from the start: after clear(), the
+// ids and ticks of the old room do not get in the way.
+TEST(WorldMirror, ClearForgetsTheOldRoom) {
+  World world;
+  WorldMirror mirror(world, testLooks());
+  mirror.spawn(spawnPacket(1, EntityKind::Enemy));
+  const Entity old = entityOf(mirror, 1);
+  mirror.destroy(EntityDestroy{.entityId = 2, .reason = DeathReason::Killed});
+  mirror.applySnapshot(WorldSnapshot{.serverTick = 500, .entities = {}});
+
+  mirror.clear();
+
+  EXPECT_EQ(mirror.size(), 0U);
+  EXPECT_FALSE(world.alive(old));
+  mirror.spawn(spawnPacket(2, EntityKind::Enemy));
+  ASSERT_TRUE(mirror.find(2).has_value());
+  mirror.applySnapshot(WorldSnapshot{
+      .serverTick = 3,
+      .entities = {EntityState{.entityId = 2, .x = 300.0F}},
+  });
+  EXPECT_FLOAT_EQ(positionX(world, mirror, 2), 300.0F);
 }

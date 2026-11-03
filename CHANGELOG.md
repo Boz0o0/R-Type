@@ -30,13 +30,20 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: controllers: the left stick moves, A shoots and Start quits.
 - **Client**: smooth movement. Our own ship is predicted: it moves as soon as a key is pressed, then slides to the server's position once both have stopped. The other entities slide toward each snapshot instead of jumping to it.
 - **Common**: `ShipMovement`, the speed, diagonals and screen edges of a ship, shared by the server and the client's prediction.
+- **Server**: a lobby. A new client enters the lobby, sees the public rooms, and creates one (public, or private with a code of 6 digits made by the server) or joins one (from the list, with a code, or with a quick match). It can leave its room to go back to the lobby. Clients of the lobby are dropped after 5 s of silence; 256 clients at most.
+- **Protocol**: lobby packets (protocol version 3): `ROOM_LIST`, `ROOM_CREATE`, `ROOM_JOIN`, `ROOM_LEAVE` from the client, `ROOM_LIST_REPLY`, `ROOM_JOINED`, `ROOM_REJECT`, `ROOM_LEFT` from the server, and the reject reason `room not found`. `ROOM_CREATE` and `ROOM_JOIN` carry a `requestId`, sent back in `ROOM_JOINED` and `ROOM_REJECT`.
+- **Protocol**: late packets of the lobby are handled. A late copy of `CONNECT_REQUEST` (less than 5 s after `CONNECT_ACCEPT`) no longer takes a player out of its room; answers to an older room request are ignored; a room request with a newer `requestId` takes the player out of the room it is still in on the server; the client drops the game packets and the `ROOM_LEFT` older (header sequence) than the `ROOM_JOINED` of its room, and goes back to the lobby on a `ROOM_LEFT` it did not ask for.
+- **Server**: a client of the lobby that sends `CONNECT_REQUEST` again has its name checked and updated; a room left empty frees its place before the next requests of the same step; on shutdown, every client gets `DISCONNECT(server shutdown)`, even one on its way back to the lobby.
+- **Client**: the lobby screen (quick match, create a public or a private room, join with a code typed with the digits, list of the public rooms). The HUD shows the room, or its code. In a room, Escape (or Start) goes back to the lobby.
 
 ### Changed
 
+- **Protocol**: version 3. `CONNECT_REQUEST` only carries the name and puts the client in the lobby; the party code moved to `ROOM_JOIN`. `CONNECT_ACCEPT` only carries the tick rate and is no longer reliable; the player id now comes in `ROOM_JOINED`.
+- **Client**: with a party code on the command line, the client joins that private room as soon as it is in the lobby. Without one, it shows the lobby instead of joining any public party.
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`) instead of being included as a git subtree.
 - **Build**: Ampersand Engine goes from 0.2.0 to 0.5.1.
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
-- **Client**: the loop is the engine `Scheduler`, timed by a `FrameTimer`. The network work is a `NetworkSystem`, quitting a `QuitSystem`, and explosions are destroyed through the engine `CommandQueue`.
+- **Client**: the loop is the engine `Scheduler`, timed by a `FrameTimer`. The network work is a `NetworkSystem`, the lobby a `LobbySystem`, quitting or leaving the room a `QuitSystem`, and explosions are destroyed through the engine `CommandQueue`.
 - **Client**: the controls are engine input actions (`Horizontal` and `Vertical` axes, `Fire` and `Quit` buttons). Holding two opposite arrows now cancels out.
 
 ### Removed

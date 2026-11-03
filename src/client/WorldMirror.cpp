@@ -33,7 +33,7 @@ namespace render = ampersand::render;
 WorldMirror::WorldMirror(core::ecs::World& world, EntityLooks looks)
     : _world(world), _looks(std::move(looks)) {}
 
-void WorldMirror::setLocalPlayer(std::uint8_t playerId) {
+void WorldMirror::setLocalPlayer(std::optional<std::uint8_t> playerId) {
   this->_localPlayer = playerId;
 }
 
@@ -108,6 +108,15 @@ void WorldMirror::destroy(const protocol::EntityDestroy& packet) {
   }
   this->_world.destroy(entity);
   this->_entities.erase(found);
+}
+
+void WorldMirror::clear() {
+  for (const auto& [entityId, mirrored] : this->_entities) {
+    this->_world.destroy(mirrored.entity);
+  }
+  this->_entities.clear();
+  this->_destroyed.clear();
+  this->_lastSnapshotTick = 0;
 }
 
 std::optional<core::ecs::Entity> WorldMirror::find(
