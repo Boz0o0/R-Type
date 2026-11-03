@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <optional>
 #include <rtype/common/Factories.hpp>
+#include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/components/Owner.hpp>
@@ -207,12 +208,8 @@ void Game::updatePlayers(float deltaTime) {
 }
 
 void Game::steer(Entity ship, std::uint8_t inputMask) {
-  const ampersand::core::math::Vec2f arrows = direction(inputMask);
-  float speed = SHIP_SPEED;
-  if (arrows.x != 0.0F && arrows.y != 0.0F) {
-    speed *= DIAGONAL_FACTOR;
-  }
-  this->_world.get<Velocity>(ship).value = {arrows.x * speed, arrows.y * speed};
+  this->_world.get<Velocity>(ship).value =
+      common::ShipMovement::velocity(inputMask);
   this->_world.get<common::Weapon>(ship).firing =
       (inputMask & InputFlag::SHOOT) != 0;
 }
@@ -350,14 +347,6 @@ bool Game::isDying(Entity entity) {
   return std::ranges::any_of(
       this->_world.getResource<common::Deaths>().entities,
       [entity](const common::Death& death) { return death.entity == entity; });
-}
-
-ampersand::core::math::Vec2f Game::direction(std::uint8_t inputMask) {
-  const auto held = [inputMask](std::uint8_t key) {
-    return (inputMask & key) != 0 ? 1.0F : 0.0F;
-  };
-  return {held(InputFlag::MOVE_RIGHT) - held(InputFlag::MOVE_LEFT),
-          held(InputFlag::MOVE_DOWN) - held(InputFlag::MOVE_UP)};
 }
 
 bool Game::hasPlayers() const noexcept {

@@ -99,19 +99,40 @@ computer, whatever its frame rate.
    which are the same on every layout, can be typed; the server makes codes of
    digits. With a party code on the command line (letters allowed), the
    client joins that room at once instead.
-5. `MovementSystem` (engine): moves the entities with their speed between two
-   snapshots, and the star-field layers.
-6. `ScrollingSystem`: once a star-field copy has fully left the screen on the
+5. `PredictionSystem`: moves our own ship from our input right away (see
+   below).
+6. `MovementSystem` (engine): moves the other entities with their speed
+   between two snapshots, and the star-field layers.
+7. `CorrectionSystem`: slides each entity a bit toward where the server says
+   it is (see below).
+8. `ScrollingSystem`: once a star-field copy has fully left the screen on the
    left, puts it back behind the other copy, so the background never ends.
-7. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
    remove an explosion once its animation and its sound are over.
-8. `AudioSystem` (engine): plays the sounds.
-9. `RenderSystem` (engine): draws the `World`, the star-field at the back and
-   the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
-   fit the window.
+10. `AudioSystem` (engine): plays the sounds.
+11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+    the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
+    fit the window.
 
 Systems never destroy an entity while the others run: they queue it in the
 engine `CommandQueue`, which the `Scheduler` applies at the end of the frame.
+
+### Smooth movement
+
+The server sends the positions 30 times per second, and they arrive late and
+not exactly every 33 ms. Drawing them as they come makes everything jump, so:
+
+- **Other entities** keep moving with their last speed between two snapshots.
+  When a snapshot disagrees, the difference goes in a `Correction`, and the
+  `CorrectionSystem` absorbs about two thirds of it in 0.1 s, at any frame
+  rate. A difference of more than 128 units (lost snapshots) is jumped at once.
+- **Our own ship** is predicted: it moves as soon as a key is pressed, with the
+  same rule as the server (`common::ShipMovement`: speed, diagonals, screen
+  edges). While it moves, the server's position is always a bit behind, so it
+  is ignored. Once both our input and the server's ship have stopped, the ship
+  slides to the server's position, which fixes any small drift. Our ship is the
+  one with our player id, which each room gives on `ROOM_JOINED`: out of a
+  room, no ship is ours.
 
 If the server refuses the client, does not answer, or goes silent for 5
 seconds, the HUD shows why and waits: the next key or button pressed stops the
