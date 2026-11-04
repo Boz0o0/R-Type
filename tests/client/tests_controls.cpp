@@ -7,6 +7,8 @@
 #include <rtype/client/Controls.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 
+#include "GameFiles.hpp"
+
 using ampersand::input::InputManager;
 using ampersand::input::JoystickAxis;
 using ampersand::input::JoystickButton;
@@ -15,17 +17,11 @@ using ampersand::input::JoystickMoved;
 using ampersand::input::KeyCode;
 using ampersand::input::KeyPressed;
 using rtype::client::Controls;
+using rtype::client::test::gameInput;
 namespace InputFlag = rtype::protocol::InputFlag;
 
-static InputManager boundInput() {
-  InputManager manager;
-  Controls::bind(manager);
-  manager.beginFrame();
-  return manager;
-}
-
 static std::uint8_t maskWhileHolding(std::initializer_list<KeyCode> keys) {
-  InputManager manager = boundInput();
+  InputManager manager = gameInput();
   for (const KeyCode key : keys) {
     manager.apply(KeyPressed{.key = key});
   }
@@ -33,7 +29,7 @@ static std::uint8_t maskWhileHolding(std::initializer_list<KeyCode> keys) {
 }
 
 static std::uint8_t maskWithStick(JoystickAxis axis, float position) {
-  InputManager manager = boundInput();
+  InputManager manager = gameInput();
   manager.apply(
       JoystickMoved{.joystick = 0, .axis = axis, .position = position});
   return Controls::inputMask(manager);
@@ -86,7 +82,7 @@ TEST(Controls, ControllerStickHasADeadZone) {
 }
 
 TEST(Controls, ControllerButtonShoots) {
-  InputManager manager = boundInput();
+  InputManager manager = gameInput();
   manager.apply(
       JoystickButtonPressed{.joystick = 0, .button = JoystickButton::Button0});
 

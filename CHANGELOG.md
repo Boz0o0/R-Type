@@ -35,6 +35,9 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Protocol**: late packets of the lobby are handled. A late copy of `CONNECT_REQUEST` (less than 5 s after `CONNECT_ACCEPT`) no longer takes a player out of its room; answers to an older room request are ignored; a room request with a newer `requestId` takes the player out of the room it is still in on the server; the client drops the game packets and the `ROOM_LEFT` older (header sequence) than the `ROOM_JOINED` of its room, and goes back to the lobby on a `ROOM_LEFT` it did not ask for.
 - **Server**: a client of the lobby that sends `CONNECT_REQUEST` again has its name checked and updated; a room left empty frees its place before the next requests of the same step; on shutdown, every client gets `DISCONNECT(server shutdown)`, even one on its way back to the lobby.
 - **Client**: the lobby screen (quick match, create a public or a private room, join with a code typed with the digits, list of the public rooms). The HUD shows the room, or its code. In a room, Escape (or Start) goes back to the lobby.
+- **Client**: the look of the game is data, in `game/` (read by the engine scene module): `world/config.json` (window, sound, camera, input actions), `world/scenes/game.json` (the star field) and `world/prefabs/` (ships, enemy, missiles, explosion, star-field layers). Changing a sprite, a sound or a key only means editing JSON.
+- **Client**: Lua scripting: the star field scrolls with `game/scripts/scroll.lua`. A broken script is printed and turned off, the game goes on.
+- **Tests**: every file of `game/` is loaded in the CI with fake window and sound backends, so a missing field, file or key fails there.
 
 ### Changed
 
@@ -49,6 +52,7 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 ### Removed
 
 - The `ampersand-engine/` git subtree.
+- **Client**: `AssetLoader`, `EntityLooks`, `Starfield`, `ScrollingSystem` and the `Scrolling` component, replaced by the `game/` files. `assets/` moved to `game/assets/`.
 
 ## [1.0.0] - 2026-10-18
 

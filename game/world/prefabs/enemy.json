@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "name": "Enemy",
+  "prefab": "world/prefabs/base.json",
+  "components": {
+    "Transform": {
+      "scale": { "x": 2.6, "y": 2.6 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/enemy.png",
+      "source": { "x": 275, "y": 5, "width": 23, "height": 26 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    },
+    "Animation": {
+      "frames": [
+        { "x": 275, "y": 5, "width": 23, "height": 26 },
+        { "x": 308, "y": 5, "width": 23, "height": 26 },
+        { "x": 341, "y": 5, "width": 23, "height": 26 },
+        { "x": 374, "y": 5, "width": 23, "height": 26 },
+        { "x": 407, "y": 5, "width": 23, "height": 26 },
+        { "x": 440, "y": 5, "width": 23, "height": 26 },
+        { "x": 473, "y": 5, "width": 23, "height": 26 },
+        { "x": 506, "y": 5, "width": 23, "height": 26 }
+      ],
+      "frameDuration": 0.08,
+      "loop": true
+    }
+  }
+}

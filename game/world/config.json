@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "gameRoot": "game/",
+  "startScene": "game",
+  "scenes": {
+    "game": "world/scenes/game.json"
+  },
+  "resources": {
+    "Renderer": {
+      "backend": "sfml",
+      "size": { "x": 1280, "y": 720 },
+      "title": "R-Type",
+      "vsync": true
+    },
+    "AudioListener": { "backend": "sfml" },
+    "Camera": {
+      "center": { "x": 960, "y": 540 },
+      "size": { "x": 1920, "y": 1080 }
+    },
+    "ClearColor": { "value": { "r": 4, "g": 4, "b": 14, "a": 255 } },
+    "InputManager": {
+      "axes": {
+        "Horizontal": {
+          "positive": "RightArrow",
+          "negative": "LeftArrow",
+          "joystick": "X",
+          "dead": 0.2,
+          "invertJoystick": false
+        },
+        "Vertical": {
+          "positive": "UpArrow",
+          "negative": "DownArrow",
+          "joystick": "Y",
+          "dead": 0.2,
+          "invertJoystick": true
+        }
+      },
+      "buttons": {
+        "Fire": ["Space", "Button0"],
+        "Quit": ["Escape", "Button7"]
+      }
+    }
+  }
+}

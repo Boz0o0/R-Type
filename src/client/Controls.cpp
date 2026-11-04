@@ -1,4 +1,3 @@
-#include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <cstdint>
 #include <rtype/client/Controls.hpp>
@@ -8,25 +7,6 @@
 namespace rtype::client {
 
 namespace input = ampersand::input;
-
-void Controls::bind(input::InputManager& manager) {
-  manager.setAxis(std::string(HORIZONTAL),
-                  input::Axis{
-                      .positive = input::KeyCode::RightArrow,
-                      .negative = input::KeyCode::LeftArrow,
-                      .joystick = input::JoystickAxis::X,
-                  });
-  // A stick pushed up gives a negative Y, but up is positive here.
-  manager.setAxis(std::string(VERTICAL),
-                  input::Axis{
-                      .positive = input::KeyCode::UpArrow,
-                      .negative = input::KeyCode::DownArrow,
-                      .joystick = input::JoystickAxis::Y,
-                      .invertJoystick = true,
-                  });
-  manager.setButton(std::string(FIRE), {input::KeyCode::Space, FIRE_BUTTON});
-  manager.setButton(std::string(QUIT), {input::KeyCode::Escape, START_BUTTON});
-}
 
 std::uint8_t Controls::inputMask(const input::InputManager& manager) {
   std::uint8_t mask = 0;

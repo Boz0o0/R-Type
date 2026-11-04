@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "Base of the entities sent by the server: WorldMirror moves it where the server says",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    }
+  }
+}

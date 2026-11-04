@@ -27,8 +27,9 @@ target_link_libraries(common
 
 if(RTYPE_CLIENT)
     if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS 
-        OR NOT AMPERSAND_MODULE_INPUT OR NOT AMPERSAND_MODULE_RENDER OR NOT AMPERSAND_MODULE_AUDIO)
-        message(FATAL_ERROR "Missing Ampersand Engine modules for the Client. Please enable the following modules: Core, Network, Physics, Input, Render, Audio.")
+        OR NOT AMPERSAND_MODULE_INPUT OR NOT AMPERSAND_MODULE_RENDER OR NOT AMPERSAND_MODULE_AUDIO
+        OR NOT AMPERSAND_MODULE_SCENE OR NOT AMPERSAND_MODULE_SCRIPTING)
+        message(FATAL_ERROR "Missing Ampersand Engine modules for the Client. Please enable the following modules: Core, Network, Physics, Input, Render, Audio, Scene, Scripting.")
     endif()
 
     add_project_module(client)
@@ -42,7 +43,13 @@ if(RTYPE_CLIENT)
             ampersand_physics
             ampersand_render
             ampersand_audio
+            ampersand_scene
+            ampersand_scripting
     )
+    # Like the engine's scripting module: sol2 makes too many sections for MSVC.
+    if(MSVC)
+        target_compile_options(client PRIVATE /bigobj)
+    endif()
     
     add_executable(r-type_client
         client/main.cpp
@@ -57,15 +64,17 @@ if(RTYPE_CLIENT)
             ampersand_input
             ampersand_render
             ampersand_audio
+            ampersand_scene
+            ampersand_scripting
     )
 
-    # The client loads its assets from the folder next to its binary.
-    add_custom_target(client_assets
+    # The client runs from its binary folder and reads game/ there.
+    add_custom_target(client_game
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${PROJECT_SOURCE_DIR}/assets"
-            "$<TARGET_FILE_DIR:r-type_client>/assets"
+            "${PROJECT_SOURCE_DIR}/game"
+            "$<TARGET_FILE_DIR:r-type_client>/game"
     )
-    add_dependencies(client client_assets)
+    add_dependencies(client client_game)
 endif()
 
 if(RTYPE_SERVER)
