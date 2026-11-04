@@ -43,7 +43,8 @@ Several parties run at once, each on its own thread (details in
 | Thread             | Class           | Does                                                               |
 | ------------------ | --------------- | ------------------------------------------------------------------ |
 | Network            | `ServerNetwork` | reads every datagram, decodes it, queues the valid packets         |
-| Lobby (main)       | `Lobby`         | answers the clients in no party (room list, create, join), gives each other packet to the party of its sender, opens and closes the parties |
+| Lobby (main)       | `Lobby`         | logs the clients in, answers the clients in no party (room list, create, join), gives each other packet to the party of its sender, opens and closes the parties |
+| Passwords          | `AuthWorker`    | checks the passwords of `LOGIN` and `REGISTER` against the `AccountStore` (SQLite), so the lobby never waits for Argon2 |
 | One per party      | `GameServer`    | 60 ticks per second: handles its packets, updates its `World`, sends a snapshot 30 times per second |
 
 The threads only share the socket (behind a mutex) and bounded
@@ -100,7 +101,8 @@ computer, whatever its frame rate.
    a room, and quits anywhere else. Once the connection has ended, any key or
    button quits.
 3. `NetworkSystem`:
-    - `ServerConnection` connects to the server, sends a `PING` every second,
+    - `ServerConnection` connects to the server once the player logged in,
+      sends a `PING` every second,
       asks for the room list in the lobby, sends the room requests until they
       are answered, acknowledges the reliable packets and drops their copies,
       then hands out the game packets of the room;
@@ -114,7 +116,18 @@ computer, whatever its frame rate.
       each time `ServerConnection::roomGeneration()` changes (we enter or
       leave a room): each room numbers its entities from the start;
     - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server.
-4. `LobbySystem`, out of a room: shows the `LobbyMenu` (quick match, create a
+4. `LoginSystem`, while logged out: shows the `LoginMenu` (username,
+   password shown as stars, "Log in" or "Create an account", chosen with
+   the arrows or Tab), then asks `ServerConnection` to send `LOGIN` or
+   `REGISTER`. While the server checks it, the menu shows "Connecting...";
+   if it is refused, the menu shows why and the player tries again. The
+   username can be written in advance with the third argument. Only
+   letters and digits can be typed, from their `KeyCode` (Shift for capital
+   letters), so on AZERTY they are the QWERTY ones (see `LobbySystem`):
+   `a` is typed `q`, and `m` cannot be typed. It stays the same on every
+   login from the same keyboard, but the name shown in game is the QWERTY
+   one. Typing the real characters needs a text event in the engine.
+5. `LobbySystem`, out of a room: shows the `LobbyMenu` (quick match, create a
    public or a private room, join with a code typed with the digits) and the
    public rooms, chosen with the arrows and Enter, and sends the room asked
    for. The engine gives the keys by their QWERTY position, not the character
@@ -122,21 +135,21 @@ computer, whatever its frame rate.
    which are the same on every layout, can be typed; the server makes codes of
    digits. With a party code on the command line (letters allowed), the
    client joins that room at once instead.
-5. `PredictionSystem`: moves our own ship from our input right away (see
+6. `PredictionSystem`: moves our own ship from our input right away (see
    below).
-6. `MovementSystem` (engine): moves the other entities with their speed
+7. `MovementSystem` (engine): moves the other entities with their speed
    between two snapshots, and the star-field layers.
-7. `CorrectionSystem`: slides each entity a bit toward where the server says
+8. `CorrectionSystem`: slides each entity a bit toward where the server says
    it is (see below).
-8. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
+9. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
    star field has one, `scroll.lua`: once a copy has fully left the screen on
    the left, it goes back behind the other copy, so the background never ends.
-9. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
-   that script off, and the game goes on.
-10. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+10. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
+    that script off, and the game goes on.
+11. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
     remove an explosion once its animation and its sound are over.
-11. `AudioSystem` (engine): plays the sounds.
-12. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+12. `AudioSystem` (engine): plays the sounds.
+13. `RenderSystem` (engine): draws the `World`, the star-field at the back and
     the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
     fit the window.
 

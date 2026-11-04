@@ -91,8 +91,12 @@ bool ServerNetwork::receiveOne(std::span<std::byte> buffer) {
     }
     return true;
   }
+  // Only the packets that enter the lobby: those are the first ones a client
+  // sends, and they are bigger than the answer.
   if (error == protocol::DecodeError::VersionMismatch &&
-      packet.header.type == protocol::PacketType::ConnectRequest) {
+      (packet.header.type == protocol::PacketType::ConnectRequest ||
+       packet.header.type == protocol::PacketType::Register ||
+       packet.header.type == protocol::PacketType::Login)) {
     this->send(
         protocol::ConnectReject{
             .reason = protocol::RejectReason::VersionMismatch,

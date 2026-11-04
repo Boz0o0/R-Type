@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
@@ -62,12 +64,14 @@ TEST(ServerNetwork, DropsInvalidDatagramsAndKeepsRunning) {
   EXPECT_EQ(ping->timestampMs, 42U);
 }
 
-TEST(ServerNetwork, RejectsConnectRequestOfAnotherVersion) {
+namespace {
+
+/** @brief Sends the packet with the next version, expects "wrong version". */
+void expectWrongVersion(const Payload& payload) {
   ServerNetwork network(0);
   TestClient client(network);
 
-  std::vector<std::byte> request =
-      encode(ConnectRequest{.playerName = "Old"}, 0);
+  std::vector<std::byte> request = encode(payload, 0);
   request[2] = std::byte{VERSION + 1};
   client.socket.send(request, client.server);
 
@@ -82,6 +86,17 @@ TEST(ServerNetwork, RejectsConnectRequestOfAnotherVersion) {
   ASSERT_NE(reject, nullptr);
   EXPECT_EQ(reject->reason, RejectReason::VersionMismatch);
   EXPECT_TRUE(network.receive().empty());
+}
+
+}  // namespace
+
+TEST(ServerNetwork, RejectsConnectRequestOfAnotherVersion) {
+  expectWrongVersion(ConnectRequest{.playerName = "Old"});
+}
+
+TEST(ServerNetwork, RejectsLoginAndRegisterOfAnotherVersion) {
+  expectWrongVersion(Login{.username = "Old", .password = "pw"});
+  expectWrongVersion(Register{.username = "Old", .password = "pw"});
 }
 
 TEST(ServerNetwork, SendIncrementsTheSequence) {

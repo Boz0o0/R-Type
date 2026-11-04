@@ -113,8 +113,9 @@ while (auto length = socket.receive(buffer, from)) {
 
 ## Server loop
 
-The server runs one network thread, one lobby thread and one thread per
-party, in `src/server/` (headers in `include/rtype/server/`):
+The server runs one network thread, one lobby thread, one password thread
+and one thread per party, in `src/server/` (headers in
+`include/rtype/server/`):
 
 ```mermaid
 flowchart LR
@@ -126,6 +127,9 @@ flowchart LR
     Inbox -->|"drain, each tick"| Server["Party threads<br/>(GameServer, 60 Hz each)"]
     Server -->|"joined / left"| Changes["MessageQueue<br/>of the Lobby"]
     Changes --> Lobby
+    Lobby -->|"LOGIN / REGISTER"| Auth["Password thread<br/>(AuthWorker)"]
+    Auth -->|"account or reason"| Lobby
+    Auth -->|"Argon2id"| Db[("AccountStore<br/>(SQLite)")]
     Server -->|"addPlayer / setInput"| Game["Game logic<br/>(Game, World + systems)"]
     Game -->|"GameEvents"| Server
     Server -->|"send()"| Socket
@@ -138,20 +142,35 @@ flowchart LR
   the memory, and a `RateLimiter` drops what a sender sends past
   `MAX_PACKETS_PER_SECOND`.
 - **Lobby thread** (`Lobby::run`, the main thread): keeps every client (IP +
-  port -> name, party). A `CONNECT_REQUEST` from a new address makes it a
-  client of the lobby (256 at most). The Lobby answers the clients in no party
+  port -> name, party, account). A `LOGIN` or `REGISTER` from a new address
+  is checked (see the password thread below); once its password is right, the
+  address becomes a client of the lobby (256 at most). A `Lobby` built
+  without an `AccountStore` (the tests) takes `CONNECT_REQUEST` instead. The Lobby answers the clients in no party
   itself: `PING`, `ROOM_LIST` (at most every 250 ms per client),
   `ROOM_CREATE` (always a new party; a private one gets a code of 6 digits)
   and `ROOM_JOIN` (by room id, by code, or the first public party with a free
-  place), and drops them after 5 s of silence. A `CONNECT_REQUEST` from the
-  lobby has its name checked (and kept) again; one from a client in a party
-  is ignored for `LATE_CONNECT_WINDOW` (5 s) after its `CONNECT_ACCEPT`, as
-  a late copy, and later means the client restarted. To put a client in a
+  place), and drops them after 5 s of silence. A `LOGIN` or `REGISTER` from
+  the lobby with the same username, less than `LATE_CONNECT_WINDOW` (5 s)
+  after its `CONNECT_ACCEPT`, gets `CONNECT_ACCEPT` again; otherwise the
+  client is logged out and its new login checked. From a client in a party,
+  it is ignored for `LATE_CONNECT_WINDOW`, as a late copy, and later means
+  the client restarted. To put a client in a
   party, it routes the client there and calls `GameServer::admit()` with the
   `requestId` of its request. Then it gives every packet of that client to
   its party. 16 parties at most, then `ROOM_REJECT(server full)`. A party is
   closed as soon as it is empty (checked right after reading the changes, so
   before the next requests), and its code is freed.
+- **Password thread** (`AuthWorker`): Argon2id takes tens of milliseconds per
+  password on purpose, and would stop the whole lobby. So the Lobby only
+  checks the format (`checkCredentials`), counts the attempt
+  (`LoginLimiter`: 5 failures per IP per minute, 4096 IPs at most) and gives
+  the job to the `AuthWorker` (64 waiting at most, then `server full`). The
+  worker runs the `AccountStore` (create, then check the password) and puts
+  the answer in a `MessageQueue`; the Lobby reads it at each step, before the
+  new packets, and admits the client or sends `CONNECT_REJECT`. Copies of a
+  login sent while it is checked are ignored (`_pendingLogins`). Only the
+  worker thread uses the `AccountStore`. On shutdown, the jobs not started
+  are dropped.
 - **Party threads** (`GameServer::run`): one per party, each with its own
   `Game` and `World`. 60 times per second, even when no client sends
   anything, it takes the clients and packets the Lobby gave it (it answers
@@ -181,7 +200,11 @@ flowchart LR
 | `ServerNetwork` | the socket, the network thread, `send()` / `encode()` + `sendDatagram()` |
 | `MessageQueue` | the bounded queue between two threads |
 | `RateLimiter` | packets per sender per second |
-| `Lobby` | the clients, the ones in no party (room list, create, join, timeout), the parties, and which client plays in which party |
+| `AccountStore` | the accounts in SQLite: create one, check a password (prepared statements, username with letter case ignored) |
+| `PasswordHasher` | random salt, Argon2id hash (Monocypher), comparison in constant time |
+| `AuthWorker` | the password thread: checks the LOGIN and REGISTER given by the Lobby |
+| `LoginLimiter` | failed logins per IP per minute |
+| `Lobby` | the clients, their login, the ones in no party (room list, create, join, timeout), the parties, and which client plays in which party |
 | `GameServer` | one party: its clients (IP + port -> player), PING/PONG, timeouts, admissions, `ROOM_LEAVE` and quits, turns `GameEvents` into packets |
 | `Log.hpp` | `logLine()`, one whole line per call, whatever the thread |
 | `ReliableOutbox` | the reliable packets of one client waiting for their ACK |
