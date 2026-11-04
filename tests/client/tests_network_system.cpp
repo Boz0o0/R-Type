@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <ampersand/core/ecs/EventQueue.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
@@ -12,11 +13,13 @@
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <thread>
+#include <variant>
 
 #include "FakeEntityFactory.hpp"
 #include "FakeServer.hpp"
 #include "GameFiles.hpp"
 
+using ampersand::core::ecs::EventQueue;
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
 using ampersand::input::KeyCode;
@@ -38,6 +41,7 @@ class NetworkSystemTest : public testing::Test {
  protected:
   void SetUp() override {
     enterRoom(this->server, this->connection);
+    this->world.addResource<EventQueue<protocol::Payload>>();
     auto& manager = this->world.addResource<InputManager>(gameInput());
     manager.apply(KeyPressed{.key = KeyCode::Space});
     this->server.send(
@@ -70,6 +74,16 @@ TEST_F(NetworkSystemTest, MirrorsTheRoomAndSendsTheInput) {
   EXPECT_TRUE(this->worldMirror.find(7).has_value());
   EXPECT_EQ(this->server.receive<protocol::PlayerInput>().inputMask,
             protocol::InputFlag::SHOOT);
+}
+
+// The scripts read them there, in the same frame.
+TEST_F(NetworkSystemTest, GivesTheGamePacketsToTheScripts) {
+  this->updateUntilMirrored();
+
+  const auto& packets =
+      this->world.getResource<EventQueue<protocol::Payload>>().read();
+  ASSERT_EQ(packets.size(), 1U);
+  EXPECT_EQ(std::get<protocol::EntitySpawn>(packets.front()).entityId, 7U);
 }
 
 TEST_F(NetworkSystemTest, StartsANewMirrorWhenWeLeaveTheRoom) {

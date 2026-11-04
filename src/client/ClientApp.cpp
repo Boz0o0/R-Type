@@ -1,4 +1,5 @@
 #include <ampersand/audio/systems/AudioSystem.hpp>
+#include <ampersand/core/ecs/EventQueue.hpp>
 #include <ampersand/core/ecs/Scheduler.hpp>
 #include <ampersand/core/time/FrameTimer.hpp>
 #include <ampersand/input/systems/InputSystem.hpp>
@@ -25,6 +26,7 @@
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
 #include <rtype/client/systems/ScriptErrorSystem.hpp>
+#include <rtype/common/protocol/PacketCodec.hpp>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -65,6 +67,7 @@ void ClientApp::run() {
 
   core::ecs::Scheduler scheduler(this->_world);
   scheduler.addEventQueue<scripting::ScriptError>();
+  scheduler.addEventQueue<protocol::Payload>();
   scheduler.add<input::InputSystem>(pollWindow);
   scheduler.add<QuitSystem>(this->_connection);
   scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
@@ -74,7 +77,10 @@ void ClientApp::run() {
   scheduler.add<PredictionSystem>();
   scheduler.add<physics::MovementSystem>();
   scheduler.add<CorrectionSystem>();
-  scheduler.add<scripting::ScriptingSystem>();
+  auto& scripts = scheduler.add<scripting::ScriptingSystem>();
+  this->_connection.bindScripting(scripts, this->_world);
+  scripts.lua()["arguments"] = scripts.lua().create_table_with(
+      "username", this->_config.name(), "partyCode", this->_config.partyCode());
   scheduler.add<ScriptErrorSystem>();
   scheduler.add<render::AnimationSystem>();
   scheduler.add<ExplosionSystem>();

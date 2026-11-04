@@ -1,3 +1,4 @@
+#include <ampersand/core/ecs/EventQueue.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <rtype/client/Controls.hpp>
@@ -7,6 +8,7 @@
 #include <rtype/client/systems/NetworkSystem.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
+#include <utility>
 #include <variant>
 
 namespace rtype::client {
@@ -27,8 +29,11 @@ void NetworkSystem::update(ampersand::core::ecs::World& world) {
   this->_hud.showConnection(this->_connection.state(), this->_connection.room(),
                             this->_connection.rejectReason());
   this->_worldMirror.setLocalPlayer(this->_connection.playerId());
-  for (const protocol::Payload& packet : this->_connection.takePackets()) {
+  auto& packets =
+      world.getResource<ampersand::core::ecs::EventQueue<protocol::Payload>>();
+  for (protocol::Payload& packet : this->_connection.takePackets()) {
     applyPacket(this->_worldMirror, this->_hud, packet);
+    packets.send(std::move(packet));
   }
   this->_connection.sendInput(
       Controls::inputMask(world.getResource<ampersand::input::InputManager>()));
