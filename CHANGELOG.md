@@ -44,7 +44,7 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Protocol**: version 3. `CONNECT_REQUEST` only carries the name and puts the client in the lobby; the party code moved to `ROOM_JOIN`. `CONNECT_ACCEPT` only carries the tick rate and is no longer reliable; the player id now comes in `ROOM_JOINED`.
 - **Client**: with a party code on the command line, the client joins that private room as soon as it is in the lobby. Without one, it shows the lobby instead of joining any public party.
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`) instead of being included as a git subtree.
-- **Build**: Ampersand Engine goes from 0.2.0 to 0.5.1.
+- **Build**: Ampersand Engine goes from 0.2.0 to 0.6.0.
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
 - **Client**: the loop is the engine `Scheduler`, timed by a `FrameTimer`. The network work is a `NetworkSystem`, the lobby a `LobbySystem`, quitting or leaving the room a `QuitSystem`, and explosions are destroyed through the engine `CommandQueue`.
 - **Client**: the controls are engine input actions (`Horizontal` and `Vertical` axes, `Fire` and `Quit` buttons). Holding two opposite arrows now cancels out.
