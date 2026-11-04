@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "name": "Back stars, with the planet and the moon",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 2, "y": 2, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/starfield-back.png",
+      "source": { "x": 0, "y": 0, "width": 960, "height": 540 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": -20
+    },
+    "Velocity": { "value": { "x": -30, "y": 0 } },
+    "Scripts": { "scripts": ["scripts/scroll.lua"] }
+  }
+}

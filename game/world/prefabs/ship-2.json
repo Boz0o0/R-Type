@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "Ship of player 2: the next colour row of the sheet",
+  "prefab": "world/prefabs/ship-1.json",
+  "components": {
+    "Sprite": {
+      "source": { "y": 19 }
+    }
+  }
+}

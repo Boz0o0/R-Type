@@ -5,12 +5,10 @@
 
 namespace rtype::client {
 
-class ScrollingSystem final : public ampersand::core::ecs::ISystem {
+// A broken script is turned off without stopping the game: this says why.
+class ScriptErrorSystem final : public ampersand::core::ecs::ISystem {
  public:
   void update(ampersand::core::ecs::World& world) override;
-
- private:
-  static constexpr float COPIES = 2.0F;
 };
 
 }  // namespace rtype::client

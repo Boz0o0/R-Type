@@ -32,8 +32,11 @@ class ClientConfig {
    *        lobby; empty to choose a room in the lobby menu.
    */
   [[nodiscard]] const std::string& partyCode() const;
-  /** @brief assets/ next to the binary, found from the first argument. */
-  [[nodiscard]] const std::filesystem::path& assetsDirectory() const;
+  /**
+   * @brief Folder of the binary, found from the first argument. The client
+   * runs from it, since the engine reads game/ from the working directory.
+   */
+  [[nodiscard]] const std::filesystem::path& binaryDirectory() const;
 
  private:
   /**
@@ -53,8 +56,8 @@ class ClientConfig {
   std::string _name;
   /** @brief See partyCode(). */
   std::string _partyCode;
-  /** @brief See assetsDirectory(). */
-  std::filesystem::path _assetsDirectory{"assets"};
+  /** @brief See binaryDirectory(). */
+  std::filesystem::path _binaryDirectory{"."};
 };
 
 }  // namespace rtype::client

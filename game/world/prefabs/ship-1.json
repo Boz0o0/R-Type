@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "Ship of player 1",
+  "prefab": "world/prefabs/base.json",
+  "components": {
+    "Transform": {
+      "scale": { "x": 2, "y": 2 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/ships.png",
+      "source": { "x": 67, "y": 2, "width": 32, "height": 15 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    }
+  }
+}

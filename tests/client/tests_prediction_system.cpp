@@ -8,11 +8,12 @@
 #include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <optional>
-#include <rtype/client/Controls.hpp>
 #include <rtype/client/components/Correction.hpp>
 #include <rtype/client/components/Predicted.hpp>
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/common/ShipMovement.hpp>
+
+#include "GameFiles.hpp"
 
 using ampersand::core::Clock;
 using ampersand::core::Transform;
@@ -22,10 +23,10 @@ using ampersand::core::math::Vec2f;
 using ampersand::input::InputManager;
 using ampersand::input::KeyCode;
 using ampersand::input::KeyPressed;
-using rtype::client::Controls;
 using rtype::client::Correction;
 using rtype::client::Predicted;
 using rtype::client::PredictionSystem;
+using rtype::client::test::gameInput;
 using rtype::common::ShipMovement;
 
 static constexpr float DELTA_TIME = 0.1F;
@@ -33,9 +34,7 @@ static constexpr float DELTA_TIME = 0.1F;
 // A world with our ship at (300, 400), the server agreeing and still.
 static Entity setUp(World& world, std::optional<KeyCode> held) {
   world.addResource<Clock>().dt = DELTA_TIME;
-  auto& manager = world.addResource<InputManager>();
-  Controls::bind(manager);
-  manager.beginFrame();
+  auto& manager = world.addResource<InputManager>(gameInput());
   if (held) {
     manager.apply(KeyPressed{.key = *held});
   }

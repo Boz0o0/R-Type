@@ -28,13 +28,13 @@ static std::optional<HostAndPort> parse(std::vector<std::string> words) {
   return HostAndPort{config->host(), config->port()};
 }
 
-static std::optional<std::filesystem::path> assetsOf(
+static std::optional<std::filesystem::path> binaryFolderOf(
     std::vector<std::string> words) {
   const auto config = configOf(std::move(words));
   if (!config) {
     return std::nullopt;
   }
-  return config->assetsDirectory();
+  return config->binaryDirectory();
 }
 
 static std::optional<std::string> nameOf(std::vector<std::string> words) {
@@ -115,8 +115,8 @@ TEST(ClientConfig, RejectsInvalidPartyCodes) {
   }
 }
 
-TEST(ClientConfig, FindsTheAssetsNextToTheBinary) {
-  EXPECT_EQ(assetsOf({"build/bin/r-type_client"}),
-            std::filesystem::path("build/bin/assets"));
-  EXPECT_EQ(assetsOf({"r-type_client"}), std::filesystem::path("assets"));
+TEST(ClientConfig, FindsTheFolderOfTheBinary) {
+  EXPECT_EQ(binaryFolderOf({"build/bin/r-type_client"}),
+            std::filesystem::path("build/bin"));
+  EXPECT_EQ(binaryFolderOf({"r-type_client"}), std::filesystem::path("."));
 }

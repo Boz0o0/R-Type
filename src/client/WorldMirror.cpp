@@ -1,37 +1,30 @@
-#include <ampersand/audio/SoundId.hpp>
-#include <ampersand/audio/components/AudioSource.hpp>
 #include <ampersand/core/components/Transform.hpp>
-#include <ampersand/core/ecs/ECSExceptions.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
-#include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <rtype/client/EntityLooks.hpp>
+#include <rtype/client/IEntityFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/components/Correction.hpp>
 #include <rtype/client/components/Explosion.hpp>
 #include <rtype/client/components/Predicted.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
-#include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/common/resources/Deaths.hpp>
-#include <utility>
 
 namespace rtype::client {
 
-namespace audio = ampersand::audio;
 namespace core = ampersand::core;
 namespace physics = ampersand::physics;
 namespace render = ampersand::render;
 
-WorldMirror::WorldMirror(core::ecs::World& world, EntityLooks looks)
-    : _world(world), _looks(std::move(looks)) {}
+WorldMirror::WorldMirror(core::ecs::World& world, IEntityFactory& factory)
+    : _world(world), _factory(factory) {}
 
 void WorldMirror::setLocalPlayer(std::optional<std::uint8_t> playerId) {
   this->_localPlayer = playerId;
@@ -43,11 +36,14 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
     return;
   }
   const std::optional<core::ecs::Entity> created =
-      this->create(this->lookFor(packet), {packet.x, packet.y});
+      this->_factory.create(packet.entityType, packet.ownerId);
   if (!created) {
     return;
   }
   const core::ecs::Entity entity = *created;
+  auto& position = this->_world.get<core::Transform>(entity).position;
+  position.x = packet.x;
+  position.y = packet.y;
   this->_world.add(entity, Correction{});
   if (this->isLocalShip(packet)) {
     this->_world.add(entity,
@@ -59,9 +55,6 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
     this->_world.add(entity, physics::Velocity{
                                  .value = {packet.velocityX, packet.velocityY},
                              });
-  }
-  if (packet.entityType == common::EntityKind::PlayerMissile) {
-    this->play(entity, this->_looks.shootSound, SHOOT_VOLUME);
   }
   this->_entities.emplace(
       packet.entityId, Mirrored{.entity = entity, .kind = packet.entityType});
@@ -132,24 +125,6 @@ std::size_t WorldMirror::size() const noexcept {
   return this->_entities.size();
 }
 
-const Look& WorldMirror::lookFor(const protocol::EntitySpawn& packet) const {
-  switch (packet.entityType) {
-    case common::EntityKind::Enemy:
-      return this->_looks.enemy;
-    case common::EntityKind::PlayerMissile:
-      return this->_looks.playerMissile;
-    case common::EntityKind::EnemyMissile:
-      return this->_looks.enemyMissile;
-    case common::EntityKind::PowerUp:
-      return this->_looks.powerUp;
-    case common::EntityKind::Obstacle:
-      return this->_looks.obstacle;
-    case common::EntityKind::Ship:
-      break;
-  }
-  return this->_looks.ships[packet.ownerId % protocol::MAX_PLAYERS];
-}
-
 bool WorldMirror::isLocalShip(const protocol::EntitySpawn& packet) const {
   return packet.entityType == common::EntityKind::Ship &&
          this->_localPlayer == packet.ownerId;
@@ -168,62 +143,28 @@ void WorldMirror::correct(core::ecs::Entity entity,
   }
 }
 
-std::optional<core::ecs::Entity> WorldMirror::create(
-    const Look& look, core::math::Vec2f position) {
-  core::ecs::Entity entity;
-  try {
-    entity = this->_world.create();
-  } catch (const core::ecs::EntityLimitReached&) {
-    return std::nullopt;
-  }
-  this->_world.add(entity, core::Transform{
-                               .position = {position.x, position.y, 0.0F},
-                               .scale = {look.scale, look.scale, 1.0F},
-                           });
-  render::Sprite sprite = look.sprite;
-  if (!look.animation.frames.empty()) {
-    sprite.source = look.animation.frames.front();
-    this->_world.add(entity, look.animation);
-  }
-  this->_world.add(entity, sprite);
-  return entity;
-}
-
 // Centers the explosion on the sprite of the entity that died.
 void WorldMirror::explode(const core::Transform& transform,
                           const render::Sprite& sprite) {
-  const Look& look = this->_looks.explosion;
-  const auto& frame = look.animation.frames.empty()
-                          ? look.sprite.source
-                          : look.animation.frames.front();
+  const std::optional<core::ecs::Entity> created =
+      this->_factory.createExplosion();
+  if (!created) {
+    return;
+  }
+  const core::ecs::Entity explosion = *created;
+  this->_world.add(explosion, Explosion{});
+  const auto& frame = this->_world.get<render::Sprite>(explosion).source;
+  auto& placed = this->_world.get<core::Transform>(explosion);
   const float centerX =
       transform.position.x +
       (static_cast<float>(sprite.source.width) * transform.scale.x / 2.0F);
   const float centerY =
       transform.position.y +
       (static_cast<float>(sprite.source.height) * transform.scale.y / 2.0F);
-  const std::optional<core::ecs::Entity> created = this->create(
-      look, {centerX - (static_cast<float>(frame.width) * look.scale / 2.0F),
-             centerY - (static_cast<float>(frame.height) * look.scale / 2.0F)});
-  if (!created) {
-    return;
-  }
-  const core::ecs::Entity explosion = *created;
-  this->_world.get<render::Sprite>(explosion).layer = EXPLOSION_LAYER;
-  this->_world.add(explosion, Explosion{});
-  this->play(explosion, this->_looks.explosionSound, EXPLOSION_VOLUME);
-}
-
-void WorldMirror::play(core::ecs::Entity entity, audio::SoundId sound,
-                       float volume) {
-  if (sound == 0) {
-    return;
-  }
-  this->_world.add(entity, audio::AudioSource{
-                               .source = audio::SoundRef{.id = sound},
-                               .volume = volume,
-                               .playing = true,
-                           });
+  placed.position.x =
+      centerX - (static_cast<float>(frame.width) * placed.scale.x / 2.0F);
+  placed.position.y =
+      centerY - (static_cast<float>(frame.height) * placed.scale.y / 2.0F);
 }
 
 }  // namespace rtype::client

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ampersand/audio/SoundId.hpp>
 #include <ampersand/core/components/Transform.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
@@ -9,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <rtype/client/EntityLooks.hpp>
+#include <rtype/client/IEntityFactory.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <unordered_map>
@@ -30,9 +29,9 @@ class WorldMirror {
    * @brief Creates an empty mirror.
    *
    * @param world The world to create the local entities in.
-   * @param looks Sprites and sounds of each kind of entity.
+   * @param factory Creates each kind of entity with its look and sounds.
    */
-  WorldMirror(ampersand::core::ecs::World& world, EntityLooks looks);
+  WorldMirror(ampersand::core::ecs::World& world, IEntityFactory& factory);
 
   /**
    * @brief Tells which ship is ours: it is predicted (moved from our input)
@@ -85,13 +84,6 @@ class WorldMirror {
   [[nodiscard]] std::size_t size() const noexcept;
 
  private:
-  /** @brief Volume of the sound of a player shot. */
-  static constexpr float SHOOT_VOLUME = 40.0F;
-  /** @brief Volume of the sound of an explosion. */
-  static constexpr float EXPLOSION_VOLUME = 70.0F;
-  /** @brief Layer of the explosions: drawn over the ships and the missiles.
-   */
-  static constexpr std::int32_t EXPLOSION_LAYER = 1;
   /** @brief Bigger gaps are jumped (several lost snapshots): smoothing them
    *         would show the entity flying across the screen. */
   static constexpr float SNAP_DISTANCE = 128.0F;
@@ -103,14 +95,6 @@ class WorldMirror {
     /** @brief Its kind, to know if it explodes. */
     common::EntityKind kind;
   };
-
-  /**
-   * @brief Look of a new entity: by its kind, and by its owner for a ship.
-   *
-   * @param packet The ENTITY_SPAWN received.
-   * @return The sprite and animation to give it.
-   */
-  [[nodiscard]] const Look& lookFor(const protocol::EntitySpawn& packet) const;
 
   /** @brief Whether the ENTITY_SPAWN is our own ship. */
   [[nodiscard]] bool isLocalShip(const protocol::EntitySpawn& packet) const;
@@ -126,18 +110,8 @@ class WorldMirror {
                ampersand::core::math::Vec2f serverPosition);
 
   /**
-   * @brief Creates a local entity with a look.
-   *
-   * @param look Its sprite, scale and animation.
-   * @param position Its position, in world units.
-   * @return The entity, or nothing if the world is full.
-   */
-  std::optional<ampersand::core::ecs::Entity> create(
-      const Look& look, ampersand::core::math::Vec2f position);
-
-  /**
    * @brief Creates an explosion centered on the sprite of an entity that
-   *        died, and plays its sound.
+   *        died.
    *
    * @param transform Transform of the entity that died.
    * @param sprite Sprite of the entity that died.
@@ -145,21 +119,10 @@ class WorldMirror {
   void explode(const ampersand::core::Transform& transform,
                const ampersand::render::Sprite& sprite);
 
-  /**
-   * @brief Plays a sound on an entity. Does nothing if the sound was not
-   *        loaded.
-   *
-   * @param entity The entity playing it.
-   * @param sound The sound, 0 if it was not loaded.
-   * @param volume Its volume, from 0 to 100.
-   */
-  void play(ampersand::core::ecs::Entity entity,
-            ampersand::audio::SoundId sound, float volume);
-
   /** @brief The world holding the local entities. */
   ampersand::core::ecs::World& _world;
-  /** @brief Sprites and sounds of each kind of entity. */
-  EntityLooks _looks;
+  /** @brief Creates each kind of entity with its look and sounds. */
+  IEntityFactory& _factory;
   /** @brief The mirrored entities, by server id. */
   std::unordered_map<std::uint32_t, Mirrored> _entities;
   /** @brief Ids destroyed: ids are never reused, so a spawn arriving after

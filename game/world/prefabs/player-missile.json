@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "name": "Missile of a player, with the shot sound",
+  "prefab": "world/prefabs/base.json",
+  "components": {
+    "Transform": {
+      "scale": { "x": 1.5, "y": 1.5 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/player-shots.png",
+      "source": { "x": 232, "y": 103, "width": 16, "height": 12 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    },
+    "Animation": {
+      "frames": [
+        { "x": 232, "y": 103, "width": 16, "height": 12 },
+        { "x": 249, "y": 103, "width": 16, "height": 12 }
+      ],
+      "frameDuration": 0.1,
+      "loop": true
+    },
+    "AudioSource": { "sound": "assets/sounds/shoot.wav", "volume": 40, "loop": false, "playing": true }
+  }
+}

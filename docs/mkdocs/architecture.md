@@ -51,19 +51,42 @@ The threads only share the socket (behind a mutex) and bounded
 
 ## Client
 
-Before the loop, `AssetLoader` loads the sprite sheets, the star-field images,
-the font and the sounds from the `assets/` folder next to the binary (CMake
-copies it there, the sources are in `assets/CREDITS.md`). The client stops if
-a file is missing.
+### The game folder
 
-`Starfield` then creates the background: two layers of stars (the back one
-with a planet and a moon), each drawn twice side by side, behind everything
-else. The back layer scrolls left at 30 px/s and the front one at 90 px/s, so
-the front stars look closer.
+What the client looks like is data, read by the engine's scene module from the
+`game/` folder (CMake copies it next to the binary). The client first moves to
+its binary folder, since the engine reads `game/` from the working directory.
 
-`Controls` sets the engine input actions: the `Horizontal` and `Vertical`
-axes (arrow keys or a controller's left stick), `Fire` (Space or the A button)
-and `Quit` (Escape or Start).
+```text
+game/
+├── assets/            sprites, font and sounds (sources in assets/CREDITS.md)
+├── scripts/
+│   └── scroll.lua     puts a star-field copy back behind the other one
+└── world/
+    ├── config.json    window, sound, camera, background colour, input actions
+    ├── scenes/
+    │   └── game.json  the star field: two copies of each layer, side by side
+    └── prefabs/       one entity each: ships (one per player colour), enemy,
+                       missiles, explosion, star-field layers
+```
+
+- `config.json` opens the window (1280x720, showing the 1920x1080 game area)
+  and the sound, and declares the input actions: the `Horizontal` and
+  `Vertical` axes (arrow keys or a controller's left stick), `Fire` (Space or
+  the A button) and `Quit` (Escape or Start). Changing a key only means editing
+  this file.
+- The **star field** has two layers (the back one with a planet and a moon),
+  each drawn twice side by side, behind everything else. The back layer scrolls
+  left at 30 px/s and the front one at 90 px/s, so the front stars look closer.
+- The **prefabs** give each kind of entity its sprite, animation, scale, layer
+  and sound. `PrefabFactory` picks the prefab for each kind the server sends,
+  and `WorldMirror` puts the entity where the server says. A power-up or an
+  obstacle has no prefab yet and gets an entity without a sprite.
+
+`WorldMirror` only talks to an `IEntityFactory`: the game gives it the
+`PrefabFactory`, and the tests a factory of plain entities, since a prefab with
+a sprite needs a window. The tests also load every file of `game/` with fake
+window and sound backends, so a missing field or file fails in the CI.
 
 The loop is the engine `Scheduler`, fed by a `FrameTimer`: each frame, the
 timer gives the real time since the previous one (at most 0.1 s, so a frozen
@@ -85,11 +108,11 @@ computer, whatever its frame rate.
       to friends), our health, lives and score, who joined or left, and the
       result of the game;
     - `WorldMirror` applies the game packets to the local `World`. It keeps
-      one entity per server entity, with the sprite, animation and size of its
-      kind (each ship has the colour of its player), plays the sound of our
-      shots, and leaves an explosion where a ship or an enemy is killed. It is
-      emptied each time `ServerConnection::roomGeneration()` changes (we enter
-      or leave a room): each room numbers its entities from the start;
+      one entity per server entity, created from the prefab of its kind (each
+      ship has the colour of its player, our shots have their sound), and
+      leaves an explosion where a ship or an enemy is killed. It is emptied
+      each time `ServerConnection::roomGeneration()` changes (we enter or
+      leave a room): each room numbers its entities from the start;
     - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server.
 4. `LobbySystem`, out of a room: shows the `LobbyMenu` (quick match, create a
    public or a private room, join with a code typed with the digits) and the
@@ -105,14 +128,20 @@ computer, whatever its frame rate.
    between two snapshots, and the star-field layers.
 7. `CorrectionSystem`: slides each entity a bit toward where the server says
    it is (see below).
-8. `ScrollingSystem`: once a star-field copy has fully left the screen on the
-   left, puts it back behind the other copy, so the background never ends.
-9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
-   remove an explosion once its animation and its sound are over.
-10. `AudioSystem` (engine): plays the sounds.
-11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+8. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
+   star field has one, `scroll.lua`: once a copy has fully left the screen on
+   the left, it goes back behind the other copy, so the background never ends.
+9. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
+   that script off, and the game goes on.
+10. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+    remove an explosion once its animation and its sound are over.
+11. `AudioSystem` (engine): plays the sounds.
+12. `RenderSystem` (engine): draws the `World`, the star-field at the back and
     the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
     fit the window.
+
+Lua only drives what is seen: the server stays the only one to decide where
+the entities are, so nothing of the game itself is in a script.
 
 Systems never destroy an entity while the others run: they queue it in the
 engine `CommandQueue`, which the `Scheduler` applies at the end of the frame.

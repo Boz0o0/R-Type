@@ -3,7 +3,6 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
-#include <rtype/client/Controls.hpp>
 #include <rtype/client/LoginMenu.hpp>
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/systems/LoginSystem.hpp>
@@ -12,16 +11,17 @@
 #include <string>
 
 #include "FakeServer.hpp"
+#include "GameFiles.hpp"
 
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
 using ampersand::input::KeyCode;
 using ampersand::input::KeyPressed;
-using rtype::client::Controls;
 using rtype::client::LoginMenu;
 using rtype::client::LoginSystem;
 using rtype::client::ServerConnection;
 using rtype::client::test::FakeServer;
+using rtype::client::test::gameInput;
 using rtype::client::test::START;
 using rtype::client::test::updateUntilStateChanges;
 using State = ServerConnection::State;
@@ -31,7 +31,7 @@ namespace protocol = rtype::protocol;
 class LoginSystemTest : public testing::Test {
  protected:
   void SetUp() override {
-    Controls::bind(this->world.addResource<InputManager>());
+    this->world.addResource<InputManager>(gameInput());
     this->input().beginFrame();
   }
 

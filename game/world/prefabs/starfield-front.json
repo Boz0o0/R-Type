@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "Front stars, faster so they look closer",
+  "prefab": "world/prefabs/starfield-back.json",
+  "components": {
+    "Sprite": {
+      "texture": "assets/sprites/starfield-front.png",
+      "layer": -10
+    },
+    "Velocity": { "value": { "x": -90 } }
+  }
+}
