@@ -13,6 +13,7 @@
 #include <rtype/common/protocol/Protocol.hpp>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <variant>
 
@@ -89,9 +90,19 @@ inline void updateUntilStateChanges(ServerConnection& connection,
 }
 
 /** @brief Brings the client into the lobby. */
+/** @brief Credentials given to logIn() by the tests. */
+inline const std::string USERNAME = "Bob";
+inline const std::string PASSWORD = "hunter2";
+
+/** @brief Starts connecting with LOGIN, if not done yet. */
+inline void logIn(ServerConnection& connection) {
+  connection.logIn(USERNAME, PASSWORD, false);
+}
+
 inline void connectToLobby(FakeServer& server, ServerConnection& connection) {
+  logIn(connection);
   connection.update(START);
-  server.receive<ConnectRequest>();
+  server.receive<Login>();
   server.send(ConnectAccept{});
   updateUntilStateChanges(connection, START);
   ASSERT_EQ(connection.state(), State::InLobby);

@@ -7,7 +7,7 @@ Quick facts:
 
 - Transport: **UDP** only (IPv4)
 - Default port: **4242**
-- Binary protocol, current version: **3**
+- Binary protocol, current version: **4**
 - Code: `include/rtype/common/protocol/` and `src/common/protocol/` (see [Implementation](implementation.md))
 
 The server runs the game. The client only sends the player's inputs and draws
@@ -20,7 +20,7 @@ is right.
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: CONNECT_REQUEST(name)
+    C->>S: LOGIN(username, password) or REGISTER
     S-->>C: CONNECT_ACCEPT (the client is in the lobby)
     C->>S: ROOM_LIST
     S-->>C: ROOM_LIST_REPLY(public rooms)
@@ -42,8 +42,8 @@ sequenceDiagram
 ```
 
 The server has a **lobby** and **rooms** (we also call them parties). A
-client first enters the lobby, then plays in one room at a time, and can go
-back to the lobby to pick another one.
+client first logs in to enter the lobby, then plays in one room at a time,
+and can go back to the lobby to pick another one.
 
 ## Data types
 
@@ -72,7 +72,7 @@ Every packet starts with the same 12 bytes:
 | Offset | Field | Type | What it is |
 | --- | --- | --- | --- |
 | 0 | `magic` | `u16` | always `0x5254` ("RT") |
-| 2 | `version` | `u8` | protocol version, `3` for now |
+| 2 | `version` | `u8` | protocol version, `4` for now |
 | 3 | `type` | `u8` | packet type (see list below) |
 | 4 | `flags` | `u8` | `0x01` = reliable, the other bits are unused |
 | 5 | `reserved` | `u8` | unused, send 0 |
@@ -96,6 +96,8 @@ internet. One UDP datagram = one packet.
 | `0x05` | [PING](#ping-0x05) | both | no | 4 |
 | `0x06` | [PONG](#pong-0x06) | both | no | 4 |
 | `0x07` | [ACK](#ack-0x07) | both | no | 4 |
+| `0x08` | [REGISTER](#register-0x08) | client | no | 2 + n + m |
+| `0x09` | [LOGIN](#login-0x09) | client | no | 2 + n + m |
 | `0x10` | [PLAYER_INPUT](#player_input-0x10) | client | no | 5 |
 | `0x20` | [GAME_START](#game_start-0x20) | server | yes | 4 |
 | `0x21` | [PLAYER_JOINED](#player_joined-0x21) | server | yes | 2 + n |
@@ -132,7 +134,9 @@ screen, `2` collected.
 **DisconnectReason**: `0` quit, `1` timeout, `2` kicked, `3` server shutdown.
 
 **RejectReason**: `0` server full, `1` game already started, `2` wrong version,
-`3` invalid name, `4` party full, `5` invalid party code, `6` room not found.
+`3` invalid name, `4` party full, `5` invalid party code, `6` room not found,
+`7` bad credentials, `8` account exists, `9` already logged in, `10` invalid
+password, `11` too many attempts.
 
 **RoomVisibility**: `0` public (in the room list, anyone can join it), `1`
 private (hidden, joined with its code only).
@@ -145,7 +149,9 @@ Player ids go from `0` to `3` (4 players max). `0xFF` means "no player".
 
 #### CONNECT_REQUEST (0x01)
 
-Sent by the client to enter the lobby.
+Sent by the client to enter the lobby without an account. Our server uses
+accounts, so it ignores this packet: send LOGIN or REGISTER instead (see
+[Accounts](#accounts)). It is kept for servers without accounts.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
@@ -153,8 +159,8 @@ Sent by the client to enter the lobby.
 
 #### CONNECT_ACCEPT (0x02)
 
-The client is in the lobby. Not reliable: the client sends CONNECT_REQUEST
-again until it gets an answer, and the server answers every one.
+The client is in the lobby. Not reliable: the client sends its LOGIN or
+REGISTER again until it gets an answer, and the server answers every one.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
@@ -163,7 +169,9 @@ again until it gets an answer, and the server answers every one.
 #### CONNECT_REJECT (0x03)
 
 The server refused the client (`server full` when it already has 256
-clients, `invalid name`, `wrong version`). The client stops trying.
+clients, `bad credentials`, `too many attempts`, `wrong version`...). The
+client stops sending its request; after a refused LOGIN or REGISTER, the
+player can try again.
 
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
@@ -203,6 +211,25 @@ Says "I got your reliable packet".
 | Offset | Field | Type | Notes |
 | --- | --- | --- | --- |
 | 0 | `sequence` | `u32` | `sequence` of the packet we got |
+
+#### REGISTER (0x08)
+
+Creates an account, then enters the lobby with it, like LOGIN.
+
+| Offset | Field | Type | Notes |
+| --- | --- | --- | --- |
+| 0 | `username` | `string` | 1 to 16 bytes of UTF-8, no control character; also the name shown in game |
+| 1 + n | `password` | `string` | 1 to 64 bytes |
+
+Refused with `invalid name`, `invalid password`, or `account exists` when
+the username is taken (by another password: see [Accounts](#accounts)).
+
+#### LOGIN (0x09)
+
+Enters the lobby with an account. Same data as REGISTER.
+
+Refused with `bad credentials` (unknown username or wrong password: the
+server never says which one), `already logged in` or `too many attempts`.
 
 ### Client packets
 
@@ -474,29 +501,63 @@ sequence.
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: CONNECT_REQUEST("Alice")
+    C->>S: LOGIN("Alice", "hunter2")
     Note right of S: no answer? the client tries again after 500 ms
-    C->>S: CONNECT_REQUEST("Alice")
+    C->>S: LOGIN("Alice", "hunter2")
     alt accepted
         S-->>C: CONNECT_ACCEPT
     else refused
-        S-->>C: CONNECT_REJECT(server full)
+        S-->>C: CONNECT_REJECT(bad credentials)
     end
 ```
 
-- The client sends CONNECT_REQUEST every 500 ms until it gets an answer. It
-  gives up after 10 tries.
+- The client sends its LOGIN (or REGISTER) every 500 ms until it gets an
+  answer. It gives up after 10 tries.
 - The server knows a client by its **IP + port**. If the same IP + port sends
-  CONNECT_REQUEST again from the lobby, the server checks the name again,
-  keeps the new one and sends CONNECT_ACCEPT again (or CONNECT_REJECT if the
-  name is invalid, and forgets the client); it doesn't create a new client.
-- If the client is in a room, a CONNECT_REQUEST that comes less than 5
-  seconds after its CONNECT_ACCEPT is a late copy (sent before the accept
-  arrived): it is ignored. Later, the server thinks the client restarted: it
-  takes it out of its room, and accepts its next CONNECT_REQUEST.
-- The server refuses when it already has 256 clients (`server full`), when
-  the name is not valid UTF-8 or holds control characters (`invalid name`).
-  If the version is different, it answers "wrong version".
+  the same username again from the lobby less than 5 seconds after its
+  CONNECT_ACCEPT, it is a copy sent before the accept arrived: the server
+  sends CONNECT_ACCEPT again. Otherwise, the server thinks the client
+  restarted: it logs it out and checks the new LOGIN or REGISTER like the one
+  of a new address.
+- If the client is in a room, a LOGIN or REGISTER that comes less than 5
+  seconds after its CONNECT_ACCEPT is a late copy: it is ignored. Later, the
+  server takes the client out of its room, back to the lobby, where its next
+  LOGIN or REGISTER is checked again.
+- The server refuses when it already has 256 clients (`server full`). If the
+  version is different, it answers "wrong version".
+
+## Accounts
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Server (lobby)
+    participant A as Server (password thread)
+    C->>L: REGISTER("Alice", "hunter2")
+    L->>A: checks it (tens of ms)
+    C->>L: REGISTER("Alice", "hunter2") (copy, ignored)
+    A->>L: account 1
+    L-->>C: CONNECT_ACCEPT
+```
+
+- An account is a username and a password. The username is also the name
+  shown in game. Letter case is ignored: `alice` and `Alice` are the same
+  account, and the name shown is the one typed at login.
+- Checking a password takes time on purpose (see
+  [Security](#security)), so the server answers a LOGIN or REGISTER a bit
+  later than other packets. Copies that come meanwhile from the same IP +
+  port are ignored.
+- REGISTER of a username that already exists with the **same** password logs
+  in: it is a copy whose CONNECT_ACCEPT was lost, or a player who forgot they
+  already made the account. With another password, it is refused with
+  `account exists`.
+- One account plays once at a time: a second LOGIN with the right password,
+  while the first client is still connected, gets `already logged in`.
+- At most 5 failed LOGIN or REGISTER per IP and per minute; the next ones get
+  `too many attempts` until the minute is over. Logins with the right password
+  are not counted.
+- At most 64 passwords wait to be checked at once; past that, the server
+  answers `server full`.
 
 ## Lobby and rooms
 
@@ -599,16 +660,17 @@ packet is **dropped**: no answer, no crash.
 1. At least 12 bytes
 2. At most 1200 bytes
 3. `magic` is `0x5254`
-4. `version` is 3 (if it's a CONNECT_REQUEST, the server can answer "wrong
-   version")
+4. `version` is 4 (if it's a CONNECT_REQUEST, REGISTER or LOGIN, the server
+   can answer "wrong version")
 5. `payloadSize` = packet size - 12
 6. `type` is in the list
 7. The data has exactly the right size, enums and ids are valid, floats are
    not NaN/infinity, strings are not too long
 8. Right direction: the server drops server packets, the client drops client
    packets
-9. Right sender: the server only accepts CONNECT_REQUEST from unknown IPs, the
-   client only listens to the server
+9. Right sender: the server only accepts LOGIN and REGISTER from unknown IPs
+   (CONNECT_REQUEST for a server without accounts), the client only listens to
+   the server
 
 Sizes are always checked against the real number of bytes before allocating
 anything. So a fake `count` or string length can't make us allocate a lot of
@@ -616,11 +678,23 @@ memory or read outside the buffer.
 
 ## Security
 
-- There is no encryption and no login. The protocol is made for LAN games.
-- Someone who can fake his IP could pretend to be another player.
+- There is no encryption: **the password is sent in clear** in LOGIN and
+  REGISTER. Someone who can read the packets (same Wi-Fi, same network) can
+  read it. The protocol is made for LAN games: don't reuse a real password.
+- The server never stores a password: only a hash of it (Argon2id, 19 MiB of
+  memory, 2 passes) with a random salt of 16 bytes per account. A stolen
+  database does not give the passwords, and the same password gives a
+  different hash for each account.
+- The hash is slow on purpose, so trying many passwords is slow too. On top,
+  an IP gets 5 failed logins per minute. A LOGIN for an unknown username
+  takes as long as one with a wrong password, and gets the same answer, so it
+  does not tell which usernames exist.
+- Someone who can fake his IP could pretend to be another player, once that
+  player logged in.
 - The answer to an unknown IP (CONNECT_ACCEPT or CONNECT_REJECT, 13 bytes)
-  is always smaller than the request (at least 14 bytes), so the server can't
-  be used for a DDoS amplification attack.
+  is always smaller than the request (CONNECT_REQUEST is at least 14 bytes,
+  LOGIN and REGISTER at least 16), so the server can't be used for a DDoS
+  amplification attack.
 - ROOM_LIST_REPLY is bigger than ROOM_LIST, so the server sends it at most
   once every 250 ms to the same client: someone who fakes the address of a
   client can't use it to flood that address.
@@ -636,13 +710,14 @@ memory or read outside the buffer.
 | Name | Value |
 | --- | --- |
 | `MAGIC` | `0x5254` |
-| `VERSION` | `3` |
+| `VERSION` | `4` |
 | `DEFAULT_PORT` | `4242` |
 | `HEADER_SIZE` | 12 bytes |
 | `MAX_DATAGRAM_SIZE` | 1200 bytes |
 | `MAX_PAYLOAD_SIZE` | 1188 bytes |
 | `MAX_PLAYERS` | 4 |
-| `MAX_PLAYER_NAME_LENGTH` | 16 bytes |
+| `MAX_PLAYER_NAME_LENGTH` | 16 bytes (also the username) |
+| `MAX_PASSWORD_LENGTH` | 64 bytes |
 | `MAX_PARTY_CODE_LENGTH` | 8 bytes |
 | `MAX_LISTED_ROOMS` | 32 |
 | `NO_OWNER` | `0xFF` |
@@ -659,18 +734,18 @@ memory or read outside the buffer.
 PLAYER_INPUT, sequence 42, frame 500, up + shoot:
 
 ```text
-52 54 03 10 00 00 00 05 00 00 00 2A | 00 00 01 F4 11
+52 54 04 10 00 00 00 05 00 00 00 2A | 00 00 01 F4 11
 magic ver type flags res size seq   | clientTick  keys
 ```
 
 ENTITY_DESTROY of entity 1234 (killed), sequence 7, reliable:
 
 ```text
-52 54 03 24 01 00 00 05 00 00 00 07 | 00 00 04 D2 00
+52 54 04 24 01 00 00 05 00 00 00 07 | 00 00 04 D2 00
 ```
 
 The ACK the client sends back for it:
 
 ```text
-52 54 03 07 00 00 00 04 00 00 00 2B | 00 00 00 07
+52 54 04 07 00 00 00 04 00 00 00 2B | 00 00 00 07
 ```

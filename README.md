@@ -44,11 +44,18 @@ To build only one of them, turn the other off with `-DRTYPE_CLIENT=OFF` or `-DRT
 Start the server, then one client per player (4 players per party, 16 parties at once):
 
 ```sh
-./build/bin/r-type_server [port]                              # default port: 4242
-./build/bin/r-type_client [host] [port] [name] [party code]   # default: 127.0.0.1 4242 Player
+./build/bin/r-type_server [port]                                  # default port: 4242
+./build/bin/r-type_client [host] [port] [username] [party code]   # default: 127.0.0.1 4242
 ```
 
-Without a party code, the client opens the **lobby**: choose a line with the
+The server keeps the player accounts in `rtype.db`, in the folder it is
+started from (only a salted Argon2id hash of each password is stored). The
+client first shows the **login** screen: type your username and password
+(Shift for upper case letters; only letters and digits can be typed), then
+choose **Log in**, or **Create an account** the first time. A username given
+on the command line is filled in already.
+
+Once logged in, without a party code, the client opens the **lobby**: choose a line with the
 arrows and press Enter.
 
 - **Quick match**: any public room with a free place (or a new one).

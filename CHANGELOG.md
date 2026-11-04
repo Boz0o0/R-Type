@@ -38,6 +38,10 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: the look of the game is data, in `game/` (read by the engine scene module): `world/config.json` (window, sound, camera, input actions), `world/scenes/game.json` (the star field) and `world/prefabs/` (ships, enemy, missiles, explosion, star-field layers). Changing a sprite, a sound or a key only means editing JSON.
 - **Client**: Lua scripting: the star field scrolls with `game/scripts/scroll.lua`. A broken script is printed and turned off, the game goes on.
 - **Tests**: every file of `game/` is loaded in the CI with fake window and sound backends, so a missing field, file or key fails there.
+- **Server**: player accounts, kept in a SQLite file (`rtype.db`, next to where the server runs). Passwords are never stored: only an Argon2id hash (19 MiB, 2 passes) and its random salt. A wrong password and an unknown username get the same answer, in the same time. One account plays once at a time.
+- **Server**: passwords are checked on a thread of their own (`AuthWorker`, 64 waiting at most), so the lobby keeps answering the other clients meanwhile. At most 5 failed logins per IP and per minute (`LoginLimiter`).
+- **Protocol**: accounts (protocol version 4): `REGISTER` (`0x08`) creates an account and logs in, `LOGIN` (`0x09`) logs in; both carry a username (1 to 16 bytes) and a password (1 to 64 bytes) and are answered by `CONNECT_ACCEPT` or `CONNECT_REJECT` (`wrong version` too, like `CONNECT_REQUEST`). New reject reasons `bad credentials`, `account exists`, `already logged in`, `invalid password` and `too many attempts`.
+- **Client**: the login screen: username, password (shown as stars), "Log in" or "Create an account". A refused login shows why and lets the player try again.
 
 ### Changed
 
@@ -48,6 +52,8 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
 - **Client**: the loop is the engine `Scheduler`, timed by a `FrameTimer`. The network work is a `NetworkSystem`, the lobby a `LobbySystem`, quitting or leaving the room a `QuitSystem`, and explosions are destroyed through the engine `CommandQueue`.
 - **Client**: the controls are engine input actions (`Horizontal` and `Vertical` axes, `Fire` and `Quit` buttons). Holding two opposite arrows now cancels out.
+- **Server**: a client enters the lobby with `REGISTER` or `LOGIN`; `CONNECT_REQUEST` is ignored. The name shown in game is the username.
+- **Client**: the third argument is the username written in advance on the login screen: `r-type_client [host] [port] [username] [party code]`. The client connects once the player logged in, not at start.
 
 ### Removed
 

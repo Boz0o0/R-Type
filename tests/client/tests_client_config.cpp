@@ -76,8 +76,8 @@ TEST(ClientConfig, RejectsExtraArguments) {
           .has_value());
 }
 
-TEST(ClientConfig, UsesPlayerAsTheDefaultName) {
-  EXPECT_EQ(nameOf({"r-type_client"}), "Player");
+TEST(ClientConfig, LeavesTheUsernameEmptyByDefault) {
+  EXPECT_EQ(nameOf({"r-type_client"}), "");
 }
 
 TEST(ClientConfig, ReadsTheName) {

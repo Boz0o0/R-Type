@@ -21,7 +21,7 @@ namespace rtype::protocol {
 /** @brief First two bytes of every datagram ("RT" in ASCII). */
 inline constexpr std::uint16_t MAGIC = 0x5254;
 /** @brief Version of the protocol implemented by this code. */
-inline constexpr std::uint8_t VERSION = 3;
+inline constexpr std::uint8_t VERSION = 4;
 /** @brief UDP port the server listens on when none is given. */
 inline constexpr std::uint16_t DEFAULT_PORT = 4242;
 
@@ -56,6 +56,8 @@ inline constexpr std::uint32_t MAX_SEND_ATTEMPTS = 20;
 inline constexpr std::uint32_t PING_INTERVAL_MS = 1000;
 /** @brief Silence after which a peer is considered disconnected. */
 inline constexpr std::uint32_t TIMEOUT_MS = 5000;
+/** @brief Longest password sent in REGISTER or LOGIN, in bytes. */
+inline constexpr std::size_t MAX_PASSWORD_LENGTH = 64;
 
 /**
  * @brief Identifies the payload carried by a datagram.
@@ -77,6 +79,8 @@ enum class PacketType : std::uint8_t {
   Ping = 0x05,
   Pong = 0x06,
   Ack = 0x07,
+  Register = 0x08,
+  Login = 0x09,
 
   PlayerInput = 0x10,
 
@@ -128,7 +132,10 @@ enum class DisconnectReason : std::uint8_t {
   ServerShutdown = 3,
 };
 
-/** @brief Why the server refused a CONNECT_REQUEST or a room request. */
+/**
+ * @brief Why the server refused a CONNECT_REQUEST, a REGISTER, a LOGIN or a
+ *        room request.
+ */
 enum class RejectReason : std::uint8_t {
   /** @brief No more clients, or no more parties, can be opened. */
   ServerFull = 0,
@@ -141,6 +148,16 @@ enum class RejectReason : std::uint8_t {
   InvalidPartyCode = 5,
   /** @brief No public party runs with the room id asked. */
   RoomNotFound = 6,
+  /** @brief Unknown username, or wrong password. */
+  BadCredentials = 7,
+  /** @brief REGISTER asked for a username that is already taken. */
+  AccountExists = 8,
+  /** @brief Someone is already logged in with this account. */
+  AlreadyLoggedIn = 9,
+  /** @brief The password is not 1 to MAX_PASSWORD_LENGTH bytes. */
+  InvalidPassword = 10,
+  /** @brief Too many failed logins from this IP address: wait a minute. */
+  TooManyAttempts = 11,
 };
 
 /** @brief Who can join a room opened with ROOM_CREATE. */

@@ -28,7 +28,8 @@ int32_t main(int32_t argc, char** argv) {
                                    : rtype::protocol::DEFAULT_PORT;
 
     ServerNetwork network(port);
-    Lobby lobby(network);
+    rtype::server::AccountStore accounts("rtype.db");
+    Lobby lobby(network, accounts);
     logLine(std::cout, "[server] listening on UDP port ", network.localPort());
 
     std::signal(SIGINT, requestStop);

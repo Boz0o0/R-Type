@@ -14,7 +14,7 @@ class ClientConfig {
   /**
    * @brief Reads the settings from the command line.
    *
-   * @param args argv: the binary, then [host] [port] [name] [party code].
+   * @param args argv: the binary, then [host] [port] [username] [party code].
    * @return The settings, or std::nullopt if an argument is invalid or
    *         there are too many.
    */
@@ -25,7 +25,7 @@ class ClientConfig {
   [[nodiscard]] const std::string& host() const;
   /** @brief UDP port of the server. */
   [[nodiscard]] std::uint16_t port() const;
-  /** @brief Name of the player. */
+  /** @brief Username filled in the login menu; empty if not given. */
   [[nodiscard]] const std::string& name() const;
   /**
    * @brief Code of the private room to join as soon as the client is in the
@@ -53,7 +53,7 @@ class ClientConfig {
   /** @brief See port(). */
   std::uint16_t _port{4242};
   /** @brief See name(). */
-  std::string _name{"Player"};
+  std::string _name;
   /** @brief See partyCode(). */
   std::string _partyCode;
   /** @brief See binaryDirectory(). */

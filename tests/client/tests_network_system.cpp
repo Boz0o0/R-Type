@@ -56,8 +56,7 @@ class NetworkSystemTest : public testing::Test {
   }
 
   FakeServer server;
-  ServerConnection connection{"127.0.0.1", this->server.socket.localPort(),
-                              "Bob"};
+  ServerConnection connection{"127.0.0.1", this->server.socket.localPort()};
   World world;
   FakeEntityFactory factory{this->world};
   WorldMirror worldMirror{this->world, this->factory};

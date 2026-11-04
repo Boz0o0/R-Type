@@ -206,6 +206,29 @@ void writePayload(BinaryWriter& writer, const RoomReject& payload) {
 
 void writePayload(BinaryWriter& /*writer*/, const RoomLeft& /*payload*/) {}
 
+/** @brief Throws if a password is too long, or empty, to be sent. */
+void checkPassword(const std::string& password) {
+  if (password.empty() || password.size() > MAX_PASSWORD_LENGTH) {
+    throw ProtocolError("password must be 1 to 64 bytes");
+  }
+}
+
+void writeCredentials(BinaryWriter& writer, const std::string& username,
+                      const std::string& password) {
+  checkPlayerName(username);
+  checkPassword(password);
+  writer.writeString(username);
+  writer.writeString(password);
+}
+
+void writePayload(BinaryWriter& writer, const Register& payload) {
+  writeCredentials(writer, payload.username, payload.password);
+}
+
+void writePayload(BinaryWriter& writer, const Login& payload) {
+  writeCredentials(writer, payload.username, payload.password);
+}
+
 // And the reading functions
 
 bool readPlayerId(BinaryReader& reader, std::uint8_t& playerId) {
@@ -225,7 +248,7 @@ bool readPayload(BinaryReader& reader, ConnectAccept& payload) {
 }
 
 bool readRejectReason(BinaryReader& reader, RejectReason& reason) {
-  return reader.readEnum(reason, RejectReason::RoomNotFound);
+  return reader.readEnum(reason, RejectReason::TooManyAttempts);
 }
 
 bool readPayload(BinaryReader& reader, ConnectReject& payload) {
@@ -361,6 +384,20 @@ bool readPayload(BinaryReader& /*reader*/, RoomLeft& /*payload*/) {
   return true;
 }
 
+bool readCredentials(BinaryReader& reader, std::string& username,
+                     std::string& password) {
+  return readPlayerName(reader, username) &&
+         reader.readString(password, MAX_PASSWORD_LENGTH) && !password.empty();
+}
+
+bool readPayload(BinaryReader& reader, Register& payload) {
+  return readCredentials(reader, payload.username, payload.password);
+}
+
+bool readPayload(BinaryReader& reader, Login& payload) {
+  return readCredentials(reader, payload.username, payload.password);
+}
+
 /**
  * @brief Reads a payload of type T, which must use every byte left.
  */
@@ -390,6 +427,10 @@ DecodeError decodePayload(PacketType type, BinaryReader& reader, Payload& out) {
       return decodeAs<Pong>(reader, out);
     case PacketType::Ack:
       return decodeAs<Ack>(reader, out);
+    case PacketType::Register:
+      return decodeAs<Register>(reader, out);
+    case PacketType::Login:
+      return decodeAs<Login>(reader, out);
     case PacketType::PlayerInput:
       return decodeAs<PlayerInput>(reader, out);
     case PacketType::GameStart:

@@ -11,12 +11,16 @@
 #include <random>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/server/AccountStore.hpp>
+#include <rtype/server/AuthWorker.hpp>
 #include <rtype/server/GameServer.hpp>
+#include <rtype/server/LoginLimiter.hpp>
 #include <rtype/server/MessageQueue.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 
 namespace rtype::server {
@@ -24,8 +28,14 @@ namespace rtype::server {
 /**
  * @brief The lobby of the server: its clients, and the parties they play in.
  *
- * A CONNECT_REQUEST from a new address makes it a client of the lobby. A
- * client in no party (a visitor) talks to the Lobby itself: it asks for the
+ * A new address becomes a client of the lobby with a CONNECT_REQUEST, in an
+ * open lobby, or with a REGISTER or a LOGIN, in a lobby with accounts (see
+ * AccountStore): there, CONNECT_REQUEST is ignored, the name of a client is
+ * its username, and an account is used by one client at a time. The
+ * passwords are checked by an AuthWorker on its own thread, so that their
+ * slow hash never stops the lobby, and each IP address has a few attempts
+ * per minute (LoginLimiter). A client in
+ * no party (a visitor) talks to the Lobby itself: it asks for the
  * list of the public parties (ROOM_LIST), opens a party (ROOM_CREATE) or
  * joins one (ROOM_JOIN), and is dropped after GameServer::CLIENT_TIMEOUT of
  * silence.
@@ -91,13 +101,26 @@ class Lobby {
   static constexpr std::size_t GENERATED_CODE_LENGTH = 6;
 
   /**
-   * @brief Creates a lobby without any client nor party.
+   * @brief Creates an open lobby, without any client nor party: anyone
+   *        enters it with CONNECT_REQUEST, without account.
    *
    * @param network Where packets come from and go to; must outlive the lobby.
    * @param maxParties Most parties run at once; past it, ROOM_CREATE and
    *        ROOM_JOIN that need a new party are refused with ServerFull.
    */
   explicit Lobby(ServerNetwork& network, std::size_t maxParties = MAX_PARTIES);
+
+  /**
+   * @brief Creates a lobby with accounts, without any client nor party:
+   *        clients enter it with REGISTER or LOGIN.
+   *
+   * @param network Where packets come from and go to; must outlive the lobby.
+   * @param accounts The player accounts; must outlive the lobby.
+   * @param maxParties Most parties run at once; past it, ROOM_CREATE and
+   *        ROOM_JOIN that need a new party are refused with ServerFull.
+   */
+  Lobby(ServerNetwork& network, AccountStore& accounts,
+        std::size_t maxParties = MAX_PARTIES);
 
   /** @brief Stops every party and waits for their threads. */
   ~Lobby() = default;
@@ -179,7 +202,7 @@ class Lobby {
   struct Client {
     /** @brief Its address. */
     ampersand::net::Endpoint endpoint;
-    /** @brief Name it gave in CONNECT_REQUEST. */
+    /** @brief Name it gave in CONNECT_REQUEST, or its username. */
     std::string name;
     /** @brief The party its packets go to; std::nullopt in the lobby. */
     std::optional<PartyId> party;
@@ -189,6 +212,8 @@ class Lobby {
     Clock::time_point connectedAt;
     /** @brief When it was last sent a ROOM_LIST_REPLY. */
     std::optional<Clock::time_point> lastRoomList;
+    /** @brief Its account; std::nullopt in an open lobby. */
+    std::optional<AccountStore::AccountId> account;
   };
 
   /** @brief A running GameServer and what the Lobby knows of it. */
@@ -234,13 +259,59 @@ class Lobby {
    */
   void route(IncomingMessage message, Clock::time_point now);
   /**
-   * @brief Makes an unknown address that sent CONNECT_REQUEST a client of
-   *        the lobby, or sends CONNECT_REJECT.
+   * @brief Makes an unknown address that sent CONNECT_REQUEST (open lobby),
+   *        or REGISTER or LOGIN (lobby with accounts), a client of the lobby,
+   *        or sends CONNECT_REJECT.
    *
    * @param message The packet and its sender; other packets are ignored.
    * @param now Current time.
    */
   void connect(const IncomingMessage& message, Clock::time_point now);
+  /**
+   * @brief Adds a client to the lobby and sends it CONNECT_ACCEPT.
+   *
+   * @param endpoint Its address, not a client yet.
+   * @param name Its name in game.
+   * @param account Its account, in a lobby with accounts.
+   * @param now Current time.
+   */
+  void admit(const ampersand::net::Endpoint& endpoint, const std::string& name,
+             std::optional<AccountStore::AccountId> account,
+             Clock::time_point now);
+  /** @brief Sends CONNECT_REJECT. */
+  void refuse(const ampersand::net::Endpoint& endpoint,
+              protocol::RejectReason reason);
+  /**
+   * @brief Why a username and a password cannot be sent to the AccountStore.
+   *
+   * @param creates REGISTER: the reasons tell what is wrong; LOGIN: they
+   *        are all BadCredentials.
+   * @return The reason, or std::nullopt if they can be checked.
+   */
+  [[nodiscard]] static std::optional<protocol::RejectReason> checkCredentials(
+      const std::string& username, const std::string& password, bool creates);
+  /**
+   * @brief Gives a LOGIN or a REGISTER of an address that is not a client
+   *        to the AuthWorker, or refuses it: bad format, server full, too
+   *        many attempts. A copy sent while it is checked is ignored.
+   */
+  void startLogin(const ampersand::net::Endpoint& endpoint,
+                  const std::string& username, const std::string& password,
+                  bool creates, Clock::time_point now);
+  /**
+   * @brief Admits the addresses whose password the AuthWorker accepted, and
+   *        refuses the others.
+   *
+   * @param now Current time.
+   */
+  void applyLogins(Clock::time_point now);
+  /**
+   * @brief Whether a packet asks to enter the lobby: CONNECT_REQUEST in an
+   *        open lobby, REGISTER or LOGIN in a lobby with accounts.
+   */
+  [[nodiscard]] bool isConnect(const protocol::Payload& payload) const;
+  /** @brief Whether a client uses an account. */
+  [[nodiscard]] bool isLoggedIn(AccountStore::AccountId account) const;
   /**
    * @brief Handles a packet of a client in the lobby.
    *
@@ -318,6 +389,12 @@ class Lobby {
 
   /** @brief Shared by every party; owned by the caller. */
   ServerNetwork& _network;
+  /** @brief Checks the passwords; nullptr in an open lobby. */
+  std::unique_ptr<AuthWorker> _auth;
+  /** @brief Addresses whose LOGIN or REGISTER the AuthWorker checks. */
+  std::unordered_set<std::string> _pendingLogins;
+  /** @brief Login attempts of each IP address. */
+  LoginLimiter _loginLimiter;
   /** @brief Most parties run at once. */
   std::size_t _maxParties;
   /** @brief Joins and leaves pushed by the parties, read by step(). */

@@ -14,11 +14,13 @@
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Hud.hpp>
 #include <rtype/client/LobbyMenu.hpp>
+#include <rtype/client/LoginMenu.hpp>
 #include <rtype/client/PrefabFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/CorrectionSystem.hpp>
 #include <rtype/client/systems/ExplosionSystem.hpp>
 #include <rtype/client/systems/LobbySystem.hpp>
+#include <rtype/client/systems/LoginSystem.hpp>
 #include <rtype/client/systems/NetworkSystem.hpp>
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
@@ -41,8 +43,7 @@ namespace scripting = ampersand::scripting;
 
 ClientApp::ClientApp(ClientConfig config)
     : _config(std::move(config)),
-      _connection(this->_config.host(), this->_config.port(),
-                  this->_config.name()) {}
+      _connection(this->_config.host(), this->_config.port()) {}
 
 void ClientApp::run() {
   std::filesystem::current_path(this->_config.binaryDirectory());
@@ -59,6 +60,7 @@ void ClientApp::run() {
         return window.renderer.loadFont(path);
       });
   Hud hud(this->_world, font);
+  LoginMenu loginMenu(this->_world, font, this->_config.name());
   LobbyMenu menu(this->_world, font);
 
   core::ecs::Scheduler scheduler(this->_world);
@@ -66,6 +68,7 @@ void ClientApp::run() {
   scheduler.add<input::InputSystem>(pollWindow);
   scheduler.add<QuitSystem>(this->_connection);
   scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
+  scheduler.add<LoginSystem>(this->_connection, loginMenu);
   scheduler.add<LobbySystem>(this->_connection, menu,
                              this->_config.partyCode());
   scheduler.add<PredictionSystem>();
