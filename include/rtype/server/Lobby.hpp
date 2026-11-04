@@ -11,6 +11,7 @@
 #include <random>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <rtype/server/AccountStore.hpp>
 #include <rtype/server/GameServer.hpp>
 #include <rtype/server/MessageQueue.hpp>
 #include <rtype/server/ServerNetwork.hpp>
@@ -97,7 +98,7 @@ class Lobby {
    * @param maxParties Most parties run at once; past it, ROOM_CREATE and
    *        ROOM_JOIN that need a new party are refused with ServerFull.
    */
-  explicit Lobby(ServerNetwork& network, std::size_t maxParties = MAX_PARTIES);
+  explicit Lobby(ServerNetwork& network, AccountStore& accounts, std::size_t maxParties = MAX_PARTIES);
 
   /** @brief Stops every party and waits for their threads. */
   ~Lobby() = default;
@@ -318,6 +319,8 @@ class Lobby {
 
   /** @brief Shared by every party; owned by the caller. */
   ServerNetwork& _network;
+  /** @brief The Database object */
+  AccountStore& _accounts;
   /** @brief Most parties run at once. */
   std::size_t _maxParties;
   /** @brief Joins and leaves pushed by the parties, read by step(). */
