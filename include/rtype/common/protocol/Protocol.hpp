@@ -21,7 +21,7 @@ namespace rtype::protocol {
 /** @brief First two bytes of every datagram ("RT" in ASCII). */
 inline constexpr std::uint16_t MAGIC = 0x5254;
 /** @brief Version of the protocol implemented by this code. */
-inline constexpr std::uint8_t VERSION = 3;
+inline constexpr std::uint8_t VERSION = 4;
 /** @brief UDP port the server listens on when none is given. */
 inline constexpr std::uint16_t DEFAULT_PORT = 4242;
 
@@ -56,7 +56,8 @@ inline constexpr std::uint32_t MAX_SEND_ATTEMPTS = 20;
 inline constexpr std::uint32_t PING_INTERVAL_MS = 1000;
 /** @brief Silence after which a peer is considered disconnected. */
 inline constexpr std::uint32_t TIMEOUT_MS = 5000;
-
+/** @brief The max password length, its logic... */
+inline constexpr std::size_t MAX_PASSWORD_LENGTH = 64;
 /**
  * @brief Identifies the payload carried by a datagram.
  *
@@ -77,6 +78,9 @@ enum class PacketType : std::uint8_t {
   Ping = 0x05,
   Pong = 0x06,
   Ack = 0x07,
+  /** @brief Register and login packet */
+  Register = 0x08,
+  Login = 0x09,
 
   PlayerInput = 0x10,
 
@@ -141,6 +145,10 @@ enum class RejectReason : std::uint8_t {
   InvalidPartyCode = 5,
   /** @brief No public party runs with the room id asked. */
   RoomNotFound = 6,
+  /** @brief Register moment */
+  BadCredentials = 7,
+  AccountExists = 8,
+  AlreadyLoggedIn = 9,
 };
 
 /** @brief Who can join a room opened with ROOM_CREATE. */

@@ -250,4 +250,18 @@ struct RoomLeft {
   static constexpr PacketType TYPE = PacketType::RoomLeft;
 };
 
+/** @brief Well see */
+struct Register {
+  static constexpr PacketType TYPE = PacketType::Register;
+  std::string username;
+  std::string password;
+};
+
+/** @brief Well see */
+struct Login {
+  static constexpr PacketType TYPE = PacketType::Login;
+  std::string username;
+  std::string password;
+};
+
 }  // namespace rtype::protocol
