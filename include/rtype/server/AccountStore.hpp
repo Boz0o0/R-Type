@@ -18,6 +18,8 @@ class AccountStore {
 
         std::optional<std::int64_t> authenticatedsqs(const std::string& username,
                                            const std::string& password);
+    private:
+        sqlite3* _db{};
 };
 
 } // namespace rtype::server
