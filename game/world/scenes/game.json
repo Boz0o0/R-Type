@@ -23,6 +23,10 @@
     {
       "name": "Login menu",
       "prefab": "world/prefabs/login-menu.json"
+    },
+    {
+      "name": "Lobby menu",
+      "prefab": "world/prefabs/lobby-menu.json"
     }
   ]
 }

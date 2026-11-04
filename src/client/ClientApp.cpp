@@ -14,12 +14,10 @@
 #include <optional>
 #include <rtype/client/ClientApp.hpp>
 #include <rtype/client/Hud.hpp>
-#include <rtype/client/LobbyMenu.hpp>
 #include <rtype/client/PrefabFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/CorrectionSystem.hpp>
 #include <rtype/client/systems/ExplosionSystem.hpp>
-#include <rtype/client/systems/LobbySystem.hpp>
 #include <rtype/client/systems/NetworkSystem.hpp>
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
@@ -60,7 +58,6 @@ void ClientApp::run() {
         return window.renderer.loadFont(path);
       });
   Hud hud(this->_world, font);
-  LobbyMenu menu(this->_world, font);
 
   core::ecs::Scheduler scheduler(this->_world);
   scheduler.addEventQueue<scripting::ScriptError>();
@@ -68,8 +65,6 @@ void ClientApp::run() {
   scheduler.add<input::InputSystem>(pollWindow);
   scheduler.add<QuitSystem>(this->_connection);
   scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
-  scheduler.add<LobbySystem>(this->_connection, menu,
-                             this->_config.partyCode());
   scheduler.add<PredictionSystem>();
   scheduler.add<physics::MovementSystem>();
   scheduler.add<CorrectionSystem>();
