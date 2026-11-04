@@ -147,6 +147,14 @@ std::string Hud::rejectText(std::optional<protocol::RejectReason> reason) {
       return "Invalid room code";
     case protocol::RejectReason::RoomNotFound:
       return "Room closed";
+    case protocol::RejectReason::BadCredentials:
+      return "Wrong username or password";
+    case protocol::RejectReason::AccountExists:
+      return "Username already taken";
+    case protocol::RejectReason::AlreadyLoggedIn:
+      return "Account already in use";
+    case protocol::RejectReason::InvalidPassword:
+      return "Invalid password";
   }
   return "Refused by the server";
 }

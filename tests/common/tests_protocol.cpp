@@ -71,6 +71,50 @@ TEST(protocol, round_trip_session_packets) {
   EXPECT_EQ(roundTrip(Ack{.sequence = 789}).sequence, 789U);
 }
 
+TEST(protocol, round_trip_account_packets) {
+  const auto registered =
+      roundTrip(Register{.username = "Seenau", .password = "hunter2"});
+  EXPECT_EQ(registered.username, "Seenau");
+  EXPECT_EQ(registered.password, "hunter2");
+  const auto login = roundTrip(Login{
+      .username = "Seenau", .password = std::string(MAX_PASSWORD_LENGTH, 'x')});
+  EXPECT_EQ(login.username, "Seenau");
+  EXPECT_EQ(login.password, std::string(MAX_PASSWORD_LENGTH, 'x'));
+  EXPECT_FALSE(isReliable(PacketType::Login));
+  EXPECT_EQ(
+      roundTrip(ConnectReject{.reason = RejectReason::InvalidPassword}).reason,
+      RejectReason::InvalidPassword);
+}
+
+TEST(protocol, encode_rejects_invalid_credentials) {
+  EXPECT_THROW((void)encode(Login{.username = "", .password = "x"}, 0),
+               ProtocolError);
+  EXPECT_THROW((void)encode(Login{.username = "Seenau", .password = ""}, 0),
+               ProtocolError);
+  EXPECT_THROW((void)encode(Register{.username = "Seenau",
+                                     .password = std::string(
+                                         MAX_PASSWORD_LENGTH + 1, 'x')},
+                            0),
+               ProtocolError);
+}
+
+TEST(protocol, decode_rejects_malformed_credentials) {
+  // Username "A", then an empty password: length 0.
+  auto emptyPassword = encode(Login{.username = "A", .password = "x"}, 0);
+  emptyPassword.pop_back();
+  emptyPassword.back() = std::byte{0};
+  emptyPassword[7] =
+      std::byte{static_cast<std::uint8_t>(emptyPassword.size() - HEADER_SIZE)};
+  EXPECT_EQ(decodeBytes(emptyPassword), DecodeError::MalformedPayload);
+
+  // A byte after the password.
+  auto trailing = encode(Register{.username = "A", .password = "x"}, 0);
+  trailing.push_back(std::byte{0});
+  trailing[7] =
+      std::byte{static_cast<std::uint8_t>(trailing.size() - HEADER_SIZE)};
+  EXPECT_EQ(decodeBytes(trailing), DecodeError::MalformedPayload);
+}
+
 TEST(protocol, round_trip_game_packets) {
   const auto input = roundTrip(PlayerInput{
       .clientTick = 42,
@@ -285,7 +329,8 @@ TEST(protocol, decode_rejects_malformed_lobby_payloads) {
 
   // Reject reason past the last one (after the request id).
   auto badReason = encode(RoomReject{.reason = RejectReason::RoomNotFound}, 0);
-  badReason[HEADER_SIZE + 1] = std::byte{7};
+  badReason[HEADER_SIZE + 1] =
+      std::byte{static_cast<std::uint8_t>(RejectReason::InvalidPassword) + 1};
   EXPECT_EQ(decodeBytes(badReason), DecodeError::MalformedPayload);
 
   // An empty packet with a byte in it.

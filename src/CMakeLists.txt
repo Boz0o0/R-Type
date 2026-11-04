@@ -81,6 +81,9 @@ if(RTYPE_SERVER)
             ampersand_core
             ampersand_net
             ampersand_physics
+        PRIVATE
+            sqlite3
+            monocypher
     )
     
     add_executable(r-type_server

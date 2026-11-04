@@ -17,7 +17,8 @@ using Payload =
                  Pong, Ack, PlayerInput, GameStart, PlayerJoined, PlayerLeft,
                  EntitySpawn, EntityDestroy, WorldSnapshot, PlayerState,
                  GameOver, RoomList, RoomCreate, RoomJoin, RoomLeave,
-                 RoomListReply, RoomJoined, RoomReject, RoomLeft, Register, Login>;
+                 RoomListReply, RoomJoined, RoomReject, RoomLeft, Register,
+                 Login>;
 
 /** @brief A decoded datagram. */
 struct Packet {

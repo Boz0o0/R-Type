@@ -250,17 +250,27 @@ struct RoomLeft {
   static constexpr PacketType TYPE = PacketType::RoomLeft;
 };
 
-/** @brief Well see */
+/**
+ * @brief C->S, unreliable, 2 + n + m bytes. Creates an account, then enters
+ *        the lobby with it, as LOGIN does.
+ */
 struct Register {
   static constexpr PacketType TYPE = PacketType::Register;
+  /** @brief 1 to MAX_PLAYER_NAME_LENGTH bytes of UTF-8, shown in game. */
   std::string username;
+  /** @brief 1 to MAX_PASSWORD_LENGTH bytes. */
   std::string password;
 };
 
-/** @brief Well see */
+/**
+ * @brief C->S, unreliable, 2 + n + m bytes. Enters the lobby with an account.
+ *        Answered by CONNECT_ACCEPT or CONNECT_REJECT.
+ */
 struct Login {
   static constexpr PacketType TYPE = PacketType::Login;
+  /** @brief 1 to MAX_PLAYER_NAME_LENGTH bytes of UTF-8, shown in game. */
   std::string username;
+  /** @brief 1 to MAX_PASSWORD_LENGTH bytes. */
   std::string password;
 };
 
