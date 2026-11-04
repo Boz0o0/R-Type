@@ -14,7 +14,7 @@ int32_t main(int32_t argc, char** argv) {
     const std::span args(argv, static_cast<std::size_t>(argc));
     const auto config = ClientConfig::fromArguments(args);
     if (!config) {
-      std::fprintf(stderr, "USAGE: %s [host] [port] [name] [party code]\n",
+      std::fprintf(stderr, "USAGE: %s [host] [port] [username] [party code]\n",
                    args.front());
       return ClientApp::EXIT_ERROR;
     }

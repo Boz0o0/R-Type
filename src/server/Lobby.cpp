@@ -58,7 +58,9 @@ Lobby::Lobby(ServerNetwork& network, std::size_t maxParties)
 
 Lobby::Lobby(ServerNetwork& network, AccountStore& accounts,
              std::size_t maxParties)
-    : _network(network), _accounts(&accounts), _maxParties(maxParties) {}
+    : _network(network),
+      _auth(std::make_unique<AuthWorker>(accounts)),
+      _maxParties(maxParties) {}
 
 void Lobby::run(const std::atomic<bool>& stopRequested) {
   while (!stopRequested) {
@@ -79,6 +81,7 @@ void Lobby::step() { this->step(Clock::now()); }
 
 void Lobby::step(Clock::time_point now) {
   this->applyChanges(now);
+  this->applyLogins(now);
   // Before the requests: a party left empty no longer counts in the limit.
   this->closeEmptyParties();
   for (IncomingMessage& message : this->_network.receive()) {
@@ -199,38 +202,23 @@ void Lobby::connect(const IncomingMessage& message, Clock::time_point now) {
   if (!this->isConnect(payload)) {
     return;  // an unknown address may only ask to enter the lobby
   }
-  const auto refuse = [&](protocol::RejectReason reason) {
-    this->_network.send(protocol::ConnectReject{.reason = reason},
-                        message.from);
-  };
+  if (const auto credentials = credentialsOf(payload)) {
+    this->startLogin(message.from, credentials->username, credentials->password,
+                     credentials->creates, now);
+    return;
+  }
+  const auto& request = std::get<protocol::ConnectRequest>(payload);
+  if (!GameServer::isValidName(request.playerName)) {
+    this->refuse(message.from, protocol::RejectReason::InvalidName);
+  } else if (this->_clients.size() >= MAX_CLIENTS) {
+    this->refuse(message.from, protocol::RejectReason::ServerFull);
+  } else {
+    this->admit(message.from, request.playerName, std::nullopt, now);
+  }
+}
 
-  if (this->_accounts == nullptr) {
-    const auto& request = std::get<protocol::ConnectRequest>(payload);
-    if (!GameServer::isValidName(request.playerName)) {
-      refuse(protocol::RejectReason::InvalidName);
-    } else if (this->_clients.size() >= MAX_CLIENTS) {
-      refuse(protocol::RejectReason::ServerFull);
-    } else {
-      this->admit(message.from, request.playerName, std::nullopt, now);
-    }
-    return;
-  }
-
-  // Checked before hashing the password, which is slow.
-  if (this->_clients.size() >= MAX_CLIENTS) {
-    refuse(protocol::RejectReason::ServerFull);
-    return;
-  }
-  const Authentication result = this->authenticate(payload, nullptr);
-  if (const auto* reason = std::get_if<protocol::RejectReason>(&result)) {
-    refuse(*reason);
-    return;
-  }
-  const std::optional<Credentials> credentials = credentialsOf(payload);
-  if (credentials) {  // always set: isConnect() checked it
-    this->admit(message.from, credentials->username,
-                std::get<AccountStore::AccountId>(result), now);
-  }
+void Lobby::refuse(const Endpoint& endpoint, protocol::RejectReason reason) {
+  this->_network.send(protocol::ConnectReject{.reason = reason}, endpoint);
 }
 
 void Lobby::admit(const Endpoint& endpoint, const std::string& name,
@@ -250,60 +238,93 @@ void Lobby::admit(const Endpoint& endpoint, const std::string& name,
   this->_network.send(protocol::ConnectAccept{}, endpoint);
 }
 
-Lobby::Authentication Lobby::authenticate(const protocol::Payload& payload,
-                                          const Client* self) {
-  const std::optional<Credentials> credentials = credentialsOf(payload);
-  if (!credentials || this->_accounts == nullptr) {
-    return protocol::RejectReason::BadCredentials;
+std::optional<protocol::RejectReason> Lobby::checkCredentials(
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    const std::string& username, const std::string& password, bool creates) {
+  if (!GameServer::isValidName(username)) {
+    return creates ? protocol::RejectReason::InvalidName
+                   : protocol::RejectReason::BadCredentials;
   }
-  const bool validPassword =
-      !credentials->password.empty() &&
-      credentials->password.size() <= protocol::MAX_PASSWORD_LENGTH;
-  if (!GameServer::isValidName(credentials->username)) {
-    return credentials->creates ? protocol::RejectReason::InvalidName
-                                : protocol::RejectReason::BadCredentials;
+  if (password.empty() || password.size() > protocol::MAX_PASSWORD_LENGTH) {
+    return creates ? protocol::RejectReason::InvalidPassword
+                   : protocol::RejectReason::BadCredentials;
   }
-  if (!validPassword) {
-    return credentials->creates ? protocol::RejectReason::InvalidPassword
-                                : protocol::RejectReason::BadCredentials;
-  }
+  return std::nullopt;
+}
 
-  std::optional<AccountStore::AccountId> account;
-  if (credentials->creates) {
-    account =
-        this->_accounts->create(credentials->username, credentials->password);
-    if (account) {
-      logLine(std::cout, "[server] account ", credentials->username,
-              " created");
+void Lobby::startLogin(const Endpoint& endpoint, const std::string& username,
+                       const std::string& password, bool creates,
+                       Clock::time_point now) {
+  const std::string key = endpoint.toString();
+  if (this->_pendingLogins.contains(key)) {
+    return;  // a copy sent again while its password is checked
+  }
+  if (const auto reason = checkCredentials(username, password, creates)) {
+    this->refuse(endpoint, *reason);
+    return;
+  }
+  // Checked before the password: hashing it is the slow part.
+  if (this->_clients.size() + this->_pendingLogins.size() >= MAX_CLIENTS ||
+      this->_pendingLogins.size() >= AuthWorker::MAX_PENDING) {
+    this->refuse(endpoint, protocol::RejectReason::ServerFull);
+    return;
+  }
+  if (!this->_loginLimiter.tryAttempt(endpoint.address, now)) {
+    logLine(std::cout, "[server] too many login attempts from ",
+            endpoint.address);
+    this->refuse(endpoint, protocol::RejectReason::TooManyAttempts);
+    return;
+  }
+  if (!this->_auth->submit(AuthJob{
+          .endpoint = endpoint,
+          .username = username,
+          .password = password,
+          .creates = creates,
+      })) {
+    this->_loginLimiter.refund(endpoint.address);
+    this->refuse(endpoint, protocol::RejectReason::ServerFull);
+    return;
+  }
+  this->_pendingLogins.insert(key);
+}
+
+void Lobby::applyLogins(Clock::time_point now) {
+  if (this->_auth == nullptr) {
+    return;
+  }
+  for (AuthResult& result : this->_auth->results()) {
+    this->_pendingLogins.erase(result.endpoint.toString());
+    if (const auto* reason =
+            std::get_if<protocol::RejectReason>(&result.outcome)) {
+      this->refuse(result.endpoint, *reason);
+      continue;
+    }
+    // The right password: only the failed attempts count.
+    this->_loginLimiter.refund(result.endpoint.address);
+    const auto account = std::get<AccountStore::AccountId>(result.outcome);
+    if (this->findClient(result.endpoint) != nullptr) {
+      continue;  // cannot happen: a pending address is not a client
+    }
+    if (this->isLoggedIn(account)) {
+      this->refuse(result.endpoint, protocol::RejectReason::AlreadyLoggedIn);
+    } else if (this->_clients.size() >= MAX_CLIENTS) {
+      this->refuse(result.endpoint, protocol::RejectReason::ServerFull);
+    } else {
+      this->admit(result.endpoint, result.username, account, now);
     }
   }
-  if (!account) {
-    // A LOGIN, or a REGISTER sent again: the account exists already.
-    account = this->_accounts->authenticate(credentials->username,
-                                            credentials->password);
-  }
-  if (!account) {
-    return credentials->creates ? protocol::RejectReason::AccountExists
-                                : protocol::RejectReason::BadCredentials;
-  }
-  if (this->isLoggedIn(*account, self)) {
-    return protocol::RejectReason::AlreadyLoggedIn;
-  }
-  return *account;
 }
 
 bool Lobby::isConnect(const protocol::Payload& payload) const {
-  if (this->_accounts == nullptr) {
+  if (this->_auth == nullptr) {
     return std::holds_alternative<protocol::ConnectRequest>(payload);
   }
   return credentialsOf(payload).has_value();
 }
 
-bool Lobby::isLoggedIn(AccountStore::AccountId account,
-                       const Client* self) const {
-  return std::ranges::any_of(this->_clients, [&](const auto& entry) {
-    const Client& client = entry.second;
-    return &client != self && client.account == account;
+bool Lobby::isLoggedIn(AccountStore::AccountId account) const {
+  return std::ranges::any_of(this->_clients, [account](const auto& entry) {
+    return entry.second.account == account;
   });
 }
 
@@ -321,7 +342,7 @@ void Lobby::handleVisitor(Client& client, const protocol::Payload& payload,
                         client.endpoint);
   } else if (const auto* request =
                  std::get_if<protocol::ConnectRequest>(&payload);
-             request != nullptr && this->_accounts == nullptr) {
+             request != nullptr && this->_auth == nullptr) {
     // Sent again by a client whose CONNECT_ACCEPT was lost, or by a client
     // that restarted with the same address: check its name again.
     if (!GameServer::isValidName(request->playerName)) {
@@ -339,22 +360,22 @@ void Lobby::handleVisitor(Client& client, const protocol::Payload& payload,
     client.connectedAt = now;
     this->_network.send(protocol::ConnectAccept{}, client.endpoint);
   } else if (const auto credentials = credentialsOf(payload);
-             credentials && this->_accounts != nullptr) {
-    // Sent again by a client whose CONNECT_ACCEPT was lost, or by a client
-    // that restarted with the same address: check its account again.
-    const Authentication result = this->authenticate(payload, &client);
-    if (const auto* reason = std::get_if<protocol::RejectReason>(&result)) {
-      this->_network.send(protocol::ConnectReject{.reason = *reason},
-                          client.endpoint);
-      logLine(std::cout, "[server] ", client.name,
-              " left the lobby: refused login");
-      this->_clients.erase(client.endpoint.toString());
+             credentials && this->_auth != nullptr) {
+    if (credentials->username == client.name &&
+        now - client.connectedAt <= LATE_CONNECT_WINDOW) {
+      // Sent again by a client whose CONNECT_ACCEPT was lost.
+      client.connectedAt = now;
+      this->_network.send(protocol::ConnectAccept{}, client.endpoint);
       return;
     }
-    client.name = credentials->username;
-    client.account = std::get<AccountStore::AccountId>(result);
-    client.connectedAt = now;
-    this->_network.send(protocol::ConnectAccept{}, client.endpoint);
+    // A client that restarted with the same address: it logs out, then its
+    // new login is checked like the one of a new address.
+    const Endpoint endpoint = client.endpoint;
+    logLine(std::cout, "[server] ", client.name,
+            " left the lobby: logs in again");
+    this->_clients.erase(endpoint.toString());
+    this->startLogin(endpoint, credentials->username, credentials->password,
+                     credentials->creates, now);
   } else if (std::holds_alternative<protocol::RoomLeave>(payload)) {
     // Sent again by a client whose ROOM_LEFT was lost.
     this->_network.send(protocol::RoomLeft{}, client.endpoint);

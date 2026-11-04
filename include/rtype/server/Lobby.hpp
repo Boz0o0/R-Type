@@ -12,12 +12,15 @@
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/server/AccountStore.hpp>
+#include <rtype/server/AuthWorker.hpp>
 #include <rtype/server/GameServer.hpp>
+#include <rtype/server/LoginLimiter.hpp>
 #include <rtype/server/MessageQueue.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 
 namespace rtype::server {
@@ -28,7 +31,10 @@ namespace rtype::server {
  * A new address becomes a client of the lobby with a CONNECT_REQUEST, in an
  * open lobby, or with a REGISTER or a LOGIN, in a lobby with accounts (see
  * AccountStore): there, CONNECT_REQUEST is ignored, the name of a client is
- * its username, and an account is used by one client at a time. A client in
+ * its username, and an account is used by one client at a time. The
+ * passwords are checked by an AuthWorker on its own thread, so that their
+ * slow hash never stops the lobby, and each IP address has a few attempts
+ * per minute (LoginLimiter). A client in
  * no party (a visitor) talks to the Lobby itself: it asks for the
  * list of the public parties (ROOM_LIST), opens a party (ROOM_CREATE) or
  * joins one (ROOM_JOIN), and is dropped after GameServer::CLIENT_TIMEOUT of
@@ -210,10 +216,6 @@ class Lobby {
     std::optional<AccountStore::AccountId> account;
   };
 
-  /** @brief The account a REGISTER or a LOGIN enters with, or why not. */
-  using Authentication =
-      std::variant<AccountStore::AccountId, protocol::RejectReason>;
-
   /** @brief A running GameServer and what the Lobby knows of it. */
   struct Party {
     /** @brief The game; on the heap, so that its address never changes. */
@@ -276,31 +278,40 @@ class Lobby {
   void admit(const ampersand::net::Endpoint& endpoint, const std::string& name,
              std::optional<AccountStore::AccountId> account,
              Clock::time_point now);
+  /** @brief Sends CONNECT_REJECT. */
+  void refuse(const ampersand::net::Endpoint& endpoint,
+              protocol::RejectReason reason);
   /**
-   * @brief Checks a REGISTER or a LOGIN, and creates the account of a
-   *        REGISTER. A REGISTER of an existing account with its password
-   *        logs in, so that a copy sent again is accepted.
+   * @brief Why a username and a password cannot be sent to the AccountStore.
    *
-   * @param payload A REGISTER or a LOGIN.
-   * @param self The client that sent it, or nullptr if it is not one yet:
-   *        its own account does not count as already logged in.
-   * @return The account, or why the client may not use it.
+   * @param creates REGISTER: the reasons tell what is wrong; LOGIN: they
+   *        are all BadCredentials.
+   * @return The reason, or std::nullopt if they can be checked.
    */
-  [[nodiscard]] Authentication authenticate(const protocol::Payload& payload,
-                                            const Client* self);
+  [[nodiscard]] static std::optional<protocol::RejectReason> checkCredentials(
+      const std::string& username, const std::string& password, bool creates);
+  /**
+   * @brief Gives a LOGIN or a REGISTER of an address that is not a client
+   *        to the AuthWorker, or refuses it: bad format, server full, too
+   *        many attempts. A copy sent while it is checked is ignored.
+   */
+  void startLogin(const ampersand::net::Endpoint& endpoint,
+                  const std::string& username, const std::string& password,
+                  bool creates, Clock::time_point now);
+  /**
+   * @brief Admits the addresses whose password the AuthWorker accepted, and
+   *        refuses the others.
+   *
+   * @param now Current time.
+   */
+  void applyLogins(Clock::time_point now);
   /**
    * @brief Whether a packet asks to enter the lobby: CONNECT_REQUEST in an
    *        open lobby, REGISTER or LOGIN in a lobby with accounts.
    */
   [[nodiscard]] bool isConnect(const protocol::Payload& payload) const;
-  /**
-   * @brief Whether a client other than self uses an account.
-   *
-   * @param account The account.
-   * @param self A client to ignore, or nullptr.
-   */
-  [[nodiscard]] bool isLoggedIn(AccountStore::AccountId account,
-                                const Client* self) const;
+  /** @brief Whether a client uses an account. */
+  [[nodiscard]] bool isLoggedIn(AccountStore::AccountId account) const;
   /**
    * @brief Handles a packet of a client in the lobby.
    *
@@ -378,8 +389,12 @@ class Lobby {
 
   /** @brief Shared by every party; owned by the caller. */
   ServerNetwork& _network;
-  /** @brief The player accounts; nullptr in an open lobby. */
-  AccountStore* _accounts{};
+  /** @brief Checks the passwords; nullptr in an open lobby. */
+  std::unique_ptr<AuthWorker> _auth;
+  /** @brief Addresses whose LOGIN or REGISTER the AuthWorker checks. */
+  std::unordered_set<std::string> _pendingLogins;
+  /** @brief Login attempts of each IP address. */
+  LoginLimiter _loginLimiter;
   /** @brief Most parties run at once. */
   std::size_t _maxParties;
   /** @brief Joins and leaves pushed by the parties, read by step(). */

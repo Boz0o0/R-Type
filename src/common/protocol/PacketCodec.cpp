@@ -248,7 +248,7 @@ bool readPayload(BinaryReader& reader, ConnectAccept& payload) {
 }
 
 bool readRejectReason(BinaryReader& reader, RejectReason& reason) {
-  return reader.readEnum(reason, RejectReason::InvalidPassword);
+  return reader.readEnum(reason, RejectReason::TooManyAttempts);
 }
 
 bool readPayload(BinaryReader& reader, ConnectReject& payload) {

@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/server/AccountStore.hpp>
 #include <rtype/server/Lobby.hpp>
+#include <rtype/server/LoginLimiter.hpp>
 #include <rtype/server/ServerNetwork.hpp>
 #include <string>
 #include <thread>
@@ -210,4 +214,84 @@ TEST(LobbyAccounts, PlaysUnderItsUsername) {
 
   ASSERT_TRUE(joined.has_value());
   EXPECT_EQ(joined->playerName, "Alice");
+}
+
+TEST(LobbyAccounts, RefusesAnAddressThatFailsTooOften) {
+  AccountLobby server;
+  ASSERT_TRUE(server.accounts.create("Alice", "pw").has_value());
+  TestClient client(server.network);
+  for (std::uint32_t attempt = 0;
+       attempt < rtype::server::LoginLimiter::MAX_ATTEMPTS; ++attempt) {
+    const auto reject = ask<ConnectReject>(
+        server.lobby, client, Login{.username = "Alice", .password = "bad"});
+    ASSERT_TRUE(reject.has_value());
+    ASSERT_EQ(reject->reason, RejectReason::BadCredentials);
+  }
+
+  // Even the right password, from any port of this address.
+  TestClient other(server.network);
+  const auto reject = ask<ConnectReject>(
+      server.lobby, other, Login{.username = "Alice", .password = "pw"});
+
+  ASSERT_TRUE(reject.has_value());
+  EXPECT_EQ(reject->reason, RejectReason::TooManyAttempts);
+}
+
+TEST(LobbyAccounts, DoesNotCountTheSuccessfulLogins) {
+  AccountLobby server;
+  std::vector<std::unique_ptr<TestClient>> clients;
+  for (std::uint32_t index = 0;
+       index <= rtype::server::LoginLimiter::MAX_ATTEMPTS; ++index) {
+    clients.push_back(std::make_unique<TestClient>(server.network));
+    const std::string name = "Player" + std::to_string(index);
+    ASSERT_TRUE(ask<ConnectAccept>(server.lobby, *clients.back(),
+                                   Register{.username = name, .password = "pw"})
+                    .has_value())
+        << name;
+  }
+}
+
+TEST(LobbyAccounts, IgnoresCopiesWhileThePasswordIsChecked) {
+  AccountLobby server;
+  ASSERT_TRUE(server.accounts.create("Alice", "pw").has_value());
+  TestClient client(server.network);
+
+  // Many copies of a wrong login: one attempt only.
+  for (int copy = 0; copy < 20; ++copy) {
+    client.send(Login{.username = "Alice", .password = "bad"});
+  }
+  const auto packets = collect(server.lobby, client);
+  std::size_t rejects = payloadsOf<ConnectReject>(packets).size();
+  const auto deadline = std::chrono::steady_clock::now() + AUTH_WAIT;
+  while (rejects == 0 && std::chrono::steady_clock::now() < deadline) {
+    rejects += payloadsOf<ConnectReject>(collect(server.lobby, client)).size();
+  }
+  EXPECT_GE(rejects, 1U);
+
+  // So the right password still works.
+  EXPECT_TRUE(ask<ConnectAccept>(server.lobby, client,
+                                 Login{.username = "Alice", .password = "pw"})
+                  .has_value());
+}
+
+// The point of the AuthWorker: a slow hash does not stop the lobby.
+TEST(LobbyAccounts, AnswersOtherClientsWhileAPasswordIsChecked) {
+  AccountLobby server;
+  TestClient alice(server.network);
+  ASSERT_TRUE(
+      ask<ConnectAccept>(server.lobby, alice,
+                         Register{.username = "Alice", .password = "pw"})
+          .has_value());
+  const auto hashStart = std::chrono::steady_clock::now();
+  (void)server.accounts.authenticate("Nobody", "pw");
+  const auto oneHash = std::chrono::steady_clock::now() - hashStart;
+
+  TestClient bob(server.network);
+  bob.send(Register{.username = "Bob", .password = "pw"});
+  std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  const auto start = std::chrono::steady_clock::now();
+  const auto pong = ask<Pong>(server.lobby, alice, Ping{.timestampMs = 7});
+
+  ASSERT_TRUE(pong.has_value());
+  EXPECT_LT(std::chrono::steady_clock::now() - start, oneHash / 2);
 }

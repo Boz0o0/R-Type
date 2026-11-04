@@ -39,6 +39,10 @@ void Hud::showConnection(State state,
       isLobby(state) && (!this->_shownState || !isLobby(*this->_shownState));
   this->_shownState = state;
   switch (state) {
+    case State::LoggedOut:
+      // The login menu shows what happened.
+      this->setText(this->_status, {});
+      break;
     case State::Connecting:
       this->setText(this->_status, "Connecting...");
       break;
@@ -155,6 +159,8 @@ std::string Hud::rejectText(std::optional<protocol::RejectReason> reason) {
       return "Account already in use";
     case protocol::RejectReason::InvalidPassword:
       return "Invalid password";
+    case protocol::RejectReason::TooManyAttempts:
+      return "Too many attempts, wait a minute";
   }
   return "Refused by the server";
 }

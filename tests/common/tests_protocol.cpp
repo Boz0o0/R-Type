@@ -330,7 +330,7 @@ TEST(protocol, decode_rejects_malformed_lobby_payloads) {
   // Reject reason past the last one (after the request id).
   auto badReason = encode(RoomReject{.reason = RejectReason::RoomNotFound}, 0);
   badReason[HEADER_SIZE + 1] =
-      std::byte{static_cast<std::uint8_t>(RejectReason::InvalidPassword) + 1};
+      std::byte{static_cast<std::uint8_t>(RejectReason::TooManyAttempts) + 1};
   EXPECT_EQ(decodeBytes(badReason), DecodeError::MalformedPayload);
 
   // An empty packet with a byte in it.

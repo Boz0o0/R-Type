@@ -29,6 +29,8 @@ using rtype::client::test::connectToLobby;
 using rtype::client::test::enterRoom;
 using rtype::client::test::FakeServer;
 using rtype::client::test::JOINED_SEQUENCE;
+using rtype::client::test::logIn;
+using rtype::client::test::PASSWORD;
 using rtype::client::test::START;
 using rtype::client::test::updateUntilStateChanges;
 
@@ -66,22 +68,83 @@ std::vector<Payload> takeGamePackets(ServerConnection& connection,
 
 // Entering the lobby
 
-TEST(ServerConnection, SendsConnectRequestWithThePlayerName) {
+TEST(ServerConnection, WaitsForTheLogin) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+
+  connection.update(START);
+  connection.update(START + ServerConnection::CONNECT_RETRY_DELAY);
+
+  EXPECT_EQ(connection.state(), State::LoggedOut);
+  EXPECT_FALSE(connection.hasEnded());
+  EXPECT_THROW(server.receive(), std::runtime_error);  // nothing sent
+}
+
+TEST(ServerConnection, SendsLoginWithTheCredentials) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  connection.logIn("Bob", "hunter2", false);
 
   connection.update(START);
   const Packet packet = server.receive();
 
-  const auto* request = std::get_if<ConnectRequest>(&packet.payload);
+  const auto* request = std::get_if<Login>(&packet.payload);
   ASSERT_NE(request, nullptr);
-  EXPECT_EQ(request->playerName, "Bob");
+  EXPECT_EQ(request->username, "Bob");
+  EXPECT_EQ(request->password, "hunter2");
   EXPECT_EQ(connection.state(), State::Connecting);
+}
+
+TEST(ServerConnection, SendsRegisterToCreateAnAccount) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  connection.logIn("Bob", "hunter2", true);
+
+  connection.update(START);
+  const auto request = server.receive<Register>();
+
+  EXPECT_EQ(request.username, "Bob");
+  EXPECT_EQ(request.password, "hunter2");
+}
+
+TEST(ServerConnection, GoesBackToTheLoginWhenTheAccountIsRefused) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
+  connection.update(START);
+  server.receive<Login>();
+
+  server.send(ConnectReject{.reason = RejectReason::BadCredentials});
+  updateUntilStateChanges(connection, START);
+
+  EXPECT_EQ(connection.state(), State::LoggedOut);
+  EXPECT_FALSE(connection.hasEnded());
+  EXPECT_EQ(connection.rejectReason(), RejectReason::BadCredentials);
+
+  // Nothing is sent until the player tries again.
+  connection.update(START + ServerConnection::CONNECT_RETRY_DELAY);
+  EXPECT_THROW(server.receive(), std::runtime_error);
+  connection.logIn("Bob", "right", false);
+  connection.update(START + ServerConnection::CONNECT_RETRY_DELAY);
+  EXPECT_EQ(server.receive<Login>().password, "right");
+  EXPECT_FALSE(connection.rejectReason().has_value());
+}
+
+TEST(ServerConnection, IgnoresLogInOnceConnecting) {
+  FakeServer server;
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
+
+  connection.logIn("Eve", "other", true);
+  connection.update(START);
+
+  EXPECT_EQ(server.receive<Login>().password, PASSWORD);
 }
 
 TEST(ServerConnection, EntersTheLobbyWhenTheServerAccepts) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connection.update(START);
   server.receive();
 
@@ -97,7 +160,8 @@ TEST(ServerConnection, EntersTheLobbyWhenTheServerAccepts) {
 
 TEST(ServerConnection, StopsWhenTheServerRejects) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connection.update(START);
   server.receive();
 
@@ -112,7 +176,8 @@ TEST(ServerConnection, StopsWhenTheServerRejects) {
 
 TEST(ServerConnection, RetriesThenGivesUp) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
 
   auto now = START;
   for (std::uint32_t attempt = 0;
@@ -124,8 +189,7 @@ TEST(ServerConnection, RetriesThenGivesUp) {
   }
   for (std::uint32_t attempt = 0;
        attempt < ServerConnection::MAX_CONNECT_ATTEMPTS; ++attempt) {
-    EXPECT_TRUE(
-        std::holds_alternative<ConnectRequest>(server.receive().payload));
+    EXPECT_TRUE(std::holds_alternative<Login>(server.receive().payload));
   }
   EXPECT_EQ(connection.state(), State::Connecting);
   EXPECT_FALSE(connection.hasEnded());
@@ -137,7 +201,8 @@ TEST(ServerConnection, RetriesThenGivesUp) {
 
 TEST(ServerConnection, IgnoresGarbageAndOtherSenders) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connection.update(START);
   server.receive();
 
@@ -155,7 +220,8 @@ TEST(ServerConnection, IgnoresGarbageAndOtherSenders) {
 
 TEST(ServerConnection, KeepsTheRoomListUpToDate) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   server.receive<RoomList>();
 
@@ -171,7 +237,8 @@ TEST(ServerConnection, KeepsTheRoomListUpToDate) {
 
 TEST(ServerConnection, IgnoresRoomRequestsOutsideTheLobby) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
 
   connection.enterRoom(RoomJoin{});  // still connecting
 
@@ -180,7 +247,8 @@ TEST(ServerConnection, IgnoresRoomRequestsOutsideTheLobby) {
 
 TEST(ServerConnection, PingsWhileConnectedAndSaysGoodbye) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
 
   connection.update(START + ServerConnection::PING_INTERVAL);
@@ -193,7 +261,8 @@ TEST(ServerConnection, PingsWhileConnectedAndSaysGoodbye) {
 
 TEST(ServerConnection, DisconnectsWhenTheServerGoesSilent) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
 
   connection.update(START + ServerConnection::SERVER_TIMEOUT);
@@ -209,7 +278,8 @@ TEST(ServerConnection, DisconnectsWhenTheServerGoesSilent) {
 
 TEST(ServerConnection, AsksForTheRoomUntilTheServerAnswers) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
 
   connection.enterRoom(RoomJoin{.roomId = 3});
@@ -237,7 +307,8 @@ TEST(ServerConnection, AsksForTheRoomUntilTheServerAnswers) {
 
 TEST(ServerConnection, GivesEachRoomRequestANewId) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{.roomId = 3});
   connection.update(START);
@@ -254,7 +325,8 @@ TEST(ServerConnection, GivesEachRoomRequestANewId) {
 
 TEST(ServerConnection, SendsTheRoomToCreate) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
 
   connection.enterRoom(RoomCreate{.visibility = RoomVisibility::Private});
@@ -265,7 +337,8 @@ TEST(ServerConnection, SendsTheRoomToCreate) {
 
 TEST(ServerConnection, StaysInTheLobbyWhenARoomIsRefused) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{.roomId = 3});
   connection.update(START);
@@ -285,7 +358,8 @@ TEST(ServerConnection, StaysInTheLobbyWhenARoomIsRefused) {
 // Answers to an older request come late: the room chosen now is another one.
 TEST(ServerConnection, IgnoresTheAnswersToAnotherRequest) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{.roomId = 7});
   connection.update(START);
@@ -309,7 +383,8 @@ TEST(ServerConnection, IgnoresTheAnswersToAnotherRequest) {
 
 TEST(ServerConnection, LeavesTheRoomForTheLobby) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
   const auto generation = connection.roomGeneration();
 
@@ -332,7 +407,8 @@ TEST(ServerConnection, LeavesTheRoomForTheLobby) {
 // world stays frozen while the lobby answers our PINGs forever.
 TEST(ServerConnection, GoesBackToTheLobbyWhenTheServerSaysSo) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
   const auto generation = connection.roomGeneration();
 
@@ -347,7 +423,8 @@ TEST(ServerConnection, GoesBackToTheLobbyWhenTheServerSaysSo) {
 
 TEST(ServerConnection, IgnoresARoomLeftOlderThanItsRoom) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
 
   // Sent before we joined this room: about the one we left before.
@@ -360,7 +437,8 @@ TEST(ServerConnection, IgnoresARoomLeftOlderThanItsRoom) {
 // While Joining, the request is sent again, and answered by the lobby.
 TEST(ServerConnection, KeepsAskingForItsRoomAfterARoomLeft) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{.roomId = 3});
   connection.update(START);
@@ -376,7 +454,8 @@ TEST(ServerConnection, KeepsAskingForItsRoomAfterARoomLeft) {
 
 TEST(ServerConnection, DropsTheGamePacketsOfARoomItLeft) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
   server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy},
               JOINED_SEQUENCE + 1);
@@ -403,7 +482,8 @@ TEST(ServerConnection, DropsTheGamePacketsOfARoomItLeft) {
 // old snapshot would hide the new ones, the old spawn would be a ghost.
 TEST(ServerConnection, KeepsOnlyTheGamePacketsOfTheRoomItJoins) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.enterRoom(RoomJoin{});
   connection.update(START);
@@ -436,7 +516,8 @@ TEST(ServerConnection, KeepsOnlyTheGamePacketsOfTheRoomItJoins) {
 
 TEST(ServerConnection, LeavesARoomItNoLongerWants) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
 
   // A late answer to a request it no longer sends.
@@ -451,7 +532,8 @@ TEST(ServerConnection, LeavesARoomItNoLongerWants) {
 
 TEST(ServerConnection, HandsGamePacketsToTheApp) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
 
   server.send(EntitySpawn{.entityId = 7, .entityType = EntityKind::Enemy},
@@ -469,7 +551,8 @@ TEST(ServerConnection, HandsGamePacketsToTheApp) {
 // The server resends a reliable packet when our ACK is lost.
 TEST(ServerConnection, HandlesAReliablePacketOnceButAcksEveryCopy) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   enterRoom(server, connection);
 
   const EntitySpawn spawn{.entityId = 7, .entityType = EntityKind::Enemy};
@@ -488,7 +571,8 @@ TEST(ServerConnection, HandlesAReliablePacketOnceButAcksEveryCopy) {
 
 TEST(ServerConnection, SendsInputOnlyInARoom) {
   FakeServer server;
-  ServerConnection connection("127.0.0.1", server.socket.localPort(), "Bob");
+  ServerConnection connection("127.0.0.1", server.socket.localPort());
+  logIn(connection);
   connectToLobby(server, connection);
   connection.sendInput(InputFlag::SHOOT);  // in the lobby: not sent
   connection.enterRoom(RoomJoin{});

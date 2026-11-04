@@ -58,8 +58,7 @@ class NetworkSystemTest : public testing::Test {
   }
 
   FakeServer server;
-  ServerConnection connection{"127.0.0.1", this->server.socket.localPort(),
-                              "Bob"};
+  ServerConnection connection{"127.0.0.1", this->server.socket.localPort()};
   World world;
   WorldMirror worldMirror{this->world, EntityLooks{}};
   Hud hud{this->world, 0};

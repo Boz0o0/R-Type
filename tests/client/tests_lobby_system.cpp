@@ -38,8 +38,7 @@ class LobbySystemTest : public testing::Test {
   InputManager& input() { return this->world.getResource<InputManager>(); }
 
   FakeServer server;
-  ServerConnection connection{"127.0.0.1", this->server.socket.localPort(),
-                              "Bob"};
+  ServerConnection connection{"127.0.0.1", this->server.socket.localPort()};
   World world;
   LobbyMenu menu{this->world, 0};
 };

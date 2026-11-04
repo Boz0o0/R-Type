@@ -21,12 +21,12 @@ using RoomRequest = std::variant<protocol::RoomCreate, protocol::RoomJoin>;
 /**
  * @brief The link between the client and the server.
  *
- * Enters the lobby by sending CONNECT_REQUEST until the server answers, then
- * keeps the connection alive with PINGs. In the lobby it asks for the list
- * of the public rooms every ROOM_LIST_INTERVAL; enterRoom() and leaveRoom()
- * send their request until the server answers it. update() never waits for
- * the network, so it is called once per frame. The game packets of the room
- * are handed out by takePackets().
+ * Waits for logIn(), then enters the lobby by sending LOGIN (or REGISTER)
+ * until the server answers, then keeps the connection alive with PINGs. In the
+ * lobby it asks for the list of the public rooms every ROOM_LIST_INTERVAL;
+ * enterRoom() and leaveRoom() send their request until the server answers it.
+ * update() never waits for the network, so it is called once per frame. The
+ * game packets of the room are handed out by takePackets().
  *
  * Packets can come late, so every answer is checked: ROOM_JOINED and
  * ROOM_REJECT must carry the requestId of the request being sent, and the
@@ -39,7 +39,12 @@ class ServerConnection {
   using Clock = std::chrono::steady_clock;
 
   enum class State : std::uint8_t {
-    /** @brief Sending CONNECT_REQUEST, no answer yet. */
+    /**
+     * @brief Waiting for logIn(). Also after a CONNECT_REJECT about the
+     *        account (see isLoginError()): rejectReason() is then set.
+     */
+    LoggedOut,
+    /** @brief Sending LOGIN or REGISTER, no answer yet. */
     Connecting,
     /** @brief In the lobby: rooms() is refreshed, enterRoom() can be used. */
     InLobby,
@@ -49,7 +54,10 @@ class ServerConnection {
     InRoom,
     /** @brief Sending ROOM_LEAVE, no answer yet. */
     Leaving,
-    /** @brief The server sent CONNECT_REJECT: rejectReason() is set. */
+    /**
+     * @brief The server sent CONNECT_REJECT for a reason other than the
+     *        account (server full, version): rejectReason() is set.
+     */
     Rejected,
     /** @brief No answer after MAX_CONNECT_ATTEMPTS requests. */
     Unreachable,
@@ -57,9 +65,9 @@ class ServerConnection {
     Disconnected,
   };
 
-  /** @brief Delay between two CONNECT_REQUEST without answer. */
+  /** @brief Delay between two LOGIN or REGISTER without answer. */
   static constexpr std::chrono::milliseconds CONNECT_RETRY_DELAY{500};
-  /** @brief CONNECT_REQUEST sent before giving up. */
+  /** @brief LOGIN or REGISTER sent before giving up. */
   static constexpr std::uint32_t MAX_CONNECT_ATTEMPTS = 10;
   /** @brief Delay between two room requests without answer. */
   static constexpr std::chrono::milliseconds REQUEST_RETRY_DELAY{500};
@@ -79,19 +87,36 @@ class ServerConnection {
 
   /**
    * @brief Opens a socket on a port picked by the system. Nothing is sent
-   *        before the first update().
+   *        before logIn().
    *
    * @param host Host name or address of the server.
    * @param port UDP port of the server.
-   * @param playerName Name sent in CONNECT_REQUEST (1 to 16 bytes).
    * @throws ampersand::net::NetError If the host cannot be resolved.
    */
-  ServerConnection(const std::string& host, std::uint16_t port,
-                   std::string playerName);
+  ServerConnection(const std::string& host, std::uint16_t port);
+
+  /**
+   * @brief Starts entering the lobby with an account. Only while LoggedOut.
+   *
+   * The password is kept only until the server answers.
+   *
+   * @param username Name of the account (1 to 16 bytes).
+   * @param password Its password (1 to MAX_PASSWORD_LENGTH bytes).
+   * @param createAccount Sends REGISTER instead of LOGIN.
+   */
+  void logIn(std::string username, std::string password, bool createAccount);
+
+  /**
+   * @brief Whether a CONNECT_REJECT is about the account, so the player can
+   *        try again with other credentials.
+   *
+   * @param reason Reason sent by the server.
+   */
+  [[nodiscard]] static bool isLoginError(protocol::RejectReason reason);
 
   /**
    * @brief Reads every packet waiting, then sends what is due: the
-   *        CONNECT_REQUEST, the room request, a ROOM_LIST or a PING.
+   *        LOGIN or REGISTER, the room request, a ROOM_LIST or a PING.
    *        Switches to Disconnected after SERVER_TIMEOUT of silence.
    *
    * @param now Current time.
@@ -128,7 +153,7 @@ class ServerConnection {
       const noexcept;
   /** @brief Id given by the room, once in one. */
   [[nodiscard]] std::optional<std::uint8_t> playerId() const noexcept;
-  /** @brief Why the server refused us, once rejected. */
+  /** @brief Why the server refused us, once rejected or logged out by it. */
   [[nodiscard]] std::optional<protocol::RejectReason> rejectReason()
       const noexcept;
   /** @brief Why the last room request was refused, until the next one. */
@@ -164,8 +189,8 @@ class ServerConnection {
                         std::uint32_t sequence);
   /** @brief Hands a game packet of the room to the app. */
   void deliver(const protocol::Payload& payload);
-  /** @brief Sends the CONNECT_REQUEST, or gives up. */
-  void sendConnectRequest(Clock::time_point now);
+  /** @brief Sends the LOGIN or REGISTER, or gives up. */
+  void sendCredentials(Clock::time_point now);
   /** @brief Sends the pending room request, ROOM_LIST and PING when due. */
   void sendDue(Clock::time_point now);
   /** @brief Back in the lobby: forgets the room and its packets. */
@@ -174,8 +199,9 @@ class ServerConnection {
 
   ampersand::net::UdpSocket _socket;
   ampersand::net::Endpoint _server;
-  std::string _playerName;
-  State _state{State::Connecting};
+  /** @brief LOGIN or REGISTER to send while Connecting. */
+  std::optional<protocol::Payload> _credentials;
+  State _state{State::LoggedOut};
   std::optional<protocol::RoomJoined> _room;
   std::optional<protocol::RejectReason> _rejectReason;
   std::optional<protocol::RejectReason> _roomRejectReason;

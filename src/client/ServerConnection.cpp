@@ -23,10 +23,40 @@ using ampersand::net::Endpoint;
 using ampersand::net::NetError;
 using ampersand::net::UdpSocket;
 
-ServerConnection::ServerConnection(const std::string& host, std::uint16_t port,
-                                   std::string playerName)
-    : _server(UdpSocket::resolve(host, port)),
-      _playerName(std::move(playerName)) {}
+ServerConnection::ServerConnection(const std::string& host, std::uint16_t port)
+    : _server(UdpSocket::resolve(host, port)) {}
+
+void ServerConnection::logIn(std::string username, std::string password,
+                             bool createAccount) {
+  if (this->_state != State::LoggedOut) {
+    return;
+  }
+  if (createAccount) {
+    this->_credentials = protocol::Register{.username = std::move(username),
+                                            .password = std::move(password)};
+  } else {
+    this->_credentials = protocol::Login{.username = std::move(username),
+                                         .password = std::move(password)};
+  }
+  this->_rejectReason.reset();
+  this->_connectAttempts = 0;
+  this->_lastSend.reset();
+  this->_state = State::Connecting;
+}
+
+bool ServerConnection::isLoginError(protocol::RejectReason reason) {
+  switch (reason) {
+    case protocol::RejectReason::InvalidName:
+    case protocol::RejectReason::BadCredentials:
+    case protocol::RejectReason::AccountExists:
+    case protocol::RejectReason::AlreadyLoggedIn:
+    case protocol::RejectReason::InvalidPassword:
+    case protocol::RejectReason::TooManyAttempts:
+      return true;
+    default:
+      return false;
+  }
+}
 
 void ServerConnection::update(Clock::time_point now) {
   this->receivePackets(now);
@@ -41,7 +71,7 @@ void ServerConnection::update(Clock::time_point now) {
     return;
   }
   if (this->_state == State::Connecting) {
-    this->sendConnectRequest(now);
+    this->sendCredentials(now);
   } else if (this->isConnected()) {
     this->sendDue(now);
   }
@@ -184,13 +214,16 @@ void ServerConnection::handlePacket(const protocol::Packet& packet) {
   if (std::holds_alternative<protocol::ConnectAccept>(payload)) {
     if (this->_state == State::Connecting) {
       std::cout << "[client] connected to " << this->_server.toString() << '\n';
+      this->_credentials.reset();  // forget the password
       this->enterLobby();
     }
   } else if (const auto* reject =
                  std::get_if<protocol::ConnectReject>(&payload)) {
     if (this->_state == State::Connecting) {
-      this->_state = State::Rejected;
+      this->_state =
+          isLoginError(reject->reason) ? State::LoggedOut : State::Rejected;
       this->_rejectReason = reject->reason;
+      this->_credentials.reset();
       std::cerr << "[client] the server refused the connection (reason "
                 << static_cast<int>(reject->reason) << ")\n";
     }
@@ -283,18 +316,21 @@ void ServerConnection::deliver(const protocol::Payload& payload) {
   this->_gamePackets.push_back(payload);
 }
 
-void ServerConnection::sendConnectRequest(Clock::time_point now) {
+void ServerConnection::sendCredentials(Clock::time_point now) {
   if (this->_lastSend && now - *this->_lastSend < CONNECT_RETRY_DELAY) {
     return;
   }
   if (this->_connectAttempts == MAX_CONNECT_ATTEMPTS) {
     this->_state = State::Unreachable;
+    this->_credentials.reset();
     std::cerr << "[client] no answer from " << this->_server.toString() << '\n';
     return;
   }
   ++this->_connectAttempts;
   this->_lastSend = now;
-  this->send(protocol::ConnectRequest{.playerName = this->_playerName});
+  if (this->_credentials) {
+    this->send(*this->_credentials);
+  }
 }
 
 void ServerConnection::sendDue(Clock::time_point now) {

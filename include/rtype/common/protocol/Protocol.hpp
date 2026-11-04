@@ -156,6 +156,8 @@ enum class RejectReason : std::uint8_t {
   AlreadyLoggedIn = 9,
   /** @brief The password is not 1 to MAX_PASSWORD_LENGTH bytes. */
   InvalidPassword = 10,
+  /** @brief Too many failed logins from this IP address: wait a minute. */
+  TooManyAttempts = 11,
 };
 
 /** @brief Who can join a room opened with ROOM_CREATE. */
