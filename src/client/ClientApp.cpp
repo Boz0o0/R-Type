@@ -4,7 +4,6 @@
 #include <ampersand/core/time/FrameTimer.hpp>
 #include <ampersand/input/systems/InputSystem.hpp>
 #include <ampersand/physics/systems/MovementSystem.hpp>
-#include <ampersand/render/FontId.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
 #include <ampersand/render/systems/AnimationSystem.hpp>
 #include <ampersand/render/systems/RenderSystem.hpp>
@@ -13,7 +12,6 @@
 #include <filesystem>
 #include <optional>
 #include <rtype/client/ClientApp.hpp>
-#include <rtype/client/Hud.hpp>
 #include <rtype/client/PrefabFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/CorrectionSystem.hpp>
@@ -53,18 +51,13 @@ void ClientApp::run() {
   }
   PrefabFactory factory(this->_world, scenes);
   WorldMirror worldMirror(this->_world, factory);
-  const render::FontId font = scenes.asset(
-      "font", std::string(FONT), [&window](const std::string& path) {
-        return window.renderer.loadFont(path);
-      });
-  Hud hud(this->_world, font);
 
   core::ecs::Scheduler scheduler(this->_world);
   scheduler.addEventQueue<scripting::ScriptError>();
   scheduler.addEventQueue<protocol::Payload>();
   scheduler.add<input::InputSystem>(pollWindow);
   scheduler.add<QuitSystem>(this->_connection);
-  scheduler.add<NetworkSystem>(this->_connection, worldMirror, hud);
+  scheduler.add<NetworkSystem>(this->_connection, worldMirror);
   scheduler.add<PredictionSystem>();
   scheduler.add<physics::MovementSystem>();
   scheduler.add<CorrectionSystem>();

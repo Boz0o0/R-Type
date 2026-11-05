@@ -21,6 +21,10 @@
       "components": { "Transform": { "position": { "x": 1920 } } }
     },
     {
+      "name": "HUD",
+      "prefab": "world/prefabs/hud.json"
+    },
+    {
       "name": "Login menu",
       "prefab": "world/prefabs/login-menu.json"
     },

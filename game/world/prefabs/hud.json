@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "name": "Texts over the game: our player and room, our stats, the last event and a banner",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Scripts": { "scripts": ["scripts/hud.lua"] }
+  },
+  "children": [
+    {
+      "name": "Status",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 30, "y": 30 } },
+        "Text": { "size": 36 }
+      }
+    },
+    {
+      "name": "Stats",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 1300, "y": 30 } },
+        "Text": { "size": 36 }
+      }
+    },
+    {
+      "name": "Event",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 30, "y": 1020 } },
+        "Text": { "size": 36 }
+      }
+    },
+    {
+      "name": "Banner",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 0, "y": 480 } },
+        "Text": { "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
+      }
+    }
+  ]
+}
