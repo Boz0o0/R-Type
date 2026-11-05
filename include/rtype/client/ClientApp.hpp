@@ -43,10 +43,11 @@ class ClientApp {
   void run();
 
  private:
-  /** @brief The window, inputs, sounds and star field: see game/world/. */
+  /**
+   * @brief The window, inputs, sounds, star field, menus and HUD: see
+   * game/world/.
+   */
   static constexpr std::string_view CONFIG = "game/world/config.json";
-  /** @brief Font of the HUD and the lobby, in the assets of the game. */
-  static constexpr std::string_view FONT = "assets/fonts/tuffy.ttf";
 
   /**
    * @brief Reads the events of the window for the InputSystem.

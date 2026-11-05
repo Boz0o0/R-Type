@@ -62,20 +62,26 @@ its binary folder, since the engine reads `game/` from the working directory.
 game/
 ├── assets/            sprites, font and sounds (sources in assets/CREDITS.md)
 ├── scripts/
-│   └── scroll.lua     puts a star-field copy back behind the other one
+│   ├── scroll.lua     puts a star-field copy back behind the other one
+│   ├── login.lua      the login screen
+│   ├── lobby.lua      the lobby screen
+│   └── hud.lua        the texts over the game
 └── world/
     ├── config.json    window, sound, camera, background colour, input actions
     ├── scenes/
-    │   └── game.json  the star field: two copies of each layer, side by side
+    │   └── game.json  the star field: two copies of each layer, side by side;
+    │                  the login, the lobby and the HUD
     └── prefabs/       one entity each: ships (one per player colour), enemy,
-                       missiles, explosion, star-field layers
+                       missiles, explosion, star-field layers, text, login,
+                       lobby, HUD
 ```
 
 - `config.json` opens the window (1280x720, showing the 1920x1080 game area)
   and the sound, and declares the input actions: the `Horizontal` and
   `Vertical` axes (arrow keys or a controller's left stick), `Fire` (Space or
-  the A button) and `Quit` (Escape or Start). Changing a key only means editing
-  this file.
+  the A button) and `Quit` (Escape or Start). The menus also read buttons
+  from it (arrows, Tab, Enter, Backspace, Shift, letters and digits).
+  Changing a key only means editing this file.
 - The **star field** has two layers (the back one with a planet and a moon),
   each drawn twice side by side, behind everything else. The back layer scrolls
   left at 30 px/s and the front one at 90 px/s, so the front stars look closer.
@@ -106,50 +112,35 @@ computer, whatever its frame rate.
       asks for the room list in the lobby, sends the room requests until they
       are answered, acknowledges the reliable packets and drops their copies,
       then hands out the game packets of the room;
-    - `Hud`, in a room, shows our player and the room (or its code, to give
-      to friends), our health, lives and score, who joined or left, and the
-      result of the game;
     - `WorldMirror` applies the game packets to the local `World`. It keeps
       one entity per server entity, created from the prefab of its kind (each
       ship has the colour of its player, our shots have their sound), and
       leaves an explosion where a ship or an enemy is killed. It is emptied
       each time `ServerConnection::roomGeneration()` changes (we enter or
       leave a room): each room numbers its entities from the start;
-    - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server.
-4. `LoginSystem`, while logged out: shows the `LoginMenu` (username,
-   password shown as stars, "Log in" or "Create an account", chosen with
-   the arrows or Tab), then asks `ServerConnection` to send `LOGIN` or
-   `REGISTER`. While the server checks it, the menu shows "Connecting...";
-   if it is refused, the menu shows why and the player tries again. The
-   username can be written in advance with the third argument. Only
-   letters and digits can be typed, from their `KeyCode` (Shift for capital
-   letters), so on AZERTY they are the QWERTY ones (see `LobbySystem`):
-   `a` is typed `q`, and `m` cannot be typed. It stays the same on every
-   login from the same keyboard, but the name shown in game is the QWERTY
-   one. Typing the real characters needs a text event in the engine.
-5. `LobbySystem`, out of a room: shows the `LobbyMenu` (quick match, create a
-   public or a private room, join with a code typed with the digits) and the
-   public rooms, chosen with the arrows and Enter, and sends the room asked
-   for. The engine gives the keys by their QWERTY position, not the character
-   typed (on AZERTY, Z is `KeyCode::W` and M is no key), so only the digits,
-   which are the same on every layout, can be typed; the server makes codes of
-   digits. With a party code on the command line (letters allowed), the
-   client joins that room at once instead.
-6. `PredictionSystem`: moves our own ship from our input right away (see
+    - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server;
+    - the game packets also go to an `EventQueue`, for the HUD script.
+4. `PredictionSystem`: moves our own ship from our input right away (see
    below).
-7. `MovementSystem` (engine): moves the other entities with their speed
+5. `MovementSystem` (engine): moves the other entities with their speed
    between two snapshots, and the star-field layers.
-8. `CorrectionSystem`: slides each entity a bit toward where the server says
+6. `CorrectionSystem`: slides each entity a bit toward where the server says
    it is (see below).
-9. `ScriptingSystem` (engine): runs the Lua scripts of the entities. Only the
+7. `ScriptingSystem` (engine): runs the Lua scripts of the entities. The
    star field has one, `scroll.lua`: once a copy has fully left the screen on
    the left, it goes back behind the other copy, so the background never ends.
-10. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
-    that script off, and the game goes on.
-11. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
-    remove an explosion once its animation and its sound are over.
-12. `AudioSystem` (engine): plays the sounds.
-13. `RenderSystem` (engine): draws the `World`, the star-field at the back and
+   The login screen, the lobby screen and the HUD are prefabs whose children
+   are their texts. Their scripts (`login.lua`, `lobby.lua`, `hud.lua`) talk
+   to the server through the `server` table of
+   `ServerConnection::bindScripting`, and each one shows its texts only in its
+   connection states. Keys are read by their QWERTY position: on AZERTY, `a`
+   is typed `q`, so room codes are digits.
+8. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
+   that script off, and the game goes on.
+9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
+   remove an explosion once its animation and its sound are over.
+10. `AudioSystem` (engine): plays the sounds.
+11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
     the HUD or the lobby menu on top. The game area is 1920x1080, scaled to
     fit the window.
 

@@ -19,6 +19,18 @@
       "name": "Front stars, right copy",
       "prefab": "world/prefabs/starfield-front.json",
       "components": { "Transform": { "position": { "x": 1920 } } }
+    },
+    {
+      "name": "HUD",
+      "prefab": "world/prefabs/hud.json"
+    },
+    {
+      "name": "Login menu",
+      "prefab": "world/prefabs/login-menu.json"
+    },
+    {
+      "name": "Lobby menu",
+      "prefab": "world/prefabs/lobby-menu.json"
     }
   ]
 }

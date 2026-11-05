@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <ampersand/core/ecs/EventQueue.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/input/Event.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <chrono>
-#include <rtype/client/Hud.hpp>
 #include <rtype/client/ServerConnection.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/NetworkSystem.hpp>
@@ -12,16 +12,17 @@
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <thread>
+#include <variant>
 
 #include "FakeEntityFactory.hpp"
 #include "FakeServer.hpp"
 #include "GameFiles.hpp"
 
+using ampersand::core::ecs::EventQueue;
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
 using ampersand::input::KeyCode;
 using ampersand::input::KeyPressed;
-using rtype::client::Hud;
 using rtype::client::NetworkSystem;
 using rtype::client::ServerConnection;
 using rtype::client::WorldMirror;
@@ -38,6 +39,7 @@ class NetworkSystemTest : public testing::Test {
  protected:
   void SetUp() override {
     enterRoom(this->server, this->connection);
+    this->world.addResource<EventQueue<protocol::Payload>>();
     auto& manager = this->world.addResource<InputManager>(gameInput());
     manager.apply(KeyPressed{.key = KeyCode::Space});
     this->server.send(
@@ -60,8 +62,7 @@ class NetworkSystemTest : public testing::Test {
   World world;
   FakeEntityFactory factory{this->world};
   WorldMirror worldMirror{this->world, this->factory};
-  Hud hud{this->world, 0};
-  NetworkSystem system{this->connection, this->worldMirror, this->hud};
+  NetworkSystem system{this->connection, this->worldMirror};
 };
 
 TEST_F(NetworkSystemTest, MirrorsTheRoomAndSendsTheInput) {
@@ -70,6 +71,16 @@ TEST_F(NetworkSystemTest, MirrorsTheRoomAndSendsTheInput) {
   EXPECT_TRUE(this->worldMirror.find(7).has_value());
   EXPECT_EQ(this->server.receive<protocol::PlayerInput>().inputMask,
             protocol::InputFlag::SHOOT);
+}
+
+// The scripts read them there, in the same frame.
+TEST_F(NetworkSystemTest, GivesTheGamePacketsToTheScripts) {
+  this->updateUntilMirrored();
+
+  const auto& packets =
+      this->world.getResource<EventQueue<protocol::Payload>>().read();
+  ASSERT_EQ(packets.size(), 1U);
+  EXPECT_EQ(std::get<protocol::EntitySpawn>(packets.front()).entityId, 7U);
 }
 
 TEST_F(NetworkSystemTest, StartsANewMirrorWhenWeLeaveTheRoom) {

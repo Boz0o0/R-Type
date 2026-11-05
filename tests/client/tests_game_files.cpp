@@ -22,6 +22,7 @@
 #include <rtype/common/protocol/Protocol.hpp>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "GameFiles.hpp"
 
@@ -49,6 +50,17 @@ using rtype::common::EntityKind;
 class GameFiles : public testing::Test {
  protected:
   void SetUp() override { loadGame(this->scenes, this->world, this->backends); }
+
+  // The star-field copies: the scripted entities with a sprite.
+  std::vector<Entity> stars() {
+    std::vector<Entity> found;
+    for (const Entity entity : this->world.owners<Scripts>()) {
+      if (this->world.has<Sprite>(entity)) {
+        found.push_back(entity);
+      }
+    }
+    return found;
+  }
 
   static Entity loaded(std::optional<Entity> entity) {
     if (!entity) {
@@ -80,7 +92,7 @@ TEST_F(GameFiles, ConfigOpensTheWindowAndDeclaresTheActions) {
 }
 
 TEST_F(GameFiles, SceneHasTwoCopiesOfEachStarLayerSideBySide) {
-  const auto stars = this->world.owners<Scripts>();
+  const auto stars = this->stars();
 
   ASSERT_EQ(stars.size(), 4U);
   float widthCovered = 0.0F;
@@ -137,7 +149,7 @@ TEST_F(GameFiles, KindsWithoutALookStillGetAnEntity) {
 
 TEST_F(GameFiles, StarScriptPutsACopyThatLeftTheScreenBehindTheOther) {
   this->world.addResource<Clock>();
-  const auto stars = this->world.owners<Scripts>();
+  const auto stars = this->stars();
   const Entity gone = stars.front();
   const Entity visible = stars.back();
   this->world.get<Transform>(gone).position.x = -1925.0F;

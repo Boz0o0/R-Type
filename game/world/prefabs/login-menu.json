@@ -1,0 +1,67 @@
+{
+  "version": 2,
+  "name": "Login screen: username, password, log in or create an account",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Scripts": { "scripts": ["scripts/login.lua"] }
+  },
+  "children": [
+    {
+      "name": "Title",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 80 } },
+        "Text": { "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
+      }
+    },
+    {
+      "name": "Username",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 300 } }
+      }
+    },
+    {
+      "name": "Password",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 370 } }
+      }
+    },
+    {
+      "name": "Log in",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 440 } }
+      }
+    },
+    {
+      "name": "Create an account",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 510 } }
+      }
+    },
+    {
+      "name": "Message",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 950 } },
+        "Text": { "color": { "r": 255, "g": 220, "b": 80 } }
+      }
+    },
+    {
+      "name": "Key help",
+      "prefab": "world/prefabs/text.json",
+      "components": {
+        "Transform": { "position": { "x": 560, "y": 1010 } },
+        "Text": { "size": 28, "color": { "r": 150, "g": 150, "b": 170 } }
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ampersand/core/ecs/World.hpp>
 #include <ampersand/net/UdpSocket.hpp>
 #include <chrono>
 #include <cstdint>
@@ -12,6 +13,10 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+namespace ampersand::scripting {
+class ScriptingSystem;
+}  // namespace ampersand::scripting
 
 namespace rtype::client {
 
@@ -168,6 +173,17 @@ class ServerConnection {
    *        of the old room must then go away.
    */
   [[nodiscard]] std::uint32_t roomGeneration() const noexcept;
+
+  /**
+   * @brief Gives the scripts the `server` table: the state of this
+   *        connection, logIn(), the rooms and the game packets of the frame.
+   *
+   * @param scripting The scripting system that runs the scripts.
+   * @param world The world whose EventQueue<protocol::Payload> holds the
+   *        game packets of the frame (sent by NetworkSystem).
+   */
+  void bindScripting(ampersand::scripting::ScriptingSystem& scripting,
+                     ampersand::core::ecs::World& world);
 
  private:
   /** @brief CONNECT_ACCEPT received or not, the server talks to us. */

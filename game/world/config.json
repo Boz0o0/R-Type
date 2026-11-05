@@ -37,7 +37,20 @@
       },
       "buttons": {
         "Fire": ["Space", "Button0"],
-        "Quit": ["Escape", "Button7"]
+        "Quit": ["Escape", "Button7"],
+        "Up": ["UpArrow"],
+        "Down": ["DownArrow"],
+        "Left": ["LeftArrow"],
+        "Right": ["RightArrow"],
+        "Next": ["Tab"],
+        "Confirm": ["Return"],
+        "Erase": ["Backspace"],
+        "Shift": ["LeftShift", "RightShift"],
+        "A": ["A"], "B": ["B"], "C": ["C"], "D": ["D"], "E": ["E"], "F": ["F"], "G": ["G"], "H": ["H"], "I": ["I"],
+        "J": ["J"], "K": ["K"], "L": ["L"], "M": ["M"], "N": ["N"], "O": ["O"], "P": ["P"], "Q": ["Q"], "R": ["R"],
+        "S": ["S"], "T": ["T"], "U": ["U"], "V": ["V"], "W": ["W"], "X": ["X"], "Y": ["Y"], "Z": ["Z"],
+        "0": ["Alpha0"], "1": ["Alpha1"], "2": ["Alpha2"], "3": ["Alpha3"], "4": ["Alpha4"],
+        "5": ["Alpha5"], "6": ["Alpha6"], "7": ["Alpha7"], "8": ["Alpha8"], "9": ["Alpha9"]
       }
     }
   }

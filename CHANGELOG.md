@@ -54,11 +54,13 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: the controls are engine input actions (`Horizontal` and `Vertical` axes, `Fire` and `Quit` buttons). Holding two opposite arrows now cancels out.
 - **Server**: a client enters the lobby with `REGISTER` or `LOGIN`; `CONNECT_REQUEST` is ignored. The name shown in game is the username.
 - **Client**: the third argument is the username written in advance on the login screen: `r-type_client [host] [port] [username] [party code]`. The client connects once the player logged in, not at start.
+- **Client**: the login screen, the lobby screen and the HUD are prefabs run by Lua scripts (`game/scripts/`), which talk to the server through `ServerConnection::bindScripting`. Same texts as before.
 
 ### Removed
 
 - The `ampersand-engine/` git subtree.
 - **Client**: `AssetLoader`, `EntityLooks`, `Starfield`, `ScrollingSystem` and the `Scrolling` component, replaced by the `game/` files. `assets/` moved to `game/assets/`.
+- **Client**: `Hud`, `LoginMenu`, `LobbyMenu`, `LoginSystem`, `LobbySystem` and `TextEntity`, replaced by the scene and the scripts.
 
 ## [1.0.0] - 2026-10-18
 
