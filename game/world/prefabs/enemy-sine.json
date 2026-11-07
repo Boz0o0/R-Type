@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "Enemy on a sine wave (enemy in green)",
+  "prefab": "world/prefabs/enemy.json",
+  "components": {
+    "Sprite": {
+      "color": { "r": 140, "g": 255, "b": 140, "a": 255 }
+    }
+  }
+}

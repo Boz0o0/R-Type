@@ -20,7 +20,8 @@ class PrefabFactory final : public IEntityFactory {
                 ampersand::scene::SceneManager& scenes);
 
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> create(
-      common::EntityKind kind, std::uint8_t ownerId) override;
+      common::EntityKind kind, std::uint8_t variant,
+      std::uint8_t ownerId) override;
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> createExplosion()
       override;
 
@@ -31,7 +32,10 @@ class PrefabFactory final : public IEntityFactory {
       "world/prefabs/ship-3.json",
       "world/prefabs/ship-4.json",
   };
-  static constexpr std::string_view ENEMY = "world/prefabs/enemy.json";
+  static constexpr std::array<std::string_view, 2> ENEMIES{
+      "world/prefabs/enemy.json",
+      "world/prefabs/enemy-sine.json",
+  };
   static constexpr std::string_view PLAYER_MISSILE =
       "world/prefabs/player-missile.json";
   static constexpr std::string_view ENEMY_MISSILE =
@@ -40,7 +44,7 @@ class PrefabFactory final : public IEntityFactory {
 
   // Power-ups and obstacles have no look yet.
   [[nodiscard]] static std::optional<std::string_view> prefabOf(
-      common::EntityKind kind, std::uint8_t ownerId);
+      common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId);
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> instantiate(
       std::string_view path);
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> createPlain();

@@ -36,7 +36,7 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
     return;
   }
   const std::optional<core::ecs::Entity> created =
-      this->_factory.create(packet.entityType, packet.ownerId);
+      this->_factory.create(packet.entityType, packet.variant, packet.ownerId);
   if (!created) {
     return;
   }
@@ -45,6 +45,9 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
   position.x = packet.x;
   position.y = packet.y;
   this->_world.add(entity, Correction{});
+  if (this->_world.has<physics::Velocity>(entity)) {
+    this->_world.remove<physics::Velocity>(entity);
+  }
   if (this->isLocalShip(packet)) {
     this->_world.add(entity,
                      Predicted{
