@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "Missile of a player, with the shot sound",
-  "prefab": "world/prefabs/base.json",
+  "prefab": "world/prefabs/common/player-missile.json",
   "components": {
     "Transform": {
       "scale": { "x": 1.5, "y": 1.5 }

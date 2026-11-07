@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "Ship of player 1",
-  "prefab": "world/prefabs/base.json",
+  "prefab": "world/prefabs/common/ship.json",
   "components": {
     "Transform": {
       "scale": { "x": 2, "y": 2 }

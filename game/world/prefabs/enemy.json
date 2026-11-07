@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "Enemy",
-  "prefab": "world/prefabs/base.json",
+  "prefab": "world/prefabs/common/enemy.json",
   "components": {
     "Transform": {
       "scale": { "x": 2.6, "y": 2.6 }
