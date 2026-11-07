@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <rtype/common/GameComponents.hpp>
 
 // The real files of game/, loaded without a window or a sound card: the
 // Renderer and AudioListener of the configuration get fake backends, which
@@ -123,6 +124,7 @@ struct FakeBackends {
 inline void loadGame(ampersand::scene::SceneManager& scenes,
                      core::ecs::World& world, FakeBackends& backends) {
   std::filesystem::current_path(RTYPE_SOURCE_DIR);
+  common::registerComponents(scenes);
   scenes.registerResource<render::Renderer>(
       "Renderer",
       [&backends](core::ecs::World& target,

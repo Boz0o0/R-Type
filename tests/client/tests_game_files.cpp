@@ -7,6 +7,7 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
+#include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/render/components/Animation.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <ampersand/render/resources/Camera.hpp>
@@ -18,7 +19,9 @@
 #include <optional>
 #include <rtype/client/Controls.hpp>
 #include <rtype/client/PrefabFactory.hpp>
+#include <rtype/client/WorldMirror.hpp>
 #include <rtype/common/components/Kind.hpp>
+#include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <stdexcept>
 #include <string>
@@ -33,6 +36,7 @@ using ampersand::core::Transform;
 using ampersand::core::ecs::Entity;
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
+using ampersand::physics::Velocity;
 using ampersand::render::Animation;
 using ampersand::render::Camera;
 using ampersand::render::Renderer;
@@ -42,6 +46,7 @@ using ampersand::scripting::ScriptingSystem;
 using ampersand::scripting::Scripts;
 using rtype::client::Controls;
 using rtype::client::PrefabFactory;
+using rtype::client::WorldMirror;
 using rtype::client::test::FakeBackends;
 using rtype::client::test::loadGame;
 using rtype::common::EntityKind;
@@ -69,8 +74,9 @@ class GameFiles : public testing::Test {
     return *entity;
   }
 
-  Entity created(EntityKind kind, std::uint8_t ownerId = 0) {
-    return loaded(this->factory.create(kind, ownerId));
+  Entity created(EntityKind kind, std::uint8_t ownerId = 0,
+                 std::uint8_t variant = 0) {
+    return loaded(this->factory.create(kind, variant, ownerId));
   }
 
   FakeBackends backends;
@@ -121,6 +127,34 @@ TEST_F(GameFiles, EnemiesAndMissilesAreAnimated) {
     EXPECT_EQ(source.y, first.y);
     EXPECT_EQ(source.width, first.width);
   }
+}
+
+TEST_F(GameFiles, SineEnemyHasItsOwnColour) {
+  const Entity enemy = this->created(EntityKind::Enemy);
+  const Entity sine = this->created(EntityKind::Enemy, 0, 1);
+  const Entity unknown = this->created(EntityKind::Enemy, 0, 200);
+
+  const auto& color = this->world.get<Sprite>(enemy).color;
+  EXPECT_NE(this->world.get<Sprite>(sine).color.r, color.r);
+  EXPECT_EQ(this->world.get<Sprite>(unknown).color.r, color.r);
+  EXPECT_EQ(this->world.get<Sprite>(sine).texture,
+            this->world.get<Sprite>(enemy).texture);
+}
+
+TEST_F(GameFiles, MirrorGivesThePacketVelocityOverThePrefabOne) {
+  WorldMirror mirror(this->world, this->factory);
+  mirror.setLocalPlayer(0);
+
+  mirror.spawn(rtype::protocol::EntitySpawn{
+      .entityId = 1, .entityType = EntityKind::Enemy, .velocityX = -123.0F});
+  mirror.spawn(rtype::protocol::EntitySpawn{
+      .entityId = 2, .entityType = EntityKind::Ship, .ownerId = 0});
+
+  const auto enemy = mirror.find(1);
+  const auto ship = mirror.find(2);
+  ASSERT_TRUE(enemy && ship);
+  EXPECT_FLOAT_EQ(this->world.get<Velocity>(*enemy).value.x, -123.0F);
+  EXPECT_FALSE(this->world.has<Velocity>(*ship));
 }
 
 TEST_F(GameFiles, OnlyPlayerMissilesPlayTheShootSound) {

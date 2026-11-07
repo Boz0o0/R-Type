@@ -136,6 +136,7 @@ TEST(protocol, round_trip_game_packets) {
   const auto spawn = roundTrip(EntitySpawn{
       .entityId = 99,
       .entityType = rtype::common::EntityKind::Enemy,
+      .variant = 1,
       .ownerId = NO_OWNER,
       .x = 1920.5F,
       .y = -12.25F,
@@ -144,10 +145,12 @@ TEST(protocol, round_trip_game_packets) {
   });
   EXPECT_EQ(spawn.entityId, 99U);
   EXPECT_EQ(spawn.entityType, rtype::common::EntityKind::Enemy);
+  EXPECT_EQ(spawn.variant, 1);
   EXPECT_EQ(spawn.ownerId, NO_OWNER);
   EXPECT_FLOAT_EQ(spawn.x, 1920.5F);
   EXPECT_FLOAT_EQ(spawn.y, -12.25F);
   EXPECT_FLOAT_EQ(spawn.velocityX, -200.0F);
+  EXPECT_EQ(encode(EntitySpawn{}, 0).size(), HEADER_SIZE + 23);
 
   const auto destroy = roundTrip(EntityDestroy{
       .entityId = 5,
@@ -387,7 +390,7 @@ TEST(protocol, decode_rejects_malformed_payloads) {
   // NaN position.
   const EntitySpawn zeroSpawn;
   auto nanSpawn = encode(zeroSpawn, 0);
-  for (std::size_t index = HEADER_SIZE + 6; index < HEADER_SIZE + 10; ++index) {
+  for (std::size_t index = HEADER_SIZE + 7; index < HEADER_SIZE + 11; ++index) {
     nanSpawn[index] = std::byte{0xFF};
   }
   EXPECT_EQ(decodeBytes(nanSpawn), DecodeError::MalformedPayload);

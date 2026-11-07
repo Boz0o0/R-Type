@@ -4,8 +4,10 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/physics/resources/Collisions.hpp>
+#include <ampersand/scene/resources/SceneManager.hpp>
+#include <filesystem>
+#include <rtype/common/GameComponents.hpp>
 #include <rtype/common/resources/Deaths.hpp>
-#include <rtype/common/resources/Spawns.hpp>
 
 namespace rtype::common::test {
 
@@ -16,7 +18,17 @@ inline void addGameplayResources(ampersand::core::ecs::World& world,
       ampersand::core::Clock{.dt = deltaTime});
   world.addResource<ampersand::physics::Collisions>();
   world.addResource<Deaths>();
-  world.addResource<Spawns>();
+}
+
+/**
+ * @brief Loads the configuration of the server from the repository, so the
+ *        factories find the prefabs of game/. Its scene creates 1 entity.
+ */
+inline void loadPrefabs(ampersand::scene::SceneManager& scenes,
+                        ampersand::core::ecs::World& world) {
+  std::filesystem::current_path(RTYPE_SOURCE_DIR);
+  registerComponents(scenes);
+  scenes.loadConfig(world, "game/world/server.json");
 }
 
 /** @brief Makes two entities touch this tick, as the CollisionSystem would. */

@@ -19,6 +19,9 @@ function(add_engine_tests MODULE)
 endfunction()
 
 add_engine_tests(common)
+# The factories load the real prefabs of game/.
+target_compile_definitions(tests_common
+    PRIVATE RTYPE_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 if(RTYPE_CLIENT)
     add_engine_tests(client)
@@ -32,4 +35,7 @@ endif()
 
 if(RTYPE_SERVER)
     add_engine_tests(server)
+    # The Game loads the real configuration, prefabs and scripts of game/.
+    target_compile_definitions(tests_server
+        PRIVATE RTYPE_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 endif()
