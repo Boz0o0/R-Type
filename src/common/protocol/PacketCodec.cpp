@@ -115,6 +115,7 @@ void writePayload(BinaryWriter& writer, const EntitySpawn& payload) {
   }
   writer.write(payload.entityId);
   writer.writeEnum(payload.entityType);
+  writer.write(payload.variant);
   writer.write(payload.ownerId);
   writer.writeFloat(payload.x);
   writer.writeFloat(payload.y);
@@ -293,7 +294,7 @@ bool readPayload(BinaryReader& reader, PlayerLeft& payload) {
 bool readPayload(BinaryReader& reader, EntitySpawn& payload) {
   return reader.read(payload.entityId) &&
          reader.readEnum(payload.entityType, common::EntityKind::Obstacle) &&
-         reader.read(payload.ownerId) &&
+         reader.read(payload.variant) && reader.read(payload.ownerId) &&
          (payload.ownerId == NO_OWNER || isPlayerId(payload.ownerId)) &&
          reader.readFloat(payload.x) && reader.readFloat(payload.y) &&
          reader.readFloat(payload.velocityX) &&

@@ -96,13 +96,15 @@ struct PlayerLeft {
   DisconnectReason reason{};
 };
 
-/** @brief S->C, reliable, 22 bytes. An entity appeared in the world. */
+/** @brief S->C, reliable, 23 bytes. An entity appeared in the world. */
 struct EntitySpawn {
   static constexpr PacketType TYPE = PacketType::EntitySpawn;
   /** @brief Server-wide id, never reused during a game. */
   std::uint32_t entityId{};
   /** @brief What it is, so the client knows which sprite to draw. */
   common::EntityKind entityType{};
+  /** @brief Which one of its kind (see Kind::variant), 0 by default. */
+  std::uint8_t variant{};
   /** @brief Player that owns it (ship, missile), or NO_OWNER. */
   std::uint8_t ownerId{NO_OWNER};
   /** @brief Position in world units (pixels of a 1920x1080 screen). */

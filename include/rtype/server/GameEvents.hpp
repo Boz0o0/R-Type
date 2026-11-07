@@ -22,6 +22,8 @@ struct EntityInfo {
   /** @brief Id given by the Game, never reused while the server runs. */
   std::uint32_t id{};
   common::EntityKind kind{};
+  /** @brief Which one of its kind (see common::Kind::variant). */
+  std::uint8_t variant{};
   /** @brief Player that owns it, or protocol::NO_OWNER. */
   std::uint8_t ownerId{protocol::NO_OWNER};
   /** @brief Top-left corner, in world units. */

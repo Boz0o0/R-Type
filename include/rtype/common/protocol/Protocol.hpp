@@ -21,7 +21,7 @@ namespace rtype::protocol {
 /** @brief First two bytes of every datagram ("RT" in ASCII). */
 inline constexpr std::uint16_t MAGIC = 0x5254;
 /** @brief Version of the protocol implemented by this code. */
-inline constexpr std::uint8_t VERSION = 4;
+inline constexpr std::uint8_t VERSION = 5;
 /** @brief UDP port the server listens on when none is given. */
 inline constexpr std::uint16_t DEFAULT_PORT = 4242;
 
