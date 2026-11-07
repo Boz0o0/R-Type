@@ -7,7 +7,7 @@ namespace rtype::common {
 /**
  * @brief Lets the prefabs and scenes give the components of the game.
  *
- * Registers Kind, Health, Damage, Team, Weapon and Projectile. 
+ * Registers Kind, Health, Damage, Team, Weapon and Projectile.
  * Owner is not registered: a prefab cannot know the player, so the
  * server adds it when it creates the ship of a player.
  *
