@@ -3,57 +3,45 @@
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
+#include <ampersand/scene/resources/SceneManager.hpp>
 #include <optional>
-#include <rtype/common/components/Kind.hpp>
+#include <string>
+#include <string_view>
 
 namespace rtype::common {
 
-/**
- * @brief Creates the ship of a player, at rest, not firing.
- *
- * Health 3, Team Players, hitbox 64x32, Weapon firing a PlayerMissile every
- * 0.25 s. Added to the Spawns.
- *
- * @param world World to create it in.
- * @param position Top-left corner of the ship.
- * @return The ship, or std::nullopt if the World is full.
- * @throws ResourceNotFound if the World has no Spawns.
- */
-std::optional<ampersand::core::ecs::Entity> createShip(
-    ampersand::core::ecs::World& world,
-    const ampersand::core::math::Vec2f& position);
+/** @brief Prefab of the ship of a player, relative to the game folder. */
+inline constexpr std::string_view SHIP_PREFAB =
+    "world/prefabs/common/ship.json";
 
 /**
- * @brief Creates an enemy, flying to the left and firing.
- *
- * Health 2, Damage 1, Team Enemies, hitbox 64x64, velocity 200 to the left,
- * Weapon firing an EnemyMissile every 1.5 s (the first one 1.5 s after it
- * appears). Added to the Spawns.
+ * @brief Creates the ship of a player from SHIP_PREFAB, at rest, not firing.
  *
  * @param world World to create it in.
- * @param position Top-left corner of the enemy.
- * @return The enemy, or std::nullopt if the World is full.
- * @throws ResourceNotFound if the World has no Spawns.
+ * @param scenes SceneManager whose configuration gives the game folder.
+ * @param position Top-left corner of the ship.
+ * @return The ship, or std::nullopt if the World is full or the prefab
+ *         cannot be loaded.
  */
-std::optional<ampersand::core::ecs::Entity> createEnemy(
-    ampersand::core::ecs::World& world,
+std::optional<ampersand::core::ecs::Entity> createShip(
+    ampersand::core::ecs::World& world, ampersand::scene::SceneManager& scenes,
     const ampersand::core::math::Vec2f& position);
 
 /**
  * @brief Creates a missile fired by an entity.
  *
  * The missile starts at the position of the shooter, with its Team and its
- * Owner (if any). Its kind gives the rest (speed, damage, sprite, etc.).
+ * Owner (if any). Its prefab gives the rest (kind, speed, damage, hitbox).
  *
  * @param world World holding the shooter.
- * @param kind Kind of the missile.
+ * @param scenes SceneManager whose configuration gives the game folder.
+ * @param prefab Prefab of the missile, relative to the game folder.
  * @param shooter Entity that fires, with a Transform.
- * @return The missile, or std::nullopt if the World is full.
- * @throws std::invalid_argument if kind is not a missile.
- * @throws ResourceNotFound if the World has no Spawns.
+ * @return The missile, or std::nullopt if the World is full or the prefab
+ *         cannot be loaded.
  */
 std::optional<ampersand::core::ecs::Entity> createMissile(
-    ampersand::core::ecs::World& world, EntityKind kind,
-    ampersand::core::ecs::Entity shooter);
+    ampersand::core::ecs::World& world, ampersand::scene::SceneManager& scenes,
+    const std::string& prefab, ampersand::core::ecs::Entity shooter);
 
 }  // namespace rtype::common

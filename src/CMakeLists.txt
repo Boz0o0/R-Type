@@ -79,8 +79,9 @@ if(RTYPE_CLIENT)
 endif()
 
 if(RTYPE_SERVER)
-    if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS)
-        message(FATAL_ERROR "Missing Ampersand Engine modules for the Server. Please enable the following modules: Core, Network, Physics.")
+    if(NOT AMPERSAND_MODULE_CORE OR NOT AMPERSAND_MODULE_NET OR NOT AMPERSAND_MODULE_PHYSICS
+        OR NOT AMPERSAND_MODULE_SCENE OR NOT AMPERSAND_MODULE_SCRIPTING)
+        message(FATAL_ERROR "Missing Ampersand Engine modules for the Server. Please enable the following modules: Core, Network, Physics, Scene, Scripting.")
     endif()
 
     add_project_module(server)
@@ -91,6 +92,8 @@ if(RTYPE_SERVER)
             ampersand_core
             ampersand_net
             ampersand_physics
+            ampersand_scene
+            ampersand_scripting
         PRIVATE
             sqlite3
             monocypher
@@ -106,5 +109,7 @@ if(RTYPE_SERVER)
             ampersand_core
             ampersand_net
             ampersand_physics
+            ampersand_scene
+            ampersand_scripting
     )
 endif()

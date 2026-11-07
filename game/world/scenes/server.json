@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "game",
+  "entities": [
+    {
+      "name": "Waves of the level",
+      "components": {
+        "Scripts": { "scripts": ["scripts/server/waves.lua"] }
+      }
+    }
+  ]
+}

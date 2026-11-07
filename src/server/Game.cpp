@@ -6,10 +6,13 @@
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/physics/resources/Collisions.hpp>
+#include <ampersand/scene/resources/SceneManager.hpp>
+#include <ampersand/scripting/systems/ScriptingSystem.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <rtype/common/Factories.hpp>
+#include <rtype/common/GameComponents.hpp>
 #include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
@@ -17,9 +20,9 @@
 #include <rtype/common/components/Weapon.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/common/resources/Deaths.hpp>
-#include <rtype/common/resources/Spawns.hpp>
 #include <rtype/server/Game.hpp>
 #include <rtype/server/GameEvents.hpp>
+#include <string>
 #include <vector>
 
 namespace rtype::server {
@@ -34,12 +37,16 @@ using common::EntityKind;
 using common::Kind;
 namespace InputFlag = protocol::InputFlag;
 
-Game::Game(std::uint32_t seed)
-    : _waveSystem({SCREEN_WIDTH, SCREEN_HEIGHT}, seed) {
+Game::Game(std::uint32_t seed) {
   this->_world.addResource<ampersand::core::Clock>();
   this->_world.addResource<ampersand::physics::Collisions>();
   this->_world.addResource<common::Deaths>();
-  this->_world.addResource<common::Spawns>();
+  common::registerComponents(this->_scenes);
+  this->_scenes.loadConfig(this->_world, std::string(CONFIG));
+  this->_scenes.bindScripting(this->_scriptingSystem, this->_world);
+  sol::state& lua = this->_scriptingSystem.lua();
+  lua.set_function("finishWaves", [this] { this->_wavesFinished = true; });
+  lua["math"]["randomseed"](seed);
 }
 
 void Game::addPlayer(std::uint8_t playerId) {
@@ -72,7 +79,7 @@ std::vector<GameEvent> Game::update(float deltaTime) {
 
   this->updatePhase(deltaTime, events);
   if (this->_phase == Phase::Playing) {
-    this->_waveSystem.update(this->_world);
+    this->_scriptingSystem.update(this->_world);
     this->updatePlayers(deltaTime);
   }
   this->_shootingSystem.update(this->_world);
@@ -159,7 +166,8 @@ void Game::start(std::vector<GameEvent>& events) {
       player->respawnIn = 0.0F;
     }
   }
-  this->_waveSystem.reset();
+  this->_wavesFinished = false;
+  this->_scenes.loadScene(this->_world, this->_scenes.getCurrentScene());
   this->_phase = Phase::Playing;
   events.emplace_back(GameStarted{});
 }
@@ -216,7 +224,7 @@ void Game::steer(Entity ship, std::uint8_t inputMask) {
 void Game::spawnShip(Player& player, std::uint8_t playerId) {
   const float lane = SCREEN_HEIGHT / (protocol::MAX_PLAYERS + 1.0F);
   const auto ship = common::createShip(
-      this->_world,
+      this->_world, this->_scenes,
       {SHIP_START_X, (lane * static_cast<float>(playerId + 1)) - 16.0F});
   if (!ship) {
     return;  // the World is full: try again on the next tick
@@ -282,7 +290,7 @@ void Game::checkEnd(std::vector<GameEvent>& events) {
     this->end(false, events);
     return;
   }
-  if (!this->_waveSystem.finished()) {
+  if (!this->_wavesFinished) {
     return;
   }
   for (const Entity entity : this->_world.owners<Kind>()) {
@@ -295,10 +303,8 @@ void Game::checkEnd(std::vector<GameEvent>& events) {
 }
 
 void Game::announce(std::vector<GameEvent>& events) {
-  for (const Entity entity :
-       this->_world.getResource<common::Spawns>().entities) {
-    if (!this->_world.alive(entity) || this->isDying(entity) ||
-        this->_world.has<NetworkId>(entity)) {
+  for (const Entity entity : this->_world.owners<Kind>()) {
+    if (this->isDying(entity) || this->_world.has<NetworkId>(entity)) {
       continue;
     }
     this->_world.add(entity, NetworkId{.value = this->_nextEntityId++});

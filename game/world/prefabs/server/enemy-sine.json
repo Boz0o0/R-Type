@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "name": "Enemy on a sine wave, with the script that moves it on the server",
+  "prefab": "world/prefabs/common/enemy-sine.json",
+  "components": {
+    "Scripts": { "scripts": ["scripts/server/sine.lua"] }
+  }
+}

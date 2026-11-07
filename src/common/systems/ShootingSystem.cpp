@@ -9,6 +9,9 @@
 
 namespace rtype::common {
 
+ShootingSystem::ShootingSystem(ampersand::scene::SceneManager& scenes)
+    : _scenes(scenes) {}
+
 void ShootingSystem::update(ampersand::core::ecs::World& world) {
   const float deltaTime = world.getResource<ampersand::core::Clock>().dt;
   for (const ampersand::core::ecs::Entity entity : world.owners<Weapon>()) {
@@ -19,7 +22,7 @@ void ShootingSystem::update(ampersand::core::ecs::World& world) {
     }
     if (weapon.remaining <= 0.0F) {
       weapon.remaining = std::max(weapon.remaining + weapon.cooldown, 0.0F);
-      createMissile(world, weapon.missile, entity);
+      createMissile(world, this->_scenes, weapon.missile, entity);
     }
     weapon.remaining -= deltaTime;
   }
