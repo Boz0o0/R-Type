@@ -371,6 +371,7 @@ protocol::Payload GameServer::toPacket(const GameEvent& event) const {
     return protocol::EntitySpawn{
         .entityId = entity.id,
         .entityType = entity.kind,
+        .variant = entity.variant,
         .ownerId = entity.ownerId,
         .x = entity.position.x,
         .y = entity.position.y,

@@ -370,11 +370,13 @@ EntityInfo Game::infoOf(Entity entity) {
   const auto& position = this->_world.get<Transform>(entity).position;
   EntityInfo info{
       .id = this->_world.get<NetworkId>(entity).value,
-      .kind = this->_world.has<Kind>(entity)
-                  ? this->_world.get<Kind>(entity).kind
-                  : EntityKind::Obstacle,
+      .kind = EntityKind::Obstacle,
       .position = {position.x, position.y},
   };
+  if (this->_world.has<Kind>(entity)) {
+    info.kind = this->_world.get<Kind>(entity).kind;
+    info.variant = this->_world.get<Kind>(entity).variant;
+  }
   if (this->_world.has<common::Owner>(entity)) {
     info.ownerId = this->_world.get<common::Owner>(entity).playerId;
   }

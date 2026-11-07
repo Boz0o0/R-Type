@@ -23,6 +23,7 @@ target_link_libraries(common
         ampersand_core
         ampersand_net
         ampersand_physics
+        ampersand_scene
 )
 
 if(RTYPE_CLIENT)
