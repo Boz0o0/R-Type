@@ -43,7 +43,7 @@
         "Left": ["LeftArrow"],
         "Right": ["RightArrow"],
         "Next": ["Tab"],
-        "Confirm": ["Return"],
+        "Confirm": ["Return", "Button0"],
         "Erase": ["Backspace"],
         "Shift": ["LeftShift", "RightShift"],
         "A": ["A"], "B": ["B"], "C": ["C"], "D": ["D"], "E": ["E"], "F": ["F"], "G": ["G"], "H": ["H"], "I": ["I"],

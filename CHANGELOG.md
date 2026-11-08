@@ -13,6 +13,12 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-08
+
+### Fixed
+
+- **Client**: menu navigation now supports the controller's left stick and A button, in addition to the keyboard.
+
 ## [2.0.0] - 2026-11-08
 
 ### Added

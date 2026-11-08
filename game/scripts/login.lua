@@ -44,12 +44,26 @@ function Login:start()
     self.password = ""
     self.message = ""
     self.hint = ""
+    self.previousVertical = 0
     if #self.username > server.MAX_PLAYER_NAME_LENGTH then
         self.username = ""
     end
     if self.username ~= "" then
         self.selected = PASSWORD
     end
+end
+
+--- Converts a stick into one menu step.
+function Login:controllerKey()
+    local vertical = input.getAxis("Vertical")
+    local key = nil
+    if vertical > 0 and self.previousVertical <= 0 then
+        key = "Up"
+    elseif vertical < 0 and self.previousVertical >= 0 then
+        key = "Down"
+    end
+    self.previousVertical = vertical
+    return key
 end
 
 --- The field typed in on the selected line and its maximum length, if it is
@@ -189,6 +203,14 @@ end
 function Login:update(dt)
     if server.state() == State.LoggedOut then
         local shift = input.getButton("Shift")
+        local controllerKey = self:controllerKey()
+        if controllerKey then
+            local request = self:press(controllerKey, shift)
+            if request then
+                server.logIn(request.username, request.password,
+                    request.createAccount)
+            end
+        end
         for _, key in ipairs(keysPressed()) do
             local request = self:press(key, shift)
             if request then
