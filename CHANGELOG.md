@@ -8,17 +8,8 @@ All notable changes to the game are listed here. The format follows
 under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 `Removed`, create it if it is missing).
 
-**When releasing a new version**:
-
-1. In a pull request, rename `## [Unreleased]` to the new version and today's
-   date (eg: `## [1.1.0] - 2026-10-25`), and add an empty `## [Unreleased]` above
-   it.
-2. Update the links at the bottom of this file.
-3. Set the same version in `project()` of `CMakeLists.txt`
-   (eg: `VERSION 1.1.0`).
-4. Once it is merged, tag `main` and push the tag
-   (`git tag v1.1.0 && git push origin v1.1.0`). The release workflow does the
-   checks and creates the GitHub release.
+**When releasing a new version**, follow the steps of
+[Contributing](https://boz0o0.github.io/R-Type/contributing/#release).
 
 ## [Unreleased]
 
