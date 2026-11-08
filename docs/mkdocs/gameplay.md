@@ -28,10 +28,10 @@ instantiate the prefabs.
 | Prefab                | Health | Damage | Team      | Speed     | Size  | Weapon                        |
 | --------------------- | ------ | ------ | --------- | --------- | ----- | ----------------------------- |
 | `ship.json`           | 3      | none   | `Players` | 0         | 64x32 | `player-missile.json` / 0.25 s, off |
-| `enemy.json`          | 2      | 1      | `Enemies` | 200 left  | 64x64 | `enemy-missile.json` / 1.5 s, on    |
-| `enemy-sine.json`     | 2      | 1      | `Enemies` | 200 left, up and down | 64x64 | `enemy-missile.json` / 1.5 s, on |
-| `player-missile.json` | none   | 1      | shooter's | 800 right | 16x4  | none (and the shooter's `Owner`) |
-| `enemy-missile.json`  | none   | 1      | shooter's | 400 left  | 8x8   | none                          |
+| `enemy.json`          | 2      | 1      | `Enemies` | 200 left  | 96x60 | `enemy-missile.json` / 1.5 s, on    |
+| `enemy-sine.json`     | 2      | 1      | `Enemies` | 200 left, up and down | 96x60 | `enemy-missile.json` / 1.5 s, on |
+| `player-missile.json` | none   | 1      | shooter's | 800 right | 40x12 | none (and the shooter's `Owner`) |
+| `enemy-missile.json`  | none   | 1      | shooter's | 400 left  | 22x22 | none                          |
 
 ```cpp
 common::registerComponents(scenes);
@@ -66,7 +66,8 @@ while (running) {
   `Deaths` only once per tick.
 - **Teams**: a missile gets the `Team` of its shooter, so it does not hurt its
   own team. No `Team` = hurts and is hurt by everyone.
-- **Missiles**: a `Projectile` dies on its first hit, even if it touches several
+- **Missiles**: a missile starts in front of its shooter, centered on its
+  height. A `Projectile` dies on its first hit, even if it touches several
   entities in the same tick.
 - **Walls**: `Damage` without `Health` and without `Projectile` never dies.
 - **Kills**: when `Damage` takes the last hit points, `Death::killer` is the

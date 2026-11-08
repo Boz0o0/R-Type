@@ -68,7 +68,10 @@ game/
 │   ├── scroll.lua     puts a star-field copy back behind the other one
 │   ├── login.lua      the login screen
 │   ├── lobby.lua      the lobby screen
-│   ├── hud.lua        the texts over the game
+│   ├── hud.lua        the texts over the game, and the announcer
+│   ├── tilt.lua, blimp.lua   the tilt of the planes, the attack of the blimps
+│   ├── effect.lua, ghost.lua, debris.lua, burst.lua
+│   │                  the death effects, which remove themselves
 │   └── server/        the waves and the sine enemy, run by the server
 └── world/
     ├── config.json    window, sound, camera, background colour, input actions
@@ -78,7 +81,7 @@ game/
     │   │              the login, the lobby and the HUD
     │   └── server.json the waves
     └── prefabs/       one entity each: ships (one per player colour), enemy,
-        │              missiles, explosion, star-field layers, text, login,
+        │              missiles, death effects, star-field layers, text, login,
         │              lobby, HUD
         ├── common/    the gameplay of the entities, for both sides
         └── server/    the scripts of the entities, on the server
@@ -95,9 +98,10 @@ game/
   left at 30 px/s and the front one at 90 px/s, so the front stars look closer.
 - The **prefabs** give each kind of entity its sprite, animation, scale, layer
   and sound, over the gameplay of its prefab in `common/`. `PrefabFactory`
-  picks the prefab for each kind and variant the server sends,
-  and `WorldMirror` puts the entity where the server says. A power-up or an
-  obstacle has no prefab yet and gets an entity without a sprite.
+  picks the prefab for each kind and variant the server sends (and the plane
+  and bullets of each player), and `WorldMirror` puts the entity where the
+  server says. A power-up or an obstacle has no prefab yet and gets an entity
+  without a sprite.
 
 `WorldMirror` only talks to an `IEntityFactory`: the game gives it the
 `PrefabFactory`, and the tests a factory of plain entities, since a prefab with
@@ -124,7 +128,8 @@ computer, whatever its frame rate.
     - `WorldMirror` applies the game packets to the local `World`. It keeps
       one entity per server entity, created from the prefab of its kind (each
       ship has the colour of its player, our shots have their sound), and
-      leaves an explosion where a ship or an enemy is killed. It is emptied
+      leaves the death effect of its kind where an entity is killed. It is
+      emptied
       each time `ServerConnection::roomGeneration()` changes (we enter or
       leave a room): each room numbers its entities from the start;
     - `Controls` turns the actions into a `PLAYER_INPUT`, sent to the server;
@@ -146,8 +151,8 @@ computer, whatever its frame rate.
    is typed `q`, so room codes are digits.
 8. `ScriptErrorSystem`: prints the error of a broken script. The engine turns
    that script off, and the game goes on.
-9. `AnimationSystem` (engine) and `ExplosionSystem`: play the animations, and
-   remove an explosion once its animation and its sound are over.
+9. `AnimationSystem` (engine): plays the animations; the death effects remove
+   themselves in Lua.
 10. `AudioSystem` (engine): plays the sounds.
 11. `RenderSystem` (engine): draws the `World`, the star-field at the back and
     the HUD or the lobby menu on top. The game area is 1920x1080, scaled to

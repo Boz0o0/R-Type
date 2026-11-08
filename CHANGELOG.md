@@ -46,6 +46,8 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Game**: an enemy on a sine wave, every other wave.
 - **Tests**: tests of the common prefabs, of the waves in Lua and of the `variant`.
 
+- **Client**: the look of Cuphead: a plane per player that tilts, two blimp enemies, animated deaths (explosions, pieces, ghosts), sounds, the announcer, and a Cuphead font for the titles and the HUD.
+
 ### Changed
 
 - **Protocol**: version 3. `CONNECT_REQUEST` only carries the name and puts the client in the lobby; the party code moved to `ROOM_JOIN`. `CONNECT_ACCEPT` only carries the tick rate and is no longer reliable; the player id now comes in `ROOM_JOINED`.
@@ -61,12 +63,15 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Protocol**: version 5. `ENTITY_SPAWN` carries a `variant` (23 bytes), so the client shows each kind of enemy with its own look.
 - **Build**: Ampersand Engine is fetched at a commit of its `main` branch until its 0.7.0 release.
 
+- **Gameplay**: hitboxes fitted to the new sprites, and missiles start in front of their shooter.
+
 ### Removed
 
 - The `ampersand-engine/` git subtree.
 - **Client**: `AssetLoader`, `EntityLooks`, `Starfield`, `ScrollingSystem` and the `Scrolling` component, replaced by the `game/` files. `assets/` moved to `game/assets/`.
 - **Client**: `Hud`, `LoginMenu`, `LobbyMenu`, `LoginSystem`, `LobbySystem` and `TextEntity`, replaced by the scene and the scripts.
 - **Server**: `WaveSystem`, `createEnemy` and the `Spawns` resource, replaced by the prefabs and `waves.lua`.
+- **Client**: `ExplosionSystem` (the effects remove themselves in Lua) and the R-Type placeholder sprites and sounds.
 
 ## [1.0.0] - 2026-10-18
 
