@@ -16,8 +16,8 @@ local TEXT_COLOR = { r = 255, g = 255, b = 255 }
 local CHOSEN_COLOR = { r = 90, g = 220, b = 255 }
 
 --- The key help at the bottom.
-local HELP = "Up/Down: choose   Enter: confirm   Esc: quit"
-    .. "   (in a room, Esc comes back here)"
+local HELP = "Up/Down or stick: choose   Enter or A: confirm"
+    .. "   Esc or Start: quit   (in a room, they come back here)"
 
 --- Why the server refused a room request: any reason it sends is shown.
 local REFUSED = {
@@ -95,8 +95,22 @@ function Lobby:start()
     self.code = ""
     self.message = ""
     self.hint = ""
+    self.previousVertical = 0
     self.rooms = {}
     self.partyCode = arguments.partyCode
+end
+
+--- Converts a controller stick into one menu step.
+function Lobby:controllerKey()
+    local vertical = input.getAxis("StickVertical")
+    local key = nil
+    if vertical > 0 and self.previousVertical <= 0 then
+        key = "Up"
+    elseif vertical < 0 and self.previousVertical >= 0 then
+        key = "Down"
+    end
+    self.previousVertical = vertical
+    return key
 end
 
 --- Replaces the public rooms. The same room stays chosen if it is still
@@ -236,6 +250,10 @@ function Lobby:update(dt)
         if self.partyCode ~= "" then
             server.joinRoom(0, self.partyCode)
             self.partyCode = ""
+        end
+        local controllerKey = self:controllerKey()
+        if controllerKey then
+            self:press(controllerKey)
         end
         for _, key in ipairs(keysPressed()) do
             self:press(key)

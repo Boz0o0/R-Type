@@ -14,8 +14,8 @@ local TEXT_COLOR = { r = 255, g = 255, b = 255 }
 local CHOSEN_COLOR = { r = 90, g = 220, b = 255 }
 
 --- The key help at the bottom.
-local HELP = "Up/Down/Tab: choose   Shift: upper case   Enter: confirm"
-    .. "   Esc: quit"
+local HELP = "Up/Down/Tab or stick: choose   Shift: upper case"
+    .. "   Enter or A: confirm   Esc or Start: quit"
 
 --- Why the server refused the account. The other reasons end the
 --- connection, and the HUD shows them.
@@ -44,12 +44,26 @@ function Login:start()
     self.password = ""
     self.message = ""
     self.hint = ""
+    self.previousVertical = 0
     if #self.username > server.MAX_PLAYER_NAME_LENGTH then
         self.username = ""
     end
     if self.username ~= "" then
         self.selected = PASSWORD
     end
+end
+
+--- Converts a stick into one menu step.
+function Login:controllerKey()
+    local vertical = input.getAxis("StickVertical")
+    local key = nil
+    if vertical > 0 and self.previousVertical <= 0 then
+        key = "Up"
+    elseif vertical < 0 and self.previousVertical >= 0 then
+        key = "Down"
+    end
+    self.previousVertical = vertical
+    return key
 end
 
 --- The field typed in on the selected line and its maximum length, if it is
@@ -189,7 +203,12 @@ end
 function Login:update(dt)
     if server.state() == State.LoggedOut then
         local shift = input.getButton("Shift")
-        for _, key in ipairs(keysPressed()) do
+        local keys = keysPressed()
+        local controllerKey = self:controllerKey()
+        if controllerKey then
+            table.insert(keys, 1, controllerKey)
+        end
+        for _, key in ipairs(keys) do
             local request = self:press(key, shift)
             if request then
                 server.logIn(request.username, request.password,
