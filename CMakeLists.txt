@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(Rtype
-    VERSION 1.0.0
+    VERSION 2.0.0
     LANGUAGES C CXX
 )
 
@@ -31,10 +31,11 @@ endif()
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
+set(AMPERSAND_ENGINE_VERSION 0.7.0)
 CPMAddPackage(
     NAME AmpersandEngine
     GITHUB_REPOSITORY Boz0o0/Ampersand-Engine
-    GIT_TAG dfdbc9b1308ca57eb1c727a5599e2ddc9a1cb018
+    GIT_TAG v${AMPERSAND_ENGINE_VERSION}
 )
 CPMAddPackage(
     NAME sqlite3
