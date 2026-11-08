@@ -34,6 +34,7 @@ nav:
   - Architecture: architecture.md
   - Gameplay: gameplay.md
   - Design decisions: decisions.md
+  - Accessibility: accessibility.md
   - Contributing: contributing.md
   - Changelog: changelog.md
   - Network Protocol:
