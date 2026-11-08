@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "Texts over the game: our player and room, our stats, the last event and a banner",
+  "name": "Texts over the game: our player and room, our stats, the last event and a banner, with the voice of the announcer",
   "components": {
     "Transform": {
       "position": { "x": 0, "y": 0, "z": 0 },
@@ -16,7 +16,7 @@
       "prefab": "world/prefabs/text.json",
       "components": {
         "Transform": { "position": { "x": 30, "y": 30 } },
-        "Text": { "size": 36 }
+        "Text": { "font": "assets/fonts/chalice-noggin.ttf", "size": 36 }
       }
     },
     {
@@ -24,7 +24,7 @@
       "prefab": "world/prefabs/text.json",
       "components": {
         "Transform": { "position": { "x": 1300, "y": 30 } },
-        "Text": { "size": 36 }
+        "Text": { "font": "assets/fonts/chalice-noggin.ttf", "size": 36 }
       }
     },
     {
@@ -32,7 +32,7 @@
       "prefab": "world/prefabs/text.json",
       "components": {
         "Transform": { "position": { "x": 30, "y": 1020 } },
-        "Text": { "size": 36 }
+        "Text": { "font": "assets/fonts/chalice-noggin.ttf", "size": 36 }
       }
     },
     {
@@ -40,7 +40,25 @@
       "prefab": "world/prefabs/text.json",
       "components": {
         "Transform": { "position": { "x": 0, "y": 480 } },
-        "Text": { "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
+        "Text": { "font": "assets/fonts/chalice-noggin.ttf", "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
+      }
+    },
+    {
+      "name": "Start voice",
+      "components": {
+        "AudioSource": { "sound": "assets/sounds/announcer-start.wav", "volume": 90, "loop": false, "playing": false }
+      }
+    },
+    {
+      "name": "Knockout voice",
+      "components": {
+        "AudioSource": { "sound": "assets/sounds/announcer-knockout.wav", "volume": 90, "loop": false, "playing": false }
+      }
+    },
+    {
+      "name": "Game over tune",
+      "components": {
+        "AudioSource": { "sound": "assets/sounds/game-over.wav", "volume": 70, "loop": false, "playing": false }
       }
     }
   ]

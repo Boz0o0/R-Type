@@ -1,10 +1,56 @@
 {
   "version": 2,
-  "name": "Enemy on a sine wave (enemy in green)",
-  "prefab": "world/prefabs/enemy.json",
+  "name": "Blimp (purple), playing its attack when its gun fires",
+  "prefab": "world/prefabs/common/enemy-sine.json",
   "components": {
+    "Transform": { "origin": { "x": 44, "y": 17, "z": 0 } },
     "Sprite": {
-      "color": { "r": 140, "g": 255, "b": 140, "a": 255 }
-    }
+      "texture": "assets/sprites/blimp-purple.png",
+      "source": { "x": 0, "y": 0, "width": 158, "height": 90 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    },
+    "AnimationStateMachine": {
+      "initial": "idle",
+      "states": {
+        "idle": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 158, "height": 90 },
+            { "x": 158, "y": 0, "width": 158, "height": 90 },
+            { "x": 316, "y": 0, "width": 158, "height": 90 },
+            { "x": 474, "y": 0, "width": 158, "height": 90 },
+            { "x": 632, "y": 0, "width": 158, "height": 90 },
+            { "x": 790, "y": 0, "width": 158, "height": 90 },
+            { "x": 948, "y": 0, "width": 158, "height": 90 },
+            { "x": 1106, "y": 0, "width": 158, "height": 90 },
+            { "x": 1264, "y": 0, "width": 158, "height": 90 },
+            { "x": 1422, "y": 0, "width": 158, "height": 90 },
+            { "x": 1580, "y": 0, "width": 158, "height": 90 },
+            { "x": 1738, "y": 0, "width": 158, "height": 90 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "attack": {
+          "frames": [
+            { "x": 0, "y": 90, "width": 158, "height": 90 },
+            { "x": 158, "y": 90, "width": 158, "height": 90 },
+            { "x": 316, "y": 90, "width": 158, "height": 90 },
+            { "x": 474, "y": 90, "width": 158, "height": 90 },
+            { "x": 632, "y": 90, "width": 158, "height": 90 },
+            { "x": 790, "y": 90, "width": 158, "height": 90 },
+            { "x": 948, "y": 90, "width": 158, "height": 90 },
+            { "x": 1106, "y": 90, "width": 158, "height": 90 },
+            { "x": 1264, "y": 90, "width": 158, "height": 90 },
+            { "x": 1422, "y": 90, "width": 158, "height": 90 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        }
+      },
+      "params": { "floats": {  }, "bools": {  } },
+      "transitions": []
+    },
+    "Scripts": { "scripts": ["scripts/blimp.lua"] }
   }
 }

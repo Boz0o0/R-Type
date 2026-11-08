@@ -4,7 +4,6 @@
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
-#include <ampersand/render/components/Sprite.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -20,8 +19,8 @@ namespace rtype::client {
  * @brief Keeps one local entity for each entity the server told us about.
  *
  * ENTITY_SPAWN creates it with the look of its kind, WORLD_SNAPSHOT moves
- * it, and ENTITY_DESTROY removes it (with an explosion for a ship or an
- * enemy that was killed).
+ * it, and ENTITY_DESTROY removes it (with the effect of its death when it was
+ * killed).
  */
 class WorldMirror {
  public:
@@ -92,8 +91,10 @@ class WorldMirror {
   struct Mirrored {
     /** @brief The local entity. */
     ampersand::core::ecs::Entity entity;
-    /** @brief Its kind, to know if it explodes. */
+    /** @brief Its kind, variant and owner, to pick the effect of its death. */
     common::EntityKind kind;
+    std::uint8_t variant;
+    std::uint8_t ownerId;
   };
 
   /** @brief Whether the ENTITY_SPAWN is our own ship. */
@@ -110,14 +111,12 @@ class WorldMirror {
                ampersand::core::math::Vec2f serverPosition);
 
   /**
-   * @brief Creates an explosion centered on the sprite of an entity that
-   *        died.
+   * @brief Creates the effect of the death of a killed entity, at the center
+   *        of its hitbox.
    *
-   * @param transform Transform of the entity that died.
-   * @param sprite Sprite of the entity that died.
+   * @param mirrored The entity that died, still alive.
    */
-  void explode(const ampersand::core::Transform& transform,
-               const ampersand::render::Sprite& sprite);
+  void die(const Mirrored& mirrored);
 
   /** @brief The world holding the local entities. */
   ampersand::core::ecs::World& _world;

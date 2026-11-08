@@ -1,0 +1,285 @@
+{
+  "version": 2,
+  "name": "Death of a purple blimp: a cloud explosion, a flash and its pieces",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "AudioSource": { "sound": "assets/sounds/blimp-sine-death.wav", "volume": 70, "loop": false, "playing": true },
+    "Scripts": { "scripts": ["scripts/burst.lua"] }
+  },
+  "children": [
+    {
+      "name": "Explosion",
+      "components": {
+        "Transform": {
+          "position": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 126, "y": 79, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-explode.png",
+          "source": { "x": 0, "y": 0, "width": 252, "height": 158 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 3
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 252, "height": 158 },
+            { "x": 252, "y": 0, "width": 252, "height": 158 },
+            { "x": 504, "y": 0, "width": 252, "height": 158 },
+            { "x": 756, "y": 0, "width": 252, "height": 158 },
+            { "x": 1008, "y": 0, "width": 252, "height": 158 },
+            { "x": 1260, "y": 0, "width": 252, "height": 158 },
+            { "x": 1512, "y": 0, "width": 252, "height": 158 },
+            { "x": 1764, "y": 0, "width": 252, "height": 158 },
+            { "x": 0, "y": 158, "width": 252, "height": 158 },
+            { "x": 252, "y": 158, "width": 252, "height": 158 },
+            { "x": 504, "y": 158, "width": 252, "height": 158 },
+            { "x": 756, "y": 158, "width": 252, "height": 158 },
+            { "x": 1008, "y": 158, "width": 252, "height": 158 },
+            { "x": 1260, "y": 158, "width": 252, "height": 158 }
+          ],
+          "frameDuration": 0.05,
+          "loop": false
+        },
+        "Scripts": { "scripts": ["scripts/effect.lua"] }
+      }
+    },
+    {
+      "name": "Flash",
+      "components": {
+        "Transform": {
+          "position": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 70, "y": 73, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-spark.png",
+          "source": { "x": 0, "y": 0, "width": 140, "height": 147 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 4
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 140, "height": 147 },
+            { "x": 140, "y": 0, "width": 140, "height": 147 },
+            { "x": 280, "y": 0, "width": 140, "height": 147 },
+            { "x": 420, "y": 0, "width": 140, "height": 147 },
+            { "x": 560, "y": 0, "width": 140, "height": 147 },
+            { "x": 700, "y": 0, "width": 140, "height": 147 },
+            { "x": 840, "y": 0, "width": 140, "height": 147 },
+            { "x": 980, "y": 0, "width": 140, "height": 147 },
+            { "x": 1120, "y": 0, "width": 140, "height": 147 }
+          ],
+          "frameDuration": 0.04,
+          "loop": false
+        },
+        "Scripts": { "scripts": ["scripts/effect.lua"] }
+      }
+    },
+    {
+      "name": "Piece A",
+      "components": {
+        "Transform": {
+          "position": { "x": -20, "y": -10, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 0, "y": 0, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 67, "height": 65 },
+            { "x": 67, "y": 0, "width": 67, "height": 65 },
+            { "x": 134, "y": 0, "width": 67, "height": 65 },
+            { "x": 201, "y": 0, "width": 67, "height": 65 },
+            { "x": 268, "y": 0, "width": 67, "height": 65 },
+            { "x": 335, "y": 0, "width": 67, "height": 65 },
+            { "x": 402, "y": 0, "width": 67, "height": 65 },
+            { "x": 469, "y": 0, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": -260, "y": -340 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Piece B",
+      "components": {
+        "Transform": {
+          "position": { "x": 16, "y": -12, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 536, "y": 0, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 536, "y": 0, "width": 67, "height": 65 },
+            { "x": 603, "y": 0, "width": 67, "height": 65 },
+            { "x": 670, "y": 0, "width": 67, "height": 65 },
+            { "x": 737, "y": 0, "width": 67, "height": 65 },
+            { "x": 804, "y": 0, "width": 67, "height": 65 },
+            { "x": 871, "y": 0, "width": 67, "height": 65 },
+            { "x": 938, "y": 0, "width": 67, "height": 65 },
+            { "x": 1005, "y": 0, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 230, "y": -400 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Piece C",
+      "components": {
+        "Transform": {
+          "position": { "x": -8, "y": 6, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 1072, "y": 0, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 1072, "y": 0, "width": 67, "height": 65 },
+            { "x": 1139, "y": 0, "width": 67, "height": 65 },
+            { "x": 1206, "y": 0, "width": 67, "height": 65 },
+            { "x": 1273, "y": 0, "width": 67, "height": 65 },
+            { "x": 1340, "y": 0, "width": 67, "height": 65 },
+            { "x": 1407, "y": 0, "width": 67, "height": 65 },
+            { "x": 1474, "y": 0, "width": 67, "height": 65 },
+            { "x": 1541, "y": 0, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": -140, "y": -220 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Piece D",
+      "components": {
+        "Transform": {
+          "position": { "x": 22, "y": 4, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 1608, "y": 0, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 1608, "y": 0, "width": 67, "height": 65 },
+            { "x": 1675, "y": 0, "width": 67, "height": 65 },
+            { "x": 1742, "y": 0, "width": 67, "height": 65 },
+            { "x": 1809, "y": 0, "width": 67, "height": 65 },
+            { "x": 1876, "y": 0, "width": 67, "height": 65 },
+            { "x": 1943, "y": 0, "width": 67, "height": 65 },
+            { "x": 0, "y": 65, "width": 67, "height": 65 },
+            { "x": 67, "y": 65, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 320, "y": -200 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Piece E",
+      "components": {
+        "Transform": {
+          "position": { "x": -26, "y": 8, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 134, "y": 65, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 134, "y": 65, "width": 67, "height": 65 },
+            { "x": 201, "y": 65, "width": 67, "height": 65 },
+            { "x": 268, "y": 65, "width": 67, "height": 65 },
+            { "x": 335, "y": 65, "width": 67, "height": 65 },
+            { "x": 402, "y": 65, "width": 67, "height": 65 },
+            { "x": 469, "y": 65, "width": 67, "height": 65 },
+            { "x": 536, "y": 65, "width": 67, "height": 65 },
+            { "x": 603, "y": 65, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": -330, "y": -110 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Piece F",
+      "components": {
+        "Transform": {
+          "position": { "x": 6, "y": -4, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 33, "y": 32, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/blimp-pieces-purple.png",
+          "source": { "x": 670, "y": 65, "width": 67, "height": 65 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 670, "y": 65, "width": 67, "height": 65 },
+            { "x": 737, "y": 65, "width": 67, "height": 65 },
+            { "x": 804, "y": 65, "width": 67, "height": 65 },
+            { "x": 871, "y": 65, "width": 67, "height": 65 },
+            { "x": 938, "y": 65, "width": 67, "height": 65 },
+            { "x": 1005, "y": 65, "width": 67, "height": 65 },
+            { "x": 1072, "y": 65, "width": 67, "height": 65 },
+            { "x": 1139, "y": 65, "width": 67, "height": 65 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 150, "y": -300 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    }
+  ]
+}

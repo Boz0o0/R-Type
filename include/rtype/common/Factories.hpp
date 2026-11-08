@@ -30,8 +30,10 @@ std::optional<ampersand::core::ecs::Entity> createShip(
 /**
  * @brief Creates a missile fired by an entity.
  *
- * The missile starts at the position of the shooter, with its Team and its
- * Owner (if any). Its prefab gives the rest (kind, speed, damage, hitbox).
+ * The missile starts in front of the shooter, centered on its height: on
+ * its right if it flies right, on its left otherwise (from their hitboxes).
+ * It gets the Team and the Owner (if any) of the shooter. Its prefab gives
+ * the rest (kind, speed, damage, hitbox).
  *
  * @param world World holding the shooter.
  * @param scenes SceneManager whose configuration gives the game folder.

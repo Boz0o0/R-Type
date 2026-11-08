@@ -1,4 +1,4 @@
---- The waves of ennemies of a level, one every WAVE_INTERVAL seconds.
+--- The waves of enemies of a level, one every WAVE_INTERVAL seconds.
 local Waves = {}
 
 --- Waves in a level.
@@ -10,7 +10,7 @@ local FIRST_WAVE_DELAY = 2
 --- Seconds between two waves.
 local WAVE_INTERVAL = 5
 --- Horizontal gap between two enemies of a wave.
-local ENEMY_SPACING = 96
+local ENEMY_SPACING = 170
 --- Free space above and below the enemies.
 local VERTICAL_MARGIN = 64
 
@@ -19,7 +19,7 @@ local SCREEN_WIDTH, SCREEN_HEIGHT = 1920, 1080
 --- Prefabs of the enemies, and their height (the hitbox of the prefabs).
 local ENEMY = "world/prefabs/common/enemy.json"
 local SINE_ENEMY = "world/prefabs/server/enemy-sine.json"
-local ENEMY_HEIGHT = 64
+local ENEMY_HEIGHT = 60
 
 --- Creates an enemy from its prefab, its top-left corner at x and y.
 local function spawn(prefab, x, y)

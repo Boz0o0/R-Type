@@ -8,8 +8,9 @@
 namespace rtype::client {
 
 // Creates the entities WorldMirror shows, with their looks and sounds but at
-// the origin. In the game they come from prefabs, which need a window, so the
-// tests give plain entities instead. std::nullopt when it cannot be created.
+// the origin, and the effect of their death. In the game they come from
+// prefabs, which need a window, so the tests give plain entities instead.
+// std::nullopt when it cannot be created.
 class IEntityFactory {
  public:
   virtual ~IEntityFactory() = default;
@@ -20,8 +21,8 @@ class IEntityFactory {
 
   [[nodiscard]] virtual std::optional<ampersand::core::ecs::Entity> create(
       common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId) = 0;
-  [[nodiscard]] virtual std::optional<ampersand::core::ecs::Entity>
-  createExplosion() = 0;
+  [[nodiscard]] virtual std::optional<ampersand::core::ecs::Entity> createDeath(
+      common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId) = 0;
 
  protected:
   IEntityFactory() = default;

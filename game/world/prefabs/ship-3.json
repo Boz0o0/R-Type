@@ -1,10 +1,75 @@
 {
   "version": 2,
-  "name": "Ship of player 3: the next colour row of the sheet",
-  "prefab": "world/prefabs/ship-1.json",
+  "name": "Plane of player 3 (chalice), tilting up or down with its vertical speed",
+  "prefab": "world/prefabs/common/ship.json",
   "components": {
+    "Transform": { "origin": { "x": 32, "y": 40, "z": 0 } },
     "Sprite": {
-      "source": { "y": 36 }
-    }
+      "texture": "assets/sprites/ship-chalice.png",
+      "source": { "x": 0, "y": 0, "width": 126, "height": 120 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    },
+    "AnimationStateMachine": {
+      "initial": "straight",
+      "states": {
+        "straight": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 126, "height": 120 },
+            { "x": 126, "y": 0, "width": 126, "height": 120 },
+            { "x": 252, "y": 0, "width": 126, "height": 120 },
+            { "x": 378, "y": 0, "width": 126, "height": 120 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        },
+        "up": {
+          "frames": [
+            { "x": 504, "y": 0, "width": 126, "height": 120 },
+            { "x": 630, "y": 0, "width": 126, "height": 120 },
+            { "x": 756, "y": 0, "width": 126, "height": 120 },
+            { "x": 882, "y": 0, "width": 126, "height": 120 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        },
+        "down": {
+          "frames": [
+            { "x": 1008, "y": 0, "width": 126, "height": 120 },
+            { "x": 1134, "y": 0, "width": 126, "height": 120 },
+            { "x": 1260, "y": 0, "width": 126, "height": 120 },
+            { "x": 1386, "y": 0, "width": 126, "height": 120 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        }
+      },
+      "params": { "floats": { "speedY": 0 }, "bools": {  } },
+      "transitions": [
+        {
+          "from": "*",
+          "to": "up",
+          "when": [
+            { "param": "speedY", "op": "<", "value": -120 }
+          ]
+        },
+        {
+          "from": "*",
+          "to": "down",
+          "when": [
+            { "param": "speedY", "op": ">", "value": 120 }
+          ]
+        },
+        {
+          "from": "*",
+          "to": "straight",
+          "when": [
+            { "param": "speedY", "op": ">=", "value": -120 },
+            { "param": "speedY", "op": "<=", "value": 120 }
+          ]
+        }
+      ]
+    },
+    "Scripts": { "scripts": ["scripts/tilt.lua"] }
   }
 }

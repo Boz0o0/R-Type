@@ -1,0 +1,238 @@
+{
+  "version": 2,
+  "name": "Death of player 4: the plane explodes, its gears fly away and its ghost rises",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "AudioSource": { "sound": "assets/sounds/plane-death.wav", "volume": 80, "loop": false, "playing": true },
+    "Scripts": { "scripts": ["scripts/burst.lua"] }
+  },
+  "children": [
+    {
+      "name": "Explosion",
+      "components": {
+        "Transform": {
+          "position": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 113, "y": 91, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/plane-explode.png",
+          "source": { "x": 0, "y": 0, "width": 227, "height": 182 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 3
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 227, "height": 182 },
+            { "x": 227, "y": 0, "width": 227, "height": 182 },
+            { "x": 454, "y": 0, "width": 227, "height": 182 },
+            { "x": 681, "y": 0, "width": 227, "height": 182 },
+            { "x": 908, "y": 0, "width": 227, "height": 182 },
+            { "x": 1135, "y": 0, "width": 227, "height": 182 },
+            { "x": 1362, "y": 0, "width": 227, "height": 182 },
+            { "x": 1589, "y": 0, "width": 227, "height": 182 },
+            { "x": 1816, "y": 0, "width": 227, "height": 182 },
+            { "x": 0, "y": 182, "width": 227, "height": 182 },
+            { "x": 227, "y": 182, "width": 227, "height": 182 },
+            { "x": 454, "y": 182, "width": 227, "height": 182 },
+            { "x": 681, "y": 182, "width": 227, "height": 182 },
+            { "x": 908, "y": 182, "width": 227, "height": 182 },
+            { "x": 1135, "y": 182, "width": 227, "height": 182 },
+            { "x": 1362, "y": 182, "width": 227, "height": 182 },
+            { "x": 1589, "y": 182, "width": 227, "height": 182 }
+          ],
+          "frameDuration": 0.05,
+          "loop": false
+        },
+        "Scripts": { "scripts": ["scripts/effect.lua"] }
+      }
+    },
+    {
+      "name": "Gear a",
+      "components": {
+        "Transform": {
+          "position": { "x": -10, "y": -6, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 27, "y": 28, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/gears.png",
+          "source": { "x": 0, "y": 0, "width": 54, "height": 56 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 54, "height": 56 },
+            { "x": 54, "y": 0, "width": 54, "height": 56 },
+            { "x": 108, "y": 0, "width": 54, "height": 56 },
+            { "x": 162, "y": 0, "width": 54, "height": 56 },
+            { "x": 216, "y": 0, "width": 54, "height": 56 },
+            { "x": 270, "y": 0, "width": 54, "height": 56 },
+            { "x": 324, "y": 0, "width": 54, "height": 56 },
+            { "x": 378, "y": 0, "width": 54, "height": 56 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": -240, "y": -380 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Gear b",
+      "components": {
+        "Transform": {
+          "position": { "x": 8, "y": -4, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 27, "y": 28, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/gears.png",
+          "source": { "x": 432, "y": 0, "width": 54, "height": 56 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 432, "y": 0, "width": 54, "height": 56 },
+            { "x": 486, "y": 0, "width": 54, "height": 56 },
+            { "x": 540, "y": 0, "width": 54, "height": 56 },
+            { "x": 594, "y": 0, "width": 54, "height": 56 },
+            { "x": 648, "y": 0, "width": 54, "height": 56 },
+            { "x": 702, "y": 0, "width": 54, "height": 56 },
+            { "x": 756, "y": 0, "width": 54, "height": 56 },
+            { "x": 810, "y": 0, "width": 54, "height": 56 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 210, "y": -420 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Gear c",
+      "components": {
+        "Transform": {
+          "position": { "x": -4, "y": 8, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 27, "y": 28, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/gears.png",
+          "source": { "x": 864, "y": 0, "width": 54, "height": 56 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 864, "y": 0, "width": 54, "height": 56 },
+            { "x": 918, "y": 0, "width": 54, "height": 56 },
+            { "x": 972, "y": 0, "width": 54, "height": 56 },
+            { "x": 1026, "y": 0, "width": 54, "height": 56 },
+            { "x": 1080, "y": 0, "width": 54, "height": 56 },
+            { "x": 1134, "y": 0, "width": 54, "height": 56 },
+            { "x": 1188, "y": 0, "width": 54, "height": 56 },
+            { "x": 1242, "y": 0, "width": 54, "height": 56 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": -300, "y": -160 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Gear d",
+      "components": {
+        "Transform": {
+          "position": { "x": 12, "y": 6, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 27, "y": 28, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/gears.png",
+          "source": { "x": 1296, "y": 0, "width": 54, "height": 56 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 2
+        },
+        "Animation": {
+          "frames": [
+            { "x": 1296, "y": 0, "width": 54, "height": 56 },
+            { "x": 1350, "y": 0, "width": 54, "height": 56 },
+            { "x": 1404, "y": 0, "width": 54, "height": 56 },
+            { "x": 1458, "y": 0, "width": 54, "height": 56 },
+            { "x": 1512, "y": 0, "width": 54, "height": 56 },
+            { "x": 1566, "y": 0, "width": 54, "height": 56 },
+            { "x": 1620, "y": 0, "width": 54, "height": 56 },
+            { "x": 1674, "y": 0, "width": 54, "height": 56 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 280, "y": -220 } },
+        "Scripts": { "scripts": ["scripts/debris.lua"] }
+      }
+    },
+    {
+      "name": "Ghost",
+      "components": {
+        "Transform": {
+          "position": { "x": 0, "y": -10, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+          "origin": { "x": 51, "y": 68, "z": 0 }
+        },
+        "Sprite": {
+          "texture": "assets/sprites/ghost-noir.png",
+          "source": { "x": 0, "y": 0, "width": 103, "height": 137 },
+          "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+          "layer": 5
+        },
+        "Animation": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 103, "height": 137 },
+            { "x": 103, "y": 0, "width": 103, "height": 137 },
+            { "x": 206, "y": 0, "width": 103, "height": 137 },
+            { "x": 309, "y": 0, "width": 103, "height": 137 },
+            { "x": 412, "y": 0, "width": 103, "height": 137 },
+            { "x": 515, "y": 0, "width": 103, "height": 137 },
+            { "x": 618, "y": 0, "width": 103, "height": 137 },
+            { "x": 721, "y": 0, "width": 103, "height": 137 },
+            { "x": 824, "y": 0, "width": 103, "height": 137 },
+            { "x": 927, "y": 0, "width": 103, "height": 137 },
+            { "x": 1030, "y": 0, "width": 103, "height": 137 },
+            { "x": 1133, "y": 0, "width": 103, "height": 137 },
+            { "x": 1236, "y": 0, "width": 103, "height": 137 },
+            { "x": 1339, "y": 0, "width": 103, "height": 137 },
+            { "x": 1442, "y": 0, "width": 103, "height": 137 },
+            { "x": 1545, "y": 0, "width": 103, "height": 137 },
+            { "x": 1648, "y": 0, "width": 103, "height": 137 },
+            { "x": 1751, "y": 0, "width": 103, "height": 137 },
+            { "x": 1854, "y": 0, "width": 103, "height": 137 },
+            { "x": 0, "y": 137, "width": 103, "height": 137 },
+            { "x": 103, "y": 137, "width": 103, "height": 137 },
+            { "x": 206, "y": 137, "width": 103, "height": 137 },
+            { "x": 309, "y": 137, "width": 103, "height": 137 },
+            { "x": 412, "y": 137, "width": 103, "height": 137 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "Velocity": { "value": { "x": 0, "y": -90 } },
+        "Scripts": { "scripts": ["scripts/ghost.lua"] }
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "name": "Spark of a player bullet that hit, with its sound",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 28, "y": 27, "z": 0 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/hit-spark.png",
+      "source": { "x": 0, "y": 0, "width": 57, "height": 54 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 4
+    },
+    "Animation": {
+      "frames": [
+        { "x": 0, "y": 0, "width": 57, "height": 54 },
+        { "x": 57, "y": 0, "width": 57, "height": 54 },
+        { "x": 114, "y": 0, "width": 57, "height": 54 },
+        { "x": 171, "y": 0, "width": 57, "height": 54 },
+        { "x": 228, "y": 0, "width": 57, "height": 54 },
+        { "x": 285, "y": 0, "width": 57, "height": 54 },
+        { "x": 342, "y": 0, "width": 57, "height": 54 },
+        { "x": 399, "y": 0, "width": 57, "height": 54 }
+      ],
+      "frameDuration": 0.04,
+      "loop": false
+    },
+    "Scripts": { "scripts": ["scripts/effect.lua"] },
+    "AudioSource": { "sound": "assets/sounds/shot-hit.wav", "volume": 25, "loop": false, "playing": true }
+  }
+}

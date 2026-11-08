@@ -115,17 +115,28 @@ TEST_F(Factories, MissilesGoTowardTheOtherSide) {
   EXPECT_EQ(world.get<Team>(*enemyShot).side, Side::Enemies);
 }
 
-TEST_F(Factories, MissileStartsOnItsShooter) {
+TEST_F(Factories, MissileStartsInFrontOfItsShooter) {
   const auto ship = createShip(world, scenes, {100.0F, 500.0F});
+  const Entity foe = this->enemy(1500.0F, 500.0F);
   ASSERT_TRUE(ship.has_value());
 
   const auto shot =
       createMissile(world, scenes, world.get<Weapon>(*ship).missile, *ship);
+  const auto enemyShot =
+      createMissile(world, scenes, world.get<Weapon>(foe).missile, foe);
 
-  ASSERT_TRUE(shot.has_value());
+  ASSERT_TRUE(shot && enemyShot);
+  const auto& shipBox = world.get<BoxCollider>(*ship).bounds;
+  const auto& shotBox = world.get<BoxCollider>(*shot).bounds;
   const auto& position = world.get<ampersand::core::Transform>(*shot).position;
-  EXPECT_FLOAT_EQ(position.x, 100.0F);
-  EXPECT_FLOAT_EQ(position.y, 500.0F);
+  EXPECT_FLOAT_EQ(position.x, 100.0F + shipBox.width);
+  EXPECT_FLOAT_EQ(position.y,
+                  500.0F + ((shipBox.height - shotBox.height) / 2.0F));
+  const auto& foeBox = world.get<BoxCollider>(foe).bounds;
+  const auto& bulletBox = world.get<BoxCollider>(*enemyShot).bounds;
+  const auto& from = world.get<ampersand::core::Transform>(*enemyShot).position;
+  EXPECT_FLOAT_EQ(from.x, 1500.0F - bulletBox.width);
+  EXPECT_FLOAT_EQ(from.y, 500.0F + ((foeBox.height - bulletBox.height) / 2.0F));
 }
 
 TEST_F(Factories, ReturnNothingForAPrefabThatCannotBeLoaded) {

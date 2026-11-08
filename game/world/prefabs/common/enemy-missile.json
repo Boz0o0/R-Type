@@ -11,7 +11,7 @@
     "Kind": { "kind": "EnemyMissile", "variant": 0 },
     "Projectile": {},
     "Velocity": { "value": { "x": -400, "y": 0 } },
-    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 8, "height": 8 } },
+    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 22, "height": 22 } },
     "Damage": { "amount": 1 }
   }
 }

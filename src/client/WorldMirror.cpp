@@ -2,8 +2,8 @@
 #include <ampersand/core/ecs/Entity.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
+#include <ampersand/physics/components/BoxCollider.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
-#include <ampersand/render/components/Sprite.hpp>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +11,6 @@
 #include <rtype/client/IEntityFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/components/Correction.hpp>
-#include <rtype/client/components/Explosion.hpp>
 #include <rtype/client/components/Predicted.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
@@ -21,7 +20,6 @@ namespace rtype::client {
 
 namespace core = ampersand::core;
 namespace physics = ampersand::physics;
-namespace render = ampersand::render;
 
 WorldMirror::WorldMirror(core::ecs::World& world, IEntityFactory& factory)
     : _world(world), _factory(factory) {}
@@ -59,8 +57,12 @@ void WorldMirror::spawn(const protocol::EntitySpawn& packet) {
                                  .value = {packet.velocityX, packet.velocityY},
                              });
   }
-  this->_entities.emplace(
-      packet.entityId, Mirrored{.entity = entity, .kind = packet.entityType});
+  this->_entities.emplace(packet.entityId, Mirrored{
+                                               .entity = entity,
+                                               .kind = packet.entityType,
+                                               .variant = packet.variant,
+                                               .ownerId = packet.ownerId,
+                                           });
 }
 
 void WorldMirror::applySnapshot(const protocol::WorldSnapshot& packet) {
@@ -93,16 +95,10 @@ void WorldMirror::destroy(const protocol::EntityDestroy& packet) {
   if (found == this->_entities.end()) {
     return;
   }
-  const auto [entity, kind] = found->second;
-  const bool isShipOrEnemy =
-      kind == common::EntityKind::Ship || kind == common::EntityKind::Enemy;
-  if (packet.reason == common::DeathReason::Killed && isShipOrEnemy) {
-    // Copies: creating the explosion can move the component storage.
-    const core::Transform transform = this->_world.get<core::Transform>(entity);
-    const render::Sprite sprite = this->_world.get<render::Sprite>(entity);
-    this->explode(transform, sprite);
+  if (packet.reason == common::DeathReason::Killed) {
+    this->die(found->second);
   }
-  this->_world.destroy(entity);
+  this->_world.destroy(found->second.entity);
   this->_entities.erase(found);
 }
 
@@ -146,28 +142,23 @@ void WorldMirror::correct(core::ecs::Entity entity,
   }
 }
 
-// Centers the explosion on the sprite of the entity that died.
-void WorldMirror::explode(const core::Transform& transform,
-                          const render::Sprite& sprite) {
-  const std::optional<core::ecs::Entity> created =
-      this->_factory.createExplosion();
-  if (!created) {
+void WorldMirror::die(const Mirrored& mirrored) {
+  const auto& dead =
+      this->_world.get<core::Transform>(mirrored.entity).position;
+  const auto& bounds =
+      this->_world.get<physics::BoxCollider>(mirrored.entity).bounds;
+  const core::math::Vec2f center{
+      dead.x + bounds.x + (bounds.width / 2.0F),
+      dead.y + bounds.y + (bounds.height / 2.0F),
+  };
+  const std::optional<core::ecs::Entity> effect = this->_factory.createDeath(
+      mirrored.kind, mirrored.variant, mirrored.ownerId);
+  if (!effect) {
     return;
   }
-  const core::ecs::Entity explosion = *created;
-  this->_world.add(explosion, Explosion{});
-  const auto& frame = this->_world.get<render::Sprite>(explosion).source;
-  auto& placed = this->_world.get<core::Transform>(explosion);
-  const float centerX =
-      transform.position.x +
-      (static_cast<float>(sprite.source.width) * transform.scale.x / 2.0F);
-  const float centerY =
-      transform.position.y +
-      (static_cast<float>(sprite.source.height) * transform.scale.y / 2.0F);
-  placed.position.x =
-      centerX - (static_cast<float>(frame.width) * placed.scale.x / 2.0F);
-  placed.position.y =
-      centerY - (static_cast<float>(frame.height) * placed.scale.y / 2.0F);
+  auto& position = this->_world.get<core::Transform>(*effect).position;
+  position.x = center.x;
+  position.y = center.y;
 }
 
 }  // namespace rtype::client

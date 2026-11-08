@@ -2,19 +2,25 @@
 
 #include <ampersand/audio/components/AudioSource.hpp>
 #include <ampersand/audio/resources/AudioListener.hpp>
+#include <ampersand/audio/systems/AudioSystem.hpp>
 #include <ampersand/core/components/Transform.hpp>
 #include <ampersand/core/ecs/Entity.hpp>
+#include <ampersand/core/ecs/Scheduler.hpp>
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/resources/Clock.hpp>
 #include <ampersand/input/resources/InputManager.hpp>
 #include <ampersand/physics/components/Velocity.hpp>
+#include <ampersand/physics/systems/MovementSystem.hpp>
 #include <ampersand/render/components/Animation.hpp>
+#include <ampersand/render/components/AnimationStateMachine.hpp>
 #include <ampersand/render/components/Sprite.hpp>
 #include <ampersand/render/resources/Camera.hpp>
 #include <ampersand/render/resources/Renderer.hpp>
+#include <ampersand/render/systems/AnimationSystem.hpp>
 #include <ampersand/scene/resources/SceneManager.hpp>
 #include <ampersand/scripting/components/Scripts.hpp>
 #include <ampersand/scripting/systems/ScriptingSystem.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <rtype/client/Controls.hpp>
@@ -23,6 +29,7 @@
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -31,13 +38,18 @@
 
 using ampersand::audio::AudioListener;
 using ampersand::audio::AudioSource;
+using ampersand::audio::AudioSystem;
 using ampersand::core::Clock;
 using ampersand::core::Transform;
 using ampersand::core::ecs::Entity;
+using ampersand::core::ecs::Scheduler;
 using ampersand::core::ecs::World;
 using ampersand::input::InputManager;
+using ampersand::physics::MovementSystem;
 using ampersand::physics::Velocity;
 using ampersand::render::Animation;
+using ampersand::render::AnimationStateMachine;
+using ampersand::render::AnimationSystem;
 using ampersand::render::Camera;
 using ampersand::render::Renderer;
 using ampersand::render::Sprite;
@@ -79,6 +91,20 @@ class GameFiles : public testing::Test {
     return loaded(this->factory.create(kind, variant, ownerId));
   }
 
+  Entity death(EntityKind kind, std::uint8_t ownerId = 0,
+               std::uint8_t variant = 0) {
+    return loaded(this->factory.createDeath(kind, variant, ownerId));
+  }
+
+  // Runs the scripts, the moves and the animations, like the client.
+  void play(Scheduler& scheduler, float seconds) {
+    for (float elapsed = 0.0F; elapsed < seconds; elapsed += TICK) {
+      scheduler.update(TICK);
+    }
+  }
+
+  static constexpr float TICK = 1.0F / 60.0F;
+
   FakeBackends backends;
   SceneManager scenes;
   World world;
@@ -109,16 +135,24 @@ TEST_F(GameFiles, SceneHasTwoCopiesOfEachStarLayerSideBySide) {
   EXPECT_FLOAT_EQ(widthCovered, 2.0F * 1920.0F);
 }
 
-TEST_F(GameFiles, EachPlayerHasAShipOfItsOwnColour) {
+TEST_F(GameFiles, EachPlayerHasItsOwnPlaneAndBullets) {
+  std::set<std::uint32_t> planes;
+  std::set<std::uint32_t> bullets;
   for (std::uint8_t owner = 0; owner < rtype::protocol::MAX_PLAYERS; ++owner) {
-    const Entity ship = this->created(EntityKind::Ship, owner);
-    EXPECT_EQ(this->world.get<Sprite>(ship).source.y, 2 + (owner * 17));
+    planes.insert(
+        this->world.get<Sprite>(this->created(EntityKind::Ship, owner))
+            .texture);
+    bullets.insert(
+        this->world.get<Sprite>(this->created(EntityKind::PlayerMissile, owner))
+            .texture);
   }
+  EXPECT_EQ(planes.size(), rtype::protocol::MAX_PLAYERS);
+  EXPECT_EQ(bullets.size(), rtype::protocol::MAX_PLAYERS);
 }
 
-TEST_F(GameFiles, EnemiesAndMissilesAreAnimated) {
-  for (const EntityKind kind : {EntityKind::Enemy, EntityKind::PlayerMissile,
-                                EntityKind::EnemyMissile}) {
+TEST_F(GameFiles, MissilesAreAnimated) {
+  for (const EntityKind kind :
+       {EntityKind::PlayerMissile, EntityKind::EnemyMissile}) {
     const Entity entity = this->created(kind);
     ASSERT_TRUE(this->world.has<Animation>(entity));
     const auto& source = this->world.get<Sprite>(entity).source;
@@ -129,16 +163,14 @@ TEST_F(GameFiles, EnemiesAndMissilesAreAnimated) {
   }
 }
 
-TEST_F(GameFiles, SineEnemyHasItsOwnColour) {
+TEST_F(GameFiles, SineEnemyHasItsOwnLook) {
   const Entity enemy = this->created(EntityKind::Enemy);
   const Entity sine = this->created(EntityKind::Enemy, 0, 1);
   const Entity unknown = this->created(EntityKind::Enemy, 0, 200);
 
-  const auto& color = this->world.get<Sprite>(enemy).color;
-  EXPECT_NE(this->world.get<Sprite>(sine).color.r, color.r);
-  EXPECT_EQ(this->world.get<Sprite>(unknown).color.r, color.r);
-  EXPECT_EQ(this->world.get<Sprite>(sine).texture,
-            this->world.get<Sprite>(enemy).texture);
+  const auto texture = this->world.get<Sprite>(enemy).texture;
+  EXPECT_NE(this->world.get<Sprite>(sine).texture, texture);
+  EXPECT_EQ(this->world.get<Sprite>(unknown).texture, texture);
 }
 
 TEST_F(GameFiles, MirrorGivesThePacketVelocityOverThePrefabOne) {
@@ -157,21 +189,73 @@ TEST_F(GameFiles, MirrorGivesThePacketVelocityOverThePrefabOne) {
   EXPECT_FALSE(this->world.has<Velocity>(*ship));
 }
 
-TEST_F(GameFiles, OnlyPlayerMissilesPlayTheShootSound) {
-  const Entity shot = this->created(EntityKind::PlayerMissile);
-  const Entity enemyShot = this->created(EntityKind::EnemyMissile);
-
-  ASSERT_TRUE(this->world.has<AudioSource>(shot));
-  EXPECT_TRUE(this->world.get<AudioSource>(shot).playing);
-  EXPECT_FALSE(this->world.has<AudioSource>(enemyShot));
+TEST_F(GameFiles, EveryKillHasItsEffectWithItsSound) {
+  for (std::uint8_t owner = 0; owner < rtype::protocol::MAX_PLAYERS; ++owner) {
+    EXPECT_TRUE(
+        this->world.has<AudioSource>(this->death(EntityKind::Ship, owner)));
+  }
+  for (std::uint8_t variant = 0; variant < 2; ++variant) {
+    EXPECT_TRUE(this->world.has<AudioSource>(
+        this->death(EntityKind::Enemy, 0, variant)));
+  }
+  EXPECT_TRUE(
+      this->world.has<AudioSource>(this->death(EntityKind::PlayerMissile)));
+  EXPECT_TRUE(
+      this->world.has<AudioSource>(this->death(EntityKind::EnemyMissile)));
+  EXPECT_FALSE(this->factory.createDeath(EntityKind::PowerUp, 0, 0));
 }
 
-TEST_F(GameFiles, ExplosionPlaysOnceOverTheShipsWithItsSound) {
-  const Entity explosion = loaded(this->factory.createExplosion());
+TEST_F(GameFiles, EffectsAreGoneOnceOver) {
+  Scheduler scheduler(this->world);
+  scheduler.add<ScriptingSystem>();
+  scheduler.add<MovementSystem>();
+  scheduler.add<AnimationSystem>();
+  scheduler.add<AudioSystem>();
+  this->play(scheduler, TICK);
+  const std::size_t before = this->world.entityCount();
+  (void)this->death(EntityKind::Ship);
+  (void)this->death(EntityKind::Enemy, 0, 1);
+  (void)this->death(EntityKind::PlayerMissile);
+  (void)this->death(EntityKind::EnemyMissile);
+  ASSERT_GT(this->world.entityCount(), before);
 
-  EXPECT_GT(this->world.get<Sprite>(explosion).layer, 0);
-  EXPECT_FALSE(this->world.get<Animation>(explosion).loop);
-  EXPECT_TRUE(this->world.get<AudioSource>(explosion).playing);
+  this->play(scheduler, 5.0F);
+
+  EXPECT_EQ(this->world.entityCount(), before);
+}
+
+TEST_F(GameFiles, PlaneTiltsWhileItClimbsOrDives) {
+  Scheduler scheduler(this->world);
+  scheduler.add<ScriptingSystem>();
+  scheduler.add<AnimationSystem>();
+  const Entity plane = this->created(EntityKind::Ship);
+  const auto& machine = this->world.get<AnimationStateMachine>(plane);
+
+  for (int frame = 0; frame < 20; ++frame) {
+    this->world.get<Transform>(plane).position.y -= 6.0F;
+    scheduler.update(TICK);
+  }
+  EXPECT_EQ(machine.current(), "up");
+  for (int frame = 0; frame < 20; ++frame) {
+    this->world.get<Transform>(plane).position.y += 6.0F;
+    scheduler.update(TICK);
+  }
+  EXPECT_EQ(machine.current(), "down");
+  this->play(scheduler, 1.0F);
+  EXPECT_EQ(machine.current(), "straight");
+}
+
+TEST_F(GameFiles, BlimpPlaysItsAttackWhenItFires) {
+  Scheduler scheduler(this->world);
+  scheduler.add<ScriptingSystem>();
+  scheduler.add<AnimationSystem>();
+  const Entity blimp = this->created(EntityKind::Enemy);
+  const auto& machine = this->world.get<AnimationStateMachine>(blimp);
+
+  this->play(scheduler, 1.0F);
+  EXPECT_FALSE(machine.isPlayingAction());
+  this->play(scheduler, 0.4F);
+  EXPECT_TRUE(machine.isPlayingAction());
 }
 
 TEST_F(GameFiles, KindsWithoutALookStillGetAnEntity) {

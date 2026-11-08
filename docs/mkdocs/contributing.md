@@ -8,7 +8,7 @@
 
 The CI builds, lints and tests the project on Linux and Windows for every pull request.
 
-Each pull request adds a short line under `[Unreleased]` in `CHANGELOG.md` (how to release a version is at the top of that file).
+Each pull request adds a short line under `[Unreleased]` in `CHANGELOG.md` (how to release a version: see [Release](#release)).
 
 ## Commits
 
@@ -45,3 +45,9 @@ GoogleTest, one file per class: `tests/<part>/tests_<name>.cpp`. A test name say
 ```sh
 ctest --test-dir build --output-on-failure
 ```
+
+## Release
+
+1. In a pull request, rename `## [Unreleased]` of the [Changelog](changelog.md) to the new version and today's date (eg: `## [1.1.0] - 2026-10-25`), add an empty `## [Unreleased]` above it, and update the links at the bottom of the file.
+2. Set the same version in `project()` of `CMakeLists.txt` (eg: `VERSION 1.1.0`).
+3. Once it is merged, tag `main` and push the tag (`git tag v1.1.0 && git push origin v1.1.0`). The release workflow does the checks and creates the GitHub release.

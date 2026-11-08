@@ -9,13 +9,13 @@
 #include <optional>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/components/Correction.hpp>
-#include <rtype/client/components/Explosion.hpp>
 #include <rtype/client/components/Predicted.hpp>
 #include <rtype/common/components/Kind.hpp>
 #include <rtype/common/protocol/Packets.hpp>
 #include <rtype/common/protocol/Protocol.hpp>
 #include <rtype/common/resources/Deaths.hpp>
 #include <stdexcept>
+#include <vector>
 
 #include "FakeEntityFactory.hpp"
 
@@ -25,7 +25,6 @@ using ampersand::core::ecs::World;
 using ampersand::physics::Velocity;
 using ampersand::render::Sprite;
 using rtype::client::Correction;
-using rtype::client::Explosion;
 using rtype::client::Predicted;
 using rtype::client::WorldMirror;
 using rtype::client::test::FakeEntityFactory;
@@ -56,6 +55,18 @@ static Entity entityOf(const WorldMirror& mirror, std::uint32_t entityId) {
     throw std::runtime_error("entity is not mirrored");
   }
   return *entity;
+}
+
+// The death effects created, found by their fake texture.
+static std::vector<Entity> deathsOf(World& world, EntityKind kind) {
+  std::vector<Entity> found;
+  for (const Entity entity : world.owners<Sprite>()) {
+    if (world.get<Sprite>(entity).texture ==
+        FakeEntityFactory::deathTextureOf(kind)) {
+      found.push_back(entity);
+    }
+  }
+  return found;
 }
 
 static float positionX(World& world, const WorldMirror& mirror,
@@ -338,7 +349,7 @@ TEST(WorldMirror, DropsASpawnThatArrivesAfterItsDestroy) {
   EXPECT_FALSE(mirror.find(7).has_value());
 }
 
-TEST(WorldMirror, KilledEnemyExplodesOnItsCenter) {
+TEST(WorldMirror, KilledEnemyDiesOnTheCenterOfItsHitbox) {
   World world;
   FakeEntityFactory factory(world);
   WorldMirror mirror(world, factory);
@@ -346,28 +357,27 @@ TEST(WorldMirror, KilledEnemyExplodesOnItsCenter) {
 
   mirror.destroy(EntityDestroy{.entityId = 7, .reason = DeathReason::Killed});
 
-  ASSERT_EQ(world.owners<Explosion>().size(), 1U);
-  const Entity explosion = world.owners<Explosion>().front();
-  // Enemy at (100, 200), 60x60: center (130, 230). Explosion 10x10.
-  const auto& position = world.get<Transform>(explosion).position;
-  EXPECT_FLOAT_EQ(position.x, 125.0F);
-  EXPECT_FLOAT_EQ(position.y, 225.0F);
-  EXPECT_EQ(world.get<Sprite>(explosion).texture,
-            FakeEntityFactory::EXPLOSION_TEXTURE);
+  const auto deaths = deathsOf(world, EntityKind::Enemy);
+  ASSERT_EQ(deaths.size(), 1U);
+  const auto& position = world.get<Transform>(deaths.front()).position;
+  EXPECT_FLOAT_EQ(position.x, 130.0F);
+  EXPECT_FLOAT_EQ(position.y, 230.0F);
 }
 
-TEST(WorldMirror, MissilesAndEntitiesLeavingTheScreenDoNotExplode) {
+TEST(WorldMirror, EntitiesLeavingTheScreenHaveNoEffect) {
   World world;
   FakeEntityFactory factory(world);
   WorldMirror mirror(world, factory);
   mirror.spawn(spawnPacket(1, EntityKind::PlayerMissile));
   mirror.spawn(spawnPacket(2, EntityKind::Enemy));
 
-  mirror.destroy(EntityDestroy{.entityId = 1, .reason = DeathReason::Killed});
+  mirror.destroy(
+      EntityDestroy{.entityId = 1, .reason = DeathReason::OutOfScreen});
   mirror.destroy(
       EntityDestroy{.entityId = 2, .reason = DeathReason::OutOfScreen});
 
-  EXPECT_TRUE(world.owners<Explosion>().empty());
+  EXPECT_TRUE(deathsOf(world, EntityKind::PlayerMissile).empty());
+  EXPECT_TRUE(deathsOf(world, EntityKind::Enemy).empty());
   EXPECT_EQ(mirror.size(), 0U);
 }
 
@@ -393,7 +403,7 @@ TEST(WorldMirror, KilledEnemyInAFullWorldJustDisappears) {
   EXPECT_NO_THROW(mirror.destroy(
       EntityDestroy{.entityId = 7, .reason = DeathReason::Killed}));
 
-  EXPECT_TRUE(world.owners<Explosion>().empty());
+  EXPECT_TRUE(deathsOf(world, EntityKind::Enemy).empty());
   EXPECT_EQ(mirror.size(), 0U);
 }
 

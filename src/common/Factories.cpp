@@ -3,6 +3,8 @@
 #include <ampersand/core/ecs/World.hpp>
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/core/math/Vec3.hpp>
+#include <ampersand/physics/components/BoxCollider.hpp>
+#include <ampersand/physics/components/Velocity.hpp>
 #include <ampersand/scene/resources/SceneManager.hpp>
 #include <optional>
 #include <rtype/common/Factories.hpp>
@@ -15,6 +17,8 @@ namespace rtype::common {
 
 using ampersand::core::ecs::Entity;
 using ampersand::core::ecs::World;
+using ampersand::physics::BoxCollider;
+using ampersand::physics::Velocity;
 using ampersand::scene::SceneManager;
 
 namespace {
@@ -47,6 +51,15 @@ std::optional<Entity> createMissile(World& world, SceneManager& scenes,
   const auto missile = instantiate(world, scenes, prefab, position);
   if (!missile) {
     return std::nullopt;
+  }
+  if (world.has<BoxCollider>(shooter) && world.has<BoxCollider>(*missile) &&
+      world.has<Velocity>(*missile)) {
+    const auto& gun = world.get<BoxCollider>(shooter).bounds;
+    const auto& bullet = world.get<BoxCollider>(*missile).bounds;
+    auto& start = world.get<ampersand::core::Transform>(*missile).position;
+    start.x += world.get<Velocity>(*missile).value.x < 0.0F ? -bullet.width
+                                                            : gun.width;
+    start.y += (gun.height - bullet.height) / 2.0F;
   }
   if (world.has<Team>(shooter)) {
     world.add(*missile, world.get<Team>(shooter));

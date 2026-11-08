@@ -1,10 +1,75 @@
 {
   "version": 2,
-  "name": "Ship of player 2: the next colour row of the sheet",
-  "prefab": "world/prefabs/ship-1.json",
+  "name": "Plane of player 2 (mugman), tilting up or down with its vertical speed",
+  "prefab": "world/prefabs/common/ship.json",
   "components": {
+    "Transform": { "origin": { "x": 32, "y": 48, "z": 0 } },
     "Sprite": {
-      "source": { "y": 19 }
-    }
+      "texture": "assets/sprites/ship-mugman.png",
+      "source": { "x": 0, "y": 0, "width": 125, "height": 128 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 0
+    },
+    "AnimationStateMachine": {
+      "initial": "straight",
+      "states": {
+        "straight": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 125, "height": 128 },
+            { "x": 125, "y": 0, "width": 125, "height": 128 },
+            { "x": 250, "y": 0, "width": 125, "height": 128 },
+            { "x": 375, "y": 0, "width": 125, "height": 128 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        },
+        "up": {
+          "frames": [
+            { "x": 500, "y": 0, "width": 125, "height": 128 },
+            { "x": 625, "y": 0, "width": 125, "height": 128 },
+            { "x": 750, "y": 0, "width": 125, "height": 128 },
+            { "x": 875, "y": 0, "width": 125, "height": 128 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        },
+        "down": {
+          "frames": [
+            { "x": 1000, "y": 0, "width": 125, "height": 128 },
+            { "x": 1125, "y": 0, "width": 125, "height": 128 },
+            { "x": 1250, "y": 0, "width": 125, "height": 128 },
+            { "x": 1375, "y": 0, "width": 125, "height": 128 }
+          ],
+          "frameDuration": 0.07,
+          "loop": true
+        }
+      },
+      "params": { "floats": { "speedY": 0 }, "bools": {  } },
+      "transitions": [
+        {
+          "from": "*",
+          "to": "up",
+          "when": [
+            { "param": "speedY", "op": "<", "value": -120 }
+          ]
+        },
+        {
+          "from": "*",
+          "to": "down",
+          "when": [
+            { "param": "speedY", "op": ">", "value": 120 }
+          ]
+        },
+        {
+          "from": "*",
+          "to": "straight",
+          "when": [
+            { "param": "speedY", "op": ">=", "value": -120 },
+            { "param": "speedY", "op": "<=", "value": 120 }
+          ]
+        }
+      ]
+    },
+    "Scripts": { "scripts": ["scripts/tilt.lua"] }
   }
 }

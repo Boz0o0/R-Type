@@ -22,8 +22,9 @@ class PrefabFactory final : public IEntityFactory {
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> create(
       common::EntityKind kind, std::uint8_t variant,
       std::uint8_t ownerId) override;
-  [[nodiscard]] std::optional<ampersand::core::ecs::Entity> createExplosion()
-      override;
+  [[nodiscard]] std::optional<ampersand::core::ecs::Entity> createDeath(
+      common::EntityKind kind, std::uint8_t variant,
+      std::uint8_t ownerId) override;
 
  private:
   static constexpr std::array<std::string_view, protocol::MAX_PLAYERS> SHIPS{
@@ -36,14 +37,35 @@ class PrefabFactory final : public IEntityFactory {
       "world/prefabs/enemy.json",
       "world/prefabs/enemy-sine.json",
   };
-  static constexpr std::string_view PLAYER_MISSILE =
-      "world/prefabs/player-missile.json";
+  static constexpr std::array<std::string_view, protocol::MAX_PLAYERS>
+      PLAYER_MISSILES{
+          "world/prefabs/player-missile-1.json",
+          "world/prefabs/player-missile-2.json",
+          "world/prefabs/player-missile-3.json",
+          "world/prefabs/player-missile-4.json",
+      };
   static constexpr std::string_view ENEMY_MISSILE =
       "world/prefabs/enemy-missile.json";
-  static constexpr std::string_view EXPLOSION = "world/prefabs/explosion.json";
+  static constexpr std::array<std::string_view, protocol::MAX_PLAYERS>
+      SHIP_DEATHS{
+          "world/prefabs/ship-death-1.json",
+          "world/prefabs/ship-death-2.json",
+          "world/prefabs/ship-death-3.json",
+          "world/prefabs/ship-death-4.json",
+      };
+  static constexpr std::array<std::string_view, 2> ENEMY_DEATHS{
+      "world/prefabs/enemy-death.json",
+      "world/prefabs/enemy-sine-death.json",
+  };
+  static constexpr std::string_view PLAYER_MISSILE_HIT =
+      "world/prefabs/player-missile-hit.json";
+  static constexpr std::string_view ENEMY_MISSILE_HIT =
+      "world/prefabs/enemy-missile-hit.json";
 
   // Power-ups and obstacles have no look yet.
   [[nodiscard]] static std::optional<std::string_view> prefabOf(
+      common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId);
+  [[nodiscard]] static std::optional<std::string_view> deathOf(
       common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId);
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> instantiate(
       std::string_view path);
