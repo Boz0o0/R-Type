@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "Missile of an enemy",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Kind": { "kind": "EnemyMissile", "variant": 0 },
+    "Projectile": {},
+    "Velocity": { "value": { "x": -400, "y": 0 } },
+    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 8, "height": 8 } },
+    "Damage": { "amount": 1 }
+  }
+}

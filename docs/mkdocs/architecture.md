@@ -57,6 +57,9 @@ The threads only share the socket (behind a mutex) and bounded
 What the client looks like is data, read by the engine's scene module from the
 `game/` folder (CMake copies it next to the binary). The client first moves to
 its binary folder, since the engine reads `game/` from the working directory.
+The server reads it from where it runs too (the repository, or the binary
+folder): the gameplay of the entities and the waves (see
+[Gameplay](gameplay.md#entities)).
 
 ```text
 game/
@@ -65,15 +68,20 @@ game/
 │   ├── scroll.lua     puts a star-field copy back behind the other one
 │   ├── login.lua      the login screen
 │   ├── lobby.lua      the lobby screen
-│   └── hud.lua        the texts over the game
+│   ├── hud.lua        the texts over the game
+│   └── server/        the waves and the sine enemy, run by the server
 └── world/
     ├── config.json    window, sound, camera, background colour, input actions
+    ├── server.json    the configuration of the server: its scene only
     ├── scenes/
-    │   └── game.json  the star field: two copies of each layer, side by side;
-    │                  the login, the lobby and the HUD
+    │   ├── game.json  the star field: two copies of each layer, side by side;
+    │   │              the login, the lobby and the HUD
+    │   └── server.json the waves
     └── prefabs/       one entity each: ships (one per player colour), enemy,
-                       missiles, explosion, star-field layers, text, login,
-                       lobby, HUD
+        │              missiles, explosion, star-field layers, text, login,
+        │              lobby, HUD
+        ├── common/    the gameplay of the entities, for both sides
+        └── server/    the scripts of the entities, on the server
 ```
 
 - `config.json` opens the window (1280x720, showing the 1920x1080 game area)
@@ -86,7 +94,8 @@ game/
   each drawn twice side by side, behind everything else. The back layer scrolls
   left at 30 px/s and the front one at 90 px/s, so the front stars look closer.
 - The **prefabs** give each kind of entity its sprite, animation, scale, layer
-  and sound. `PrefabFactory` picks the prefab for each kind the server sends,
+  and sound, over the gameplay of its prefab in `common/`. `PrefabFactory`
+  picks the prefab for each kind and variant the server sends,
   and `WorldMirror` puts the entity where the server says. A power-up or an
   obstacle has no prefab yet and gets an entity without a sprite.
 

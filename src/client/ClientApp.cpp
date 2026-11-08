@@ -20,6 +20,7 @@
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
 #include <rtype/client/systems/ScriptErrorSystem.hpp>
+#include <rtype/common/GameComponents.hpp>
 #include <rtype/common/protocol/PacketCodec.hpp>
 #include <stdexcept>
 #include <string>
@@ -44,6 +45,7 @@ ClientApp::ClientApp(ClientConfig config)
 void ClientApp::run() {
   std::filesystem::current_path(this->_config.binaryDirectory());
   scene::SceneManager scenes;
+  common::registerComponents(scenes);
   scenes.loadConfig(this->_world, std::string(CONFIG));
   auto& window = this->_world.getResource<render::Renderer>();
   if (!window.isOpen) {

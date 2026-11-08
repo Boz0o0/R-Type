@@ -42,6 +42,9 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Server**: passwords are checked on a thread of their own (`AuthWorker`, 64 waiting at most), so the lobby keeps answering the other clients meanwhile. At most 5 failed logins per IP and per minute (`LoginLimiter`).
 - **Protocol**: accounts (protocol version 4): `REGISTER` (`0x08`) creates an account and logs in, `LOGIN` (`0x09`) logs in; both carry a username (1 to 16 bytes) and a password (1 to 64 bytes) and are answered by `CONNECT_ACCEPT` or `CONNECT_REJECT` (`wrong version` too, like `CONNECT_REQUEST`). New reject reasons `bad credentials`, `account exists`, `already logged in`, `invalid password` and `too many attempts`.
 - **Client**: the login screen: username, password (shown as stars), "Log in" or "Create an account". A refused login shows why and lets the player try again.
+- **Server**: the gameplay is data in `game/`, read from where the server runs. The entities are the prefabs of `world/prefabs/common/`, which the client prefabs inherit, and the waves are a Lua script of the server scene (`scripts/server/waves.lua`). See [Gameplay](https://boz0o0.github.io/R-Type/gameplay/#entities).
+- **Game**: an enemy on a sine wave, every other wave.
+- **Tests**: tests of the common prefabs, of the waves in Lua and of the `variant`.
 
 ### Changed
 
@@ -55,12 +58,15 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Server**: a client enters the lobby with `REGISTER` or `LOGIN`; `CONNECT_REQUEST` is ignored. The name shown in game is the username.
 - **Client**: the third argument is the username written in advance on the login screen: `r-type_client [host] [port] [username] [party code]`. The client connects once the player logged in, not at start.
 - **Client**: the login screen, the lobby screen and the HUD are prefabs run by Lua scripts (`game/scripts/`), which talk to the server through `ServerConnection::bindScripting`. Same texts as before.
+- **Protocol**: version 5. `ENTITY_SPAWN` carries a `variant` (23 bytes), so the client shows each kind of enemy with its own look.
+- **Build**: Ampersand Engine is fetched at a commit of its `main` branch until its 0.7.0 release.
 
 ### Removed
 
 - The `ampersand-engine/` git subtree.
 - **Client**: `AssetLoader`, `EntityLooks`, `Starfield`, `ScrollingSystem` and the `Scrolling` component, replaced by the `game/` files. `assets/` moved to `game/assets/`.
 - **Client**: `Hud`, `LoginMenu`, `LobbyMenu`, `LoginSystem`, `LobbySystem` and `TextEntity`, replaced by the scene and the scripts.
+- **Server**: `WaveSystem`, `createEnemy` and the `Spawns` resource, replaced by the prefabs and `waves.lua`.
 
 ## [1.0.0] - 2026-10-18
 

@@ -7,7 +7,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <rtype/common/Factories.hpp>
 #include <rtype/common/ShipMovement.hpp>
 #include <rtype/common/components/Health.hpp>
 #include <rtype/common/components/Kind.hpp>
@@ -15,7 +14,6 @@
 #include <rtype/common/resources/Deaths.hpp>
 #include <rtype/server/Game.hpp>
 #include <rtype/server/GameEvents.hpp>
-#include <rtype/server/systems/WaveSystem.hpp>
 #include <set>
 #include <stdexcept>
 #include <variant>
@@ -34,6 +32,12 @@ namespace {
 
 constexpr float TICK = 1.0F / 60.0F;
 constexpr std::uint32_t SEED = 42;
+
+/** @brief The waves of game/scripts/server/waves.lua. */
+constexpr float FIRST_WAVE_DELAY = 2.0F;
+constexpr float WAVE_INTERVAL = 5.0F;
+constexpr std::size_t FIRST_WAVE_SIZE = 3;
+constexpr int WAVE_COUNT = 10;
 
 /** @brief The events of type T in a list. */
 template <typename T>
@@ -76,6 +80,16 @@ Entity shipOf(const Game& game, std::uint8_t playerId) {
     throw std::logic_error("the player has no ship");
   }
   return *ship;
+}
+
+/** @brief The first entity of a kind, which must exist. */
+Entity firstOf(ampersand::core::ecs::World& world, EntityKind kind) {
+  for (const Entity entity : world.owners<rtype::common::Kind>()) {
+    if (world.get<rtype::common::Kind>(entity).kind == kind) {
+      return entity;
+    }
+  }
+  throw std::logic_error("no entity of this kind");
 }
 
 /** @brief Destroys a ship as if it had been shot down. */
@@ -209,10 +223,64 @@ TEST(Game, SendsWavesOfEnemies) {
   Game game(SEED);
   game.addPlayer(0);
 
-  const auto events = runFor(game, WaveSystem::FIRST_WAVE_DELAY + TICK);
+  const auto events = runFor(game, FIRST_WAVE_DELAY + TICK);
 
-  EXPECT_EQ(spawnedCount(events, EntityKind::Enemy),
-            WaveSystem::FIRST_WAVE_SIZE);
+  EXPECT_EQ(spawnedCount(events, EntityKind::Enemy), FIRST_WAVE_SIZE);
+}
+
+TEST(Game, SecondWaveIsOnASine) {
+  Game game(SEED);
+  game.addPlayer(0);
+
+  const auto events = runFor(game, FIRST_WAVE_DELAY + WAVE_INTERVAL + TICK);
+
+  std::size_t sine = 0;
+  for (const EntitySpawned& spawned : eventsOf<EntitySpawned>(events)) {
+    if (spawned.entity.kind == EntityKind::Enemy) {
+      sine += spawned.entity.variant == 1 ? 1 : 0;
+    }
+  }
+  EXPECT_EQ(sine, FIRST_WAVE_SIZE + 1);
+}
+
+TEST(Game, SineEnemiesGoUpAndDown) {
+  Game game(SEED);
+  game.addPlayer(0);
+  (void)runFor(game, FIRST_WAVE_DELAY + WAVE_INTERVAL + TICK);
+  auto& world = game.world();
+
+  bool up = false;
+  bool down = false;
+  for (int tick = 0; tick < 120; ++tick) {
+    (void)game.update(TICK);
+    for (const Entity entity : world.owners<rtype::common::Kind>()) {
+      if (world.get<rtype::common::Kind>(entity).variant == 1) {
+        const float speed = world.get<Velocity>(entity).value.y;
+        up = up || speed < 0.0F;
+        down = down || speed > 0.0F;
+      }
+    }
+  }
+  EXPECT_TRUE(up);
+  EXPECT_TRUE(down);
+}
+
+TEST(Game, SameSeedSameWaves) {
+  Game first(SEED);
+  Game second(SEED);
+  first.addPlayer(0);
+  second.addPlayer(0);
+
+  const auto firstEvents = runFor(first, FIRST_WAVE_DELAY + TICK);
+  const auto secondEvents = runFor(second, FIRST_WAVE_DELAY + TICK);
+
+  const auto firstSpawns = eventsOf<EntitySpawned>(firstEvents);
+  const auto secondSpawns = eventsOf<EntitySpawned>(secondEvents);
+  ASSERT_EQ(firstSpawns.size(), secondSpawns.size());
+  for (std::size_t index = 0; index < firstSpawns.size(); ++index) {
+    EXPECT_FLOAT_EQ(firstSpawns[index].entity.position.y,
+                    secondSpawns[index].entity.position.y);
+  }
 }
 
 TEST(Game, DestroysTheShipOfAPlayerWhoLeaves) {
@@ -248,14 +316,17 @@ TEST(Game, GoesBackToWaitingWhenEveryoneLeaves) {
 TEST(Game, CreditsTheShooterOfAnEnemy) {
   Game game(SEED);
   game.addPlayer(3);
+  (void)runFor(game, FIRST_WAVE_DELAY + TICK);
+  game.setInput(3, InputFlag::SHOOT);
   (void)game.update(TICK);
+  game.setInput(3, 0);
   auto& world = game.world();
-  const auto enemy = rtype::common::createEnemy(world, {1000.0F, 500.0F});
-  const auto shot = rtype::common::createMissile(
-      world, EntityKind::PlayerMissile, shipOf(game, 3));
-  ASSERT_TRUE(enemy && shot);
-  world.get<rtype::common::Health>(*enemy).current = 1;
-  world.get<Transform>(*shot).position = {1010.0F, 520.0F, 0.0F};
+  const Entity enemy = firstOf(world, EntityKind::Enemy);
+  const Entity shot = firstOf(world, EntityKind::PlayerMissile);
+  world.get<rtype::common::Health>(enemy).current = 1;
+  const auto& target = world.get<Transform>(enemy).position;
+  world.get<Transform>(shot).position = {target.x + 10.0F, target.y + 20.0F,
+                                         0.0F};
 
   const auto events = game.update(TICK);
 
@@ -299,8 +370,7 @@ TEST(Game, WinsOnceEveryWaveIsBeaten) {
   game.addPlayer(0);
   std::vector<GameEnded> ended;
   const float levelLength =
-      WaveSystem::FIRST_WAVE_DELAY +
-      (WaveSystem::WAVE_INTERVAL * WaveSystem::WAVE_COUNT);
+      FIRST_WAVE_DELAY + (WAVE_INTERVAL * static_cast<float>(WAVE_COUNT));
 
   const auto ticks = static_cast<int>(levelLength / TICK);
   for (int tick = 0; tick < ticks && ended.empty(); ++tick) {

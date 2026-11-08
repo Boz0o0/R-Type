@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "name": "Enemy on a sine wave",
+  "prefab": "world/prefabs/common/enemy.json",
+  "components": {
+    "Kind": { "variant": 1 }
+  }
+}

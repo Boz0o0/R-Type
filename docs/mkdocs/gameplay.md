@@ -7,31 +7,36 @@
 | `Health`         | component | hit points (`current`, `max`), dies at 0                     |
 | `Damage`         | component | hit points removed from what it touches                      |
 | `Team`           | component | `Players` or `Enemies`, no damage inside a team              |
-| `Kind`           | component | what it is: `Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile`, `PowerUp`, `Obstacle` (sent to the clients, values never change) |
+| `Kind`           | component | what it is: `Ship`, `Enemy`, `PlayerMissile`, `EnemyMissile`, `PowerUp`, `Obstacle` (sent to the clients, values never change), and its `variant` (0 by default, 1 for the sine enemy) |
 | `Weapon`         | component | fires a `missile` every `cooldown` seconds while `firing`    |
 | `Projectile`     | component | tag, dies on its first hit                                   |
 | `Owner`          | component | player a ship belongs to; its missiles get it too            |
 | `Deaths`         | resource  | entities dead this tick, why, and what dealt the last hit    |
-| `Spawns`         | resource  | entities created this tick                                   |
 | `ShootingSystem` | system    | creates the missiles                                         |
 | `DamageSystem`   | system    | applies the damage of the `Collisions`, fills `Deaths`       |
 | `OutOfScreenSystem` | system | kills (`OutOfScreen`) what left the screen for good          |
-| `CleanupSystem`  | system    | destroys `Deaths`, empties `Deaths` and `Spawns`             |
+| `CleanupSystem`  | system    | destroys `Deaths`, empties `Deaths`                          |
 
 ## Entities
 
-Always create an entity with a factory: it adds all the components and fills
-`Spawns`.
+The entities are the prefabs of `game/world/prefabs/common/`, with the
+gameplay components only. The client prefabs inherit them and add the look,
+the server prefabs of `server/` add the scripts. `registerComponents` lets a
+`SceneManager` read these components, and `createShip` and `createMissile`
+instantiate the prefabs.
 
-| Factory                | Health | Damage | Team      | Speed     | Size  | Weapon                        |
-| ---------------------- | ------ | ------ | --------- | --------- | ----- | ----------------------------- |
-| `createShip`           | 3      | none   | `Players` | 0         | 64x32 | `PlayerMissile` / 0.25 s, off |
-| `createEnemy`          | 2      | 1      | `Enemies` | 200 left  | 64x64 | `EnemyMissile` / 1.5 s, on    |
-| `createMissile` player | none   | 1      | shooter's | 800 right | 16x4  | none (and the shooter's `Owner`) |
-| `createMissile` enemy  | none   | 1      | shooter's | 400 left  | 8x8   | none                          |
+| Prefab                | Health | Damage | Team      | Speed     | Size  | Weapon                        |
+| --------------------- | ------ | ------ | --------- | --------- | ----- | ----------------------------- |
+| `ship.json`           | 3      | none   | `Players` | 0         | 64x32 | `player-missile.json` / 0.25 s, off |
+| `enemy.json`          | 2      | 1      | `Enemies` | 200 left  | 64x64 | `enemy-missile.json` / 1.5 s, on    |
+| `enemy-sine.json`     | 2      | 1      | `Enemies` | 200 left, up and down | 64x64 | `enemy-missile.json` / 1.5 s, on |
+| `player-missile.json` | none   | 1      | shooter's | 800 right | 16x4  | none (and the shooter's `Owner`) |
+| `enemy-missile.json`  | none   | 1      | shooter's | 400 left  | 8x8   | none                          |
 
 ```cpp
-if (const auto ship = common::createShip(world, {100, 500})) {
+common::registerComponents(scenes);
+scenes.loadConfig(world, "game/world/server.json");
+if (const auto ship = common::createShip(world, scenes, {100, 500})) {
   world.get<common::Weapon>(*ship).firing = true;  // shoot
 }
 ```
@@ -42,7 +47,6 @@ if (const auto ship = common::createShip(world, {100, 500})) {
 world.addResource<ampersand::core::Clock>();
 world.addResource<physics::Collisions>();
 world.addResource<common::Deaths>();
-world.addResource<common::Spawns>();
 
 while (running) {
   shooting.update(world);   // 1. before the movement
@@ -70,13 +74,13 @@ while (running) {
 - **Screen**: an entity dies `OutOfScreen` once its collider is fully out of
   the screen and its speed does not bring it back: an enemy waiting on the
   right and flying left stays alive. Ships are never killed this way.
-- **Collisions**: only between entities with the same z. All factories use z = 0.
+- **Collisions**: only between entities with the same z. All prefabs use z = 0.
 
 ## Limits
 
 - Damage only on contact, once per pair and per tick.
-- `Spawns` only has the entities created by a factory.
-- A factory returns nothing (`std::nullopt`) when the World is full.
+- A factory returns nothing (`std::nullopt`) when the World is full or the
+  prefab cannot be loaded.
 
 ## Server rules
 
@@ -88,7 +92,7 @@ The server runs the game in `rtype::server::Game` (see
 | Game starts | as soon as one player is in the room (each room has its own game) |
 | Ship speed | 450 units/s, keys from `PLAYER_INPUT`, kept on the screen |
 | Lives | 3 per player; a lost ship comes back after 2 s |
-| Waves | 10 waves, one every 5 s (first after 2 s); wave n has 3 + n Bydos |
+| Waves | 10 waves, one every 5 s (first after 2 s); wave n has 3 + n Bydos, on a sine every other wave (`game/scripts/server/waves.lua`) |
 | Score | 100 per Bydos, to the player whose missile killed it |
 | Defeat | every player has lost all its lives |
 | Victory | every wave was sent and no Bydos is left |

@@ -22,8 +22,9 @@ PrefabFactory::PrefabFactory(core::ecs::World& world,
     : _world(world), _scenes(scenes) {}
 
 std::optional<core::ecs::Entity> PrefabFactory::create(common::EntityKind kind,
+                                                       std::uint8_t variant,
                                                        std::uint8_t ownerId) {
-  if (const auto prefab = prefabOf(kind, ownerId)) {
+  if (const auto prefab = prefabOf(kind, variant, ownerId)) {
     return this->instantiate(*prefab);
   }
   return this->createPlain();
@@ -33,13 +34,15 @@ std::optional<core::ecs::Entity> PrefabFactory::createExplosion() {
   return this->instantiate(EXPLOSION);
 }
 
-std::optional<std::string_view> PrefabFactory::prefabOf(common::EntityKind kind,
-                                                        std::uint8_t ownerId) {
+std::optional<std::string_view> PrefabFactory::prefabOf(
+    common::EntityKind kind,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    std::uint8_t variant, std::uint8_t ownerId) {
   switch (kind) {
     case common::EntityKind::Ship:
       return SHIPS[ownerId % protocol::MAX_PLAYERS];
     case common::EntityKind::Enemy:
-      return ENEMY;
+      return ENEMIES[variant < ENEMIES.size() ? variant : 0];
     case common::EntityKind::PlayerMissile:
       return PLAYER_MISSILE;
     case common::EntityKind::EnemyMissile:

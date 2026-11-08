@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "Missile of an enemy",
-  "prefab": "world/prefabs/base.json",
+  "prefab": "world/prefabs/common/enemy-missile.json",
   "components": {
     "Transform": {
       "scale": { "x": 1.5, "y": 1.5 }

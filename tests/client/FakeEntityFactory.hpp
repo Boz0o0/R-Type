@@ -32,7 +32,8 @@ class FakeEntityFactory final : public IEntityFactory {
   }
 
   [[nodiscard]] std::optional<ampersand::core::ecs::Entity> create(
-      common::EntityKind kind, std::uint8_t ownerId) override {
+      common::EntityKind kind, std::uint8_t /*variant*/,
+      std::uint8_t ownerId) override {
     const float scale = kind == common::EntityKind::Enemy ? 3.0F : 1.0F;
     return this->make(
         ampersand::render::Sprite{.texture = textureOf(kind, ownerId),

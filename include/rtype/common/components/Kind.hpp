@@ -29,6 +29,9 @@ enum class EntityKind : std::uint8_t {
 struct Kind {
   /** @brief What the entity is. */
   EntityKind kind{};
+  /** @brief Which one of its kind (0 by default), so the client picks its
+   *         prefab */
+  std::uint8_t variant{};
 };
 
 }  // namespace rtype::common

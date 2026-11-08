@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rtype/common/components/Kind.hpp>
+#include <string>
 
 namespace rtype::common {
 
@@ -18,8 +18,8 @@ struct Weapon {
   float remaining{};
   /** @brief Whether the trigger is held. */
   bool firing{};
-  /** @brief Missile it fires (see createMissile). */
-  EntityKind missile{};
+  /** @brief Prefab of the missile it fires. */
+  std::string missile;
 };
 
 }  // namespace rtype::common

@@ -5,6 +5,8 @@
 #include <ampersand/core/math/Vec2.hpp>
 #include <ampersand/physics/systems/CollisionSystem.hpp>
 #include <ampersand/physics/systems/MovementSystem.hpp>
+#include <ampersand/scene/resources/SceneManager.hpp>
+#include <ampersand/scripting/systems/ScriptingSystem.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -18,7 +20,7 @@
 #include <rtype/common/systems/OutOfScreenSystem.hpp>
 #include <rtype/common/systems/ShootingSystem.hpp>
 #include <rtype/server/GameEvents.hpp>
-#include <rtype/server/systems/WaveSystem.hpp>
+#include <string_view>
 #include <vector>
 
 namespace rtype::server {
@@ -40,6 +42,11 @@ struct NetworkId {
  *
  * A game goes Waiting (no player) -> Playing (waves of Bydos) -> Over (every
  * ship lost, or every wave beaten) -> Playing again after RESTART_DELAY.
+ *
+ * The entities come from the prefabs of game/world/prefabs/common, read from
+ * the working directory (the repository, or the binary folder of the client).
+ * The waves come from the scripts of the server scene: they create the
+ * enemies with instantiate(), and call finishWaves() after the last wave.
  */
 class Game {
  public:
@@ -67,11 +74,14 @@ class Game {
   static constexpr float RESTART_DELAY = 5.0F;
   /** @brief Score given to the player whose missile kills an enemy. */
   static constexpr std::uint32_t ENEMY_SCORE = 100;
+  /** @brief Configuration of the server, from the working directory. */
+  static constexpr std::string_view CONFIG = "game/world/server.json";
 
   /**
    * @brief Creates a game with no player.
    *
-   * @param seed Seed of the random parts (heights of the enemies).
+   * @param seed Seed of math.random in the scripts (heights of the enemies).
+   * @throws std::runtime_error if CONFIG cannot be loaded.
    */
   explicit Game(std::uint32_t seed = std::random_device{}());
 
@@ -146,7 +156,8 @@ class Game {
   /** @brief Takes away lives and gives score from the Deaths of the tick. */
   void applyDeaths();
   void checkEnd(std::vector<GameEvent>& events);
-  /** @brief Turns the Spawns and Deaths of the tick into events. */
+  /** @brief Announces the new entities with a Kind, and the Deaths of the
+   *         tick. */
   void announce(std::vector<GameEvent>& events);
   void reportPlayers(std::vector<GameEvent>& events);
 
@@ -159,14 +170,17 @@ class Game {
   [[nodiscard]] EntityInfo infoOf(ampersand::core::ecs::Entity entity);
 
   ampersand::core::ecs::World _world;
-  common::ShootingSystem _shootingSystem;
+  ampersand::scene::SceneManager _scenes;
+  common::ShootingSystem _shootingSystem{_scenes};
   ampersand::physics::MovementSystem _movementSystem;
   ampersand::physics::CollisionSystem _collisionSystem;
   common::DamageSystem _damageSystem;
   common::OutOfScreenSystem _outOfScreenSystem{
       {0.0F, 0.0F, SCREEN_WIDTH, SCREEN_HEIGHT}};
   common::CleanupSystem _cleanupSystem;
-  WaveSystem _waveSystem;
+  ampersand::scripting::ScriptingSystem _scriptingSystem;
+  /** @brief Whether the scripts sent the last wave (finishWaves()). */
+  bool _wavesFinished{};
   /** @brief Indexed by player id. */
   std::array<std::optional<Player>, protocol::MAX_PLAYERS> _players;
   Phase _phase{Phase::Waiting};

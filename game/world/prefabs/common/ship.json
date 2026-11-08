@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "name": "Ship of a player",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Kind": { "kind": "Ship", "variant": 0 },
+    "Velocity": { "value": { "x": 0, "y": 0 } },
+    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 64, "height": 32 } },
+    "Health": { "current": 3, "max": 3 },
+    "Team": { "side": "Players" },
+    "Weapon": {
+      "cooldown": 0.25,
+      "remaining": 0,
+      "firing": false,
+      "missile": "world/prefabs/common/player-missile.json"
+    }
+  }
+}

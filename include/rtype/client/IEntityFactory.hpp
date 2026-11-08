@@ -19,7 +19,7 @@ class IEntityFactory {
   IEntityFactory& operator=(IEntityFactory&&) = delete;
 
   [[nodiscard]] virtual std::optional<ampersand::core::ecs::Entity> create(
-      common::EntityKind kind, std::uint8_t ownerId) = 0;
+      common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId) = 0;
   [[nodiscard]] virtual std::optional<ampersand::core::ecs::Entity>
   createExplosion() = 0;
 

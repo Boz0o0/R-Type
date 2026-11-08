@@ -7,7 +7,7 @@ Quick facts:
 
 - Transport: **UDP** only (IPv4)
 - Default port: **4242**
-- Binary protocol, current version: **4**
+- Binary protocol, current version: **5**
 - Code: `include/rtype/common/protocol/` and `src/common/protocol/` (see [Implementation](implementation.md))
 
 The server runs the game. The client only sends the player's inputs and draws
@@ -72,7 +72,7 @@ Every packet starts with the same 12 bytes:
 | Offset | Field | Type | What it is |
 | --- | --- | --- | --- |
 | 0 | `magic` | `u16` | always `0x5254` ("RT") |
-| 2 | `version` | `u8` | protocol version, `4` for now |
+| 2 | `version` | `u8` | protocol version, `5` for now |
 | 3 | `type` | `u8` | packet type (see list below) |
 | 4 | `flags` | `u8` | `0x01` = reliable, the other bits are unused |
 | 5 | `reserved` | `u8` | unused, send 0 |
@@ -102,7 +102,7 @@ internet. One UDP datagram = one packet.
 | `0x20` | [GAME_START](#game_start-0x20) | server | yes | 4 |
 | `0x21` | [PLAYER_JOINED](#player_joined-0x21) | server | yes | 2 + n |
 | `0x22` | [PLAYER_LEFT](#player_left-0x22) | server | yes | 2 |
-| `0x23` | [ENTITY_SPAWN](#entity_spawn-0x23) | server | yes | 22 |
+| `0x23` | [ENTITY_SPAWN](#entity_spawn-0x23) | server | yes | 23 |
 | `0x24` | [ENTITY_DESTROY](#entity_destroy-0x24) | server | yes | 5 |
 | `0x25` | [WORLD_SNAPSHOT](#world_snapshot-0x25) | server | no | 6 + 20 x n |
 | `0x26` | [PLAYER_STATE](#player_state-0x26) | server | yes | 7 |
@@ -289,11 +289,12 @@ A new entity appears: a ship, a Bydos, a missile, a power-up...
 | --- | --- | --- | --- |
 | 0 | `entityId` | `u32` | unique id, never reused in the same game |
 | 4 | `entityType` | `EntityKind` | tells the client which sprite to use |
-| 5 | `ownerId` | `u8` | player who owns it, or `0xFF` |
-| 6 | `x` | `f32` | position |
-| 10 | `y` | `f32` | |
-| 14 | `velocityX` | `f32` | speed |
-| 18 | `velocityY` | `f32` | |
+| 5 | `variant` | `u8` | which one of its kind (0 by default, 1 = enemy on a sine) |
+| 6 | `ownerId` | `u8` | player who owns it, or `0xFF` |
+| 7 | `x` | `f32` | position |
+| 11 | `y` | `f32` | |
+| 15 | `velocityX` | `f32` | speed |
+| 19 | `velocityY` | `f32` | |
 
 The client uses `ownerId` to give each player ship a different color.
 
@@ -660,7 +661,7 @@ packet is **dropped**: no answer, no crash.
 1. At least 12 bytes
 2. At most 1200 bytes
 3. `magic` is `0x5254`
-4. `version` is 4 (if it's a CONNECT_REQUEST, REGISTER or LOGIN, the server
+4. `version` is 5 (if it's a CONNECT_REQUEST, REGISTER or LOGIN, the server
    can answer "wrong version")
 5. `payloadSize` = packet size - 12
 6. `type` is in the list
@@ -710,7 +711,7 @@ memory or read outside the buffer.
 | Name | Value |
 | --- | --- |
 | `MAGIC` | `0x5254` |
-| `VERSION` | `4` |
+| `VERSION` | `5` |
 | `DEFAULT_PORT` | `4242` |
 | `HEADER_SIZE` | 12 bytes |
 | `MAX_DATAGRAM_SIZE` | 1200 bytes |

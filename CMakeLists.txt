@@ -31,11 +31,10 @@ endif()
 option(RTYPE_CLIENT "Build the Client" ON)
 option(RTYPE_SERVER "Build the Server" ON)
 
-set(AMPERSAND_ENGINE_VERSION 0.6.0)
 CPMAddPackage(
     NAME AmpersandEngine
     GITHUB_REPOSITORY Boz0o0/Ampersand-Engine
-    GIT_TAG v${AMPERSAND_ENGINE_VERSION}
+    GIT_TAG dfdbc9b1308ca57eb1c727a5599e2ddc9a1cb018
 )
 CPMAddPackage(
     NAME sqlite3

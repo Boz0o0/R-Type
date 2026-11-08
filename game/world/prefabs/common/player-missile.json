@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "Missile of a player",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 0, "y": 0, "z": 0 }
+    },
+    "Kind": { "kind": "PlayerMissile", "variant": 0 },
+    "Projectile": {},
+    "Velocity": { "value": { "x": 800, "y": 0 } },
+    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 16, "height": 4 } },
+    "Damage": { "amount": 1 }
+  }
+}
