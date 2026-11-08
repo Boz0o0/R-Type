@@ -30,6 +30,8 @@ The headers are in `include/rtype/`, in the same folders.
   the other way around.
 - The client and the server never include each other: they only share
   `common`.
+- The server is authoritative: it alone runs the game rules, the clients only
+  send their input and show what it says.
 
 ## The game folder
 
