@@ -15,43 +15,43 @@
       "name": "Title",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 80 } },
-        "Text": { "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
+        "Transform": { "position": { "x": 801, "y": 80 } },
+        "Text": { "font": "assets/fonts/chalice-noggin.ttf", "size": 80, "color": { "r": 255, "g": 220, "b": 80 } }
       }
     },
     {
       "name": "Quick match",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 240 } }
+        "Transform": { "position": { "x": 761, "y": 240 } }
       }
     },
     {
       "name": "Create a public room",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 290 } }
+        "Transform": { "position": { "x": 761, "y": 290 } }
       }
     },
     {
       "name": "Create a private room",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 340 } }
+        "Transform": { "position": { "x": 761, "y": 340 } }
       }
     },
     {
       "name": "Join with a code",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 390 } }
+        "Transform": { "position": { "x": 761, "y": 390 } }
       }
     },
     {
       "name": "Header of the room list",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 510 } },
+        "Transform": { "position": { "x": 761, "y": 510 } },
         "Text": { "color": { "r": 150, "g": 150, "b": 170 } }
       }
     },
@@ -59,56 +59,56 @@
       "name": "Room 1",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 570 } }
+        "Transform": { "position": { "x": 761, "y": 570 } }
       }
     },
     {
       "name": "Room 2",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 620 } }
+        "Transform": { "position": { "x": 761, "y": 620 } }
       }
     },
     {
       "name": "Room 3",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 670 } }
+        "Transform": { "position": { "x": 761, "y": 670 } }
       }
     },
     {
       "name": "Room 4",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 720 } }
+        "Transform": { "position": { "x": 761, "y": 720 } }
       }
     },
     {
       "name": "Room 5",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 770 } }
+        "Transform": { "position": { "x": 761, "y": 770 } }
       }
     },
     {
       "name": "Room 6",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 820 } }
+        "Transform": { "position": { "x": 761, "y": 820 } }
       }
     },
     {
       "name": "Room 7",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 870 } }
+        "Transform": { "position": { "x": 761, "y": 870 } }
       }
     },
     {
       "name": "Message",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 950 } },
+        "Transform": { "position": { "x": 761, "y": 950 } },
         "Text": { "color": { "r": 255, "g": 220, "b": 80 } }
       }
     },
@@ -116,7 +116,7 @@
       "name": "Key help",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 560, "y": 1010 } },
+        "Transform": { "position": { "x": 496, "y": 1010 } },
         "Text": { "size": 28, "color": { "r": 150, "g": 150, "b": 170 } }
       }
     }
