@@ -30,8 +30,32 @@ std::optional<core::ecs::Entity> PrefabFactory::create(common::EntityKind kind,
   return this->createPlain();
 }
 
-std::optional<core::ecs::Entity> PrefabFactory::createExplosion() {
-  return this->instantiate(EXPLOSION);
+std::optional<core::ecs::Entity> PrefabFactory::createDeath(
+    common::EntityKind kind, std::uint8_t variant, std::uint8_t ownerId) {
+  if (const auto prefab = deathOf(kind, variant, ownerId)) {
+    return this->instantiate(*prefab);
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string_view> PrefabFactory::deathOf(
+    common::EntityKind kind,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    std::uint8_t variant, std::uint8_t ownerId) {
+  switch (kind) {
+    case common::EntityKind::Ship:
+      return SHIP_DEATHS[ownerId % protocol::MAX_PLAYERS];
+    case common::EntityKind::Enemy:
+      return ENEMY_DEATHS[variant < ENEMY_DEATHS.size() ? variant : 0];
+    case common::EntityKind::PlayerMissile:
+      return PLAYER_MISSILE_HIT;
+    case common::EntityKind::EnemyMissile:
+      return ENEMY_MISSILE_HIT;
+    case common::EntityKind::PowerUp:
+    case common::EntityKind::Obstacle:
+      break;
+  }
+  return std::nullopt;
 }
 
 std::optional<std::string_view> PrefabFactory::prefabOf(
@@ -44,7 +68,7 @@ std::optional<std::string_view> PrefabFactory::prefabOf(
     case common::EntityKind::Enemy:
       return ENEMIES[variant < ENEMIES.size() ? variant : 0];
     case common::EntityKind::PlayerMissile:
-      return PLAYER_MISSILE;
+      return PLAYER_MISSILES[ownerId % protocol::MAX_PLAYERS];
     case common::EntityKind::EnemyMissile:
       return ENEMY_MISSILE;
     case common::EntityKind::PowerUp:

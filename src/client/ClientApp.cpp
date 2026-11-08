@@ -15,7 +15,6 @@
 #include <rtype/client/PrefabFactory.hpp>
 #include <rtype/client/WorldMirror.hpp>
 #include <rtype/client/systems/CorrectionSystem.hpp>
-#include <rtype/client/systems/ExplosionSystem.hpp>
 #include <rtype/client/systems/NetworkSystem.hpp>
 #include <rtype/client/systems/PredictionSystem.hpp>
 #include <rtype/client/systems/QuitSystem.hpp>
@@ -69,7 +68,6 @@ void ClientApp::run() {
       "username", this->_config.name(), "partyCode", this->_config.partyCode());
   scheduler.add<ScriptErrorSystem>();
   scheduler.add<render::AnimationSystem>();
-  scheduler.add<ExplosionSystem>();
   scheduler.add<audio::AudioSystem>();
   scheduler.add<render::RenderSystem>();
 

@@ -1,30 +1,56 @@
 {
   "version": 2,
-  "name": "Enemy",
+  "name": "Blimp (green), playing its attack when its gun fires",
   "prefab": "world/prefabs/common/enemy.json",
   "components": {
-    "Transform": {
-      "scale": { "x": 2.6, "y": 2.6 }
-    },
+    "Transform": { "origin": { "x": 44, "y": 17, "z": 0 } },
     "Sprite": {
-      "texture": "assets/sprites/enemy.png",
-      "source": { "x": 275, "y": 5, "width": 23, "height": 26 },
+      "texture": "assets/sprites/blimp-green.png",
+      "source": { "x": 0, "y": 0, "width": 157, "height": 89 },
       "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
       "layer": 0
     },
-    "Animation": {
-      "frames": [
-        { "x": 275, "y": 5, "width": 23, "height": 26 },
-        { "x": 308, "y": 5, "width": 23, "height": 26 },
-        { "x": 341, "y": 5, "width": 23, "height": 26 },
-        { "x": 374, "y": 5, "width": 23, "height": 26 },
-        { "x": 407, "y": 5, "width": 23, "height": 26 },
-        { "x": 440, "y": 5, "width": 23, "height": 26 },
-        { "x": 473, "y": 5, "width": 23, "height": 26 },
-        { "x": 506, "y": 5, "width": 23, "height": 26 }
-      ],
-      "frameDuration": 0.08,
-      "loop": true
-    }
+    "AnimationStateMachine": {
+      "initial": "idle",
+      "states": {
+        "idle": {
+          "frames": [
+            { "x": 0, "y": 0, "width": 157, "height": 89 },
+            { "x": 157, "y": 0, "width": 157, "height": 89 },
+            { "x": 314, "y": 0, "width": 157, "height": 89 },
+            { "x": 471, "y": 0, "width": 157, "height": 89 },
+            { "x": 628, "y": 0, "width": 157, "height": 89 },
+            { "x": 785, "y": 0, "width": 157, "height": 89 },
+            { "x": 942, "y": 0, "width": 157, "height": 89 },
+            { "x": 1099, "y": 0, "width": 157, "height": 89 },
+            { "x": 1256, "y": 0, "width": 157, "height": 89 },
+            { "x": 1413, "y": 0, "width": 157, "height": 89 },
+            { "x": 1570, "y": 0, "width": 157, "height": 89 },
+            { "x": 1727, "y": 0, "width": 157, "height": 89 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        },
+        "attack": {
+          "frames": [
+            { "x": 1884, "y": 0, "width": 157, "height": 89 },
+            { "x": 0, "y": 89, "width": 157, "height": 89 },
+            { "x": 157, "y": 89, "width": 157, "height": 89 },
+            { "x": 314, "y": 89, "width": 157, "height": 89 },
+            { "x": 471, "y": 89, "width": 157, "height": 89 },
+            { "x": 628, "y": 89, "width": 157, "height": 89 },
+            { "x": 785, "y": 89, "width": 157, "height": 89 },
+            { "x": 942, "y": 89, "width": 157, "height": 89 },
+            { "x": 1099, "y": 89, "width": 157, "height": 89 },
+            { "x": 1256, "y": 89, "width": 157, "height": 89 }
+          ],
+          "frameDuration": 0.05,
+          "loop": true
+        }
+      },
+      "params": { "floats": {  }, "bools": {  } },
+      "transitions": []
+    },
+    "Scripts": { "scripts": ["scripts/blimp.lua"] }
   }
 }

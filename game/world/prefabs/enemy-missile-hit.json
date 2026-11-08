@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "name": "Blow of a blimp bullet that hit a plane, with its sound",
+  "components": {
+    "Transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "scale": { "x": 1, "y": 1, "z": 1 },
+      "rotationDegrees": { "x": 0, "y": 0, "z": 0 },
+      "origin": { "x": 56, "y": 65, "z": 0 }
+    },
+    "Sprite": {
+      "texture": "assets/sprites/plane-hit.png",
+      "source": { "x": 0, "y": 0, "width": 112, "height": 130 },
+      "color": { "r": 255, "g": 255, "b": 255, "a": 255 },
+      "layer": 4
+    },
+    "Animation": {
+      "frames": [
+        { "x": 0, "y": 0, "width": 112, "height": 130 },
+        { "x": 112, "y": 0, "width": 112, "height": 130 },
+        { "x": 224, "y": 0, "width": 112, "height": 130 },
+        { "x": 336, "y": 0, "width": 112, "height": 130 },
+        { "x": 448, "y": 0, "width": 112, "height": 130 },
+        { "x": 560, "y": 0, "width": 112, "height": 130 },
+        { "x": 672, "y": 0, "width": 112, "height": 130 },
+        { "x": 784, "y": 0, "width": 112, "height": 130 },
+        { "x": 896, "y": 0, "width": 112, "height": 130 },
+        { "x": 1008, "y": 0, "width": 112, "height": 130 },
+        { "x": 1120, "y": 0, "width": 112, "height": 130 }
+      ],
+      "frameDuration": 0.04,
+      "loop": false
+    },
+    "Scripts": { "scripts": ["scripts/effect.lua"] },
+    "AudioSource": { "sound": "assets/sounds/plane-damaged.wav", "volume": 70, "loop": false, "playing": true }
+  }
+}
