@@ -76,7 +76,8 @@ none yet): give everyone the same code to play together.
 
 Controls: the arrow keys move and Space shoots, Escape quits. A controller
 works too: left stick, A to shoot, Start to quit. The keys are in
-`game/world/config.json`. Menuscan also be navigated with controller, but text inputs still need the keyboard.
+`game/world/config.json`. Menus can also be navigated with controller, but text
+inputs still need the keyboard.
 
 Stop the server with `Ctrl+C`: it tells every client before closing.
 

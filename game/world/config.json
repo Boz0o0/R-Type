@@ -33,6 +33,13 @@
           "joystick": "Y",
           "dead": 0.2,
           "invertJoystick": true
+        },
+        "StickVertical": {
+          "positive": null,
+          "negative": null,
+          "joystick": "Y",
+          "dead": 0.2,
+          "invertJoystick": true
         }
       },
       "buttons": {

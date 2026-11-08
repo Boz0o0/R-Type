@@ -14,8 +14,8 @@ local TEXT_COLOR = { r = 255, g = 255, b = 255 }
 local CHOSEN_COLOR = { r = 90, g = 220, b = 255 }
 
 --- The key help at the bottom.
-local HELP = "Up/Down/Tab: choose   Shift: upper case   Enter: confirm"
-    .. "   Esc: quit"
+local HELP = "Up/Down/Tab or stick: choose   Shift: upper case"
+    .. "   Enter or A: confirm   Esc or Start: quit"
 
 --- Why the server refused the account. The other reasons end the
 --- connection, and the HUD shows them.
@@ -55,7 +55,7 @@ end
 
 --- Converts a stick into one menu step.
 function Login:controllerKey()
-    local vertical = input.getAxis("Vertical")
+    local vertical = input.getAxis("StickVertical")
     local key = nil
     if vertical > 0 and self.previousVertical <= 0 then
         key = "Up"
@@ -203,15 +203,12 @@ end
 function Login:update(dt)
     if server.state() == State.LoggedOut then
         local shift = input.getButton("Shift")
+        local keys = keysPressed()
         local controllerKey = self:controllerKey()
         if controllerKey then
-            local request = self:press(controllerKey, shift)
-            if request then
-                server.logIn(request.username, request.password,
-                    request.createAccount)
-            end
+            table.insert(keys, 1, controllerKey)
         end
-        for _, key in ipairs(keysPressed()) do
+        for _, key in ipairs(keys) do
             local request = self:press(key, shift)
             if request then
                 server.logIn(request.username, request.password,

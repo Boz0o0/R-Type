@@ -84,6 +84,7 @@ First playable version (Part 1).
 - Built with CMake and CPM on Linux and Windows, CI with lint, build and tests.
 - Documentation website: architecture, gameplay, design decisions, contributing, protocol.
 
-[Unreleased]: https://github.com/Boz0o0/R-Type/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/Boz0o0/R-Type/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/Boz0o0/R-Type/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/Boz0o0/R-Type/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/Boz0o0/R-Type/releases/tag/v1.0.0

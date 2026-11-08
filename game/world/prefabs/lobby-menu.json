@@ -116,7 +116,7 @@
       "name": "Key help",
       "prefab": "world/prefabs/text.json",
       "components": {
-        "Transform": { "position": { "x": 496, "y": 1010 } },
+        "Transform": { "position": { "x": 372, "y": 1010 } },
         "Text": { "size": 28, "color": { "r": 150, "g": 150, "b": 170 } }
       }
     }
