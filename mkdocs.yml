@@ -33,7 +33,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Gameplay: gameplay.md
-  - Content creation:
+  - Tutorials:
       - 'Tutorial: a new enemy': tutorial.md
       - How-to: how-to.md
   - Design decisions: decisions.md
