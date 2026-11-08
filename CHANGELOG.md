@@ -13,6 +13,8 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-08
+
 ### Added
 
 - **Server**: several parties at once. Each party has its own thread and tick loop; a new client goes to the first party with a free place, or to a new party when they are all full (16 at most). Empty parties are closed.
@@ -44,7 +46,7 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Protocol**: version 3. `CONNECT_REQUEST` only carries the name and puts the client in the lobby; the party code moved to `ROOM_JOIN`. `CONNECT_ACCEPT` only carries the tick rate and is no longer reliable; the player id now comes in `ROOM_JOINED`.
 - **Client**: with a party code on the command line, the client joins that private room as soon as it is in the lobby. Without one, it shows the lobby instead of joining any public party.
 - **Build**: Ampersand Engine is fetched with CPM from its GitHub release (`AMPERSAND_ENGINE_VERSION` in `CMakeLists.txt`) instead of being included as a git subtree.
-- **Build**: Ampersand Engine goes from 0.2.0 to 0.6.0.
+- **Build**: Ampersand Engine goes from 0.2.0 to 0.7.0.
 - **Client**: ported to the new engine: keys are `KeyCode`s read through the `InputManager` getters, and the draw order is the `layer` of the `Sprite` and `Text` instead of the `z` of the `Transform`.
 - **Client**: the loop is the engine `Scheduler`, timed by a `FrameTimer`. The network work is a `NetworkSystem`, the lobby a `LobbySystem`, quitting or leaving the room a `QuitSystem`, and explosions are destroyed through the engine `CommandQueue`.
 - **Client**: the controls are engine input actions (`Horizontal` and `Vertical` axes, `Fire` and `Quit` buttons). Holding two opposite arrows now cancels out.
@@ -52,7 +54,6 @@ under `[Unreleased]`, in the right subsection (`Added`, `Changed`, `Fixed` or
 - **Client**: the third argument is the username written in advance on the login screen: `r-type_client [host] [port] [username] [party code]`. The client connects once the player logged in, not at start.
 - **Client**: the login screen, the lobby screen and the HUD are prefabs run by Lua scripts (`game/scripts/`), which talk to the server through `ServerConnection::bindScripting`. Same texts as before.
 - **Protocol**: version 5. `ENTITY_SPAWN` carries a `variant` (23 bytes), so the client shows each kind of enemy with its own look.
-- **Build**: Ampersand Engine is fetched at a commit of its `main` branch until its 0.7.0 release.
 
 - **Gameplay**: hitboxes fitted to the new sprites, and missiles start in front of their shooter.
 
@@ -77,5 +78,6 @@ First playable version (Part 1).
 - Built with CMake and CPM on Linux and Windows, CI with lint, build and tests.
 - Documentation website: architecture, gameplay, design decisions, contributing, protocol.
 
-[Unreleased]: https://github.com/Boz0o0/R-Type/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Boz0o0/R-Type/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Boz0o0/R-Type/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/Boz0o0/R-Type/releases/tag/v1.0.0
