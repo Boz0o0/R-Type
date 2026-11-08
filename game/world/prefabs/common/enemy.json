@@ -10,7 +10,7 @@
     },
     "Kind": { "kind": "Enemy", "variant": 0 },
     "Velocity": { "value": { "x": -200, "y": 0 } },
-    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 64, "height": 64 } },
+    "BoxCollider": { "bounds": { "x": 0, "y": 0, "width": 96, "height": 60 } },
     "Health": { "current": 2, "max": 2 },
     "Damage": { "amount": 1 },
     "Team": { "side": "Enemies" },
